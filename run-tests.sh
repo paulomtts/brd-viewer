@@ -6,5 +6,7 @@ cd "$(dirname "$0")"
 
 python3 -m pytest tests
 
+bash tests/panel/run.sh
+
 qmltestrunner=$(command -v /usr/lib/qt6/bin/qmltestrunner || command -v qmltestrunner)
 QT_QPA_PLATFORM=offscreen "$qmltestrunner" -input tests/qml

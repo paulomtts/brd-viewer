@@ -320,6 +320,7 @@ Panel {
   // dependency, unlike `brd tree` in Task 5.
   Process {
     id: listProc
+    objectName: "listProc"
     command: ["brd", "projects"]
     stdout: StdioCollector {
       waitForEnd: true
@@ -343,6 +344,7 @@ Panel {
 
   Process {
     id: resolveDbPathProc
+    objectName: "resolveDbPathProc"
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -366,6 +368,7 @@ Panel {
 
   Process {
     id: treeProc
+    objectName: "treeProc"
     command: ["brd", "tree"]
     stdout: StdioCollector {
       waitForEnd: true
@@ -393,6 +396,7 @@ Panel {
   // assumes success until Logic.parseDeleteResult says so.
   Process {
     id: deleteProc
+    objectName: "deleteProc"
     property string outText: ""
     stdout: StdioCollector {
       waitForEnd: true
