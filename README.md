@@ -30,7 +30,9 @@ section on the right.
 - **Documents** - lists the project's root `README.md` plus every `.md` file
   under `docs/` (at most 500; a note says when the list was cut off).
   Documents over 1 MB (1048576 bytes) are not displayed. A document is
-  rendered as Markdown and reloads live when the file changes. With none
+  rendered as Markdown and reloads live when the file changes; links are not
+  clickable, and a document that references remote images may cause them to be
+  fetched when it is displayed. With none
   found the list says "No Markdown documents found in this project."
 - **Status colors** - done is green, in progress is blue, blocked is orange;
   todo follows the theme's dim color.
@@ -107,5 +109,6 @@ rm -rf ~/.config/omarchy/plugins/paulomtts.brd-viewer
 ./run-tests.sh
 ```
 
-See `docs/superpowers/specs/2026-09-23-brd-board-viewer-design.md` for
-the full design.
+See `docs/superpowers/specs/2026-09-23-brd-board-viewer-design.md` and
+`docs/superpowers/specs/2026-09-23-sidebar-and-documents-design.md` (sidebar
+and documents) for the full design.

@@ -38,7 +38,6 @@ Item {
   readonly property Item filterItem: filterField
   implicitHeight: Style.space(300)
 
-  function focusFilter() { filterField.forceActiveFocus() }
 
   ColumnLayout {
     anchors.fill: parent

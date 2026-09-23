@@ -61,8 +61,9 @@ highlights **Board** for `board`/`entry` and **Documents** for
 Back behaviour is unchanged: from a card or a document, Back / Escape / Left
 returns to its list with the highlight and scroll position restored. From a
 section's list, Escape closes the panel. With no projects registered the content
-area shows "No projects registered with brd." and the sidebar controls that need
-a project are disabled.
+area shows "No projects registered with brd."; the Board and Documents rows and
+the Delete button are disabled, while the project dropdown stays enabled and
+shows "No projects registered."
 
 Keyboard, in addition to the existing per-view keys: **Ctrl+P** toggles the
 project dropdown, **Ctrl+1** shows Board, **Ctrl+2** shows Documents. The mouse
@@ -104,6 +105,11 @@ succeeded, so a failed state read never overwrites the stored project.
 Deleting the current project selects the first remaining project (or shows the
 empty state) and persists that.
 
+A 2 s watchdog makes this fail soft: if `viewer-state.py get` has not answered
+by then (python3 missing, spawn failure), it is treated as a failed read, so the
+first project is selected and nothing stored is overwritten. A reply arriving
+after the state was already settled is ignored, so it cannot move the selection.
+
 ## Documents (phase B)
 
 ### `list-docs.py <root_path>`
@@ -132,9 +138,13 @@ Properties: `docs` (list from the helper), `query`, `cursorIndex`, `loading`,
 (title, dim path), with the same highlight, hover and auto-scroll behaviour as
 the Board. Filtering by title/path uses the content header's search field.
 
-`applyDocsResult` ignores a reply for a project other than the current one and
-a reply from a superseded run (`fetchDocs` restarts the process; the killed
-run's exit is dropped while a newer run is active).
+Every `fetchDocs()` launch creates its own `Process` (from a `Component`), with
+its own stdout collector and immutable `forRoot` (the project at launch) and
+`seq` (a monotonic `docsSeq`). On exit it applies its result only if `seq` is
+still the latest and `forRoot` is still the selected project, then destroys
+itself either way. A newer fetch stops the previous instance, so a stale exit
+arriving at any time, even after the newer run finished, can neither apply
+another project's data or error nor wipe a good list.
 
 ### Viewing a document
 
@@ -160,8 +170,6 @@ Explicit interface, no access to `Panel.qml` ids:
   (the dropdown's filter field).
 - `Panel.qml`'s `focusItem` is the single source of which item holds focus
   (confirm field, dropdown filter, key catcher or search field).
-- Function: `focusFilter()` so `Panel.qml`'s focus logic can put the caret in the
-  dropdown's filter field.
 
 `Panel.qml` keeps all state (selection, cursor, delete flow) and passes it down;
 the sidebar only renders and emits.
