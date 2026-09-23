@@ -251,8 +251,10 @@ Panel {
       onStreamFinished: {
         try {
           var parsed = JSON.parse(text || "{}")
+          root.loadError = ""
           root.applyTreeData(parsed.data || [])
         } catch (e) {
+          root.applyTreeData([])
           root.loadError = "Could not load the board for this project."
         }
       }
@@ -454,6 +456,16 @@ Panel {
               wrapMode: Text.WordWrap
             }
 
+            Text {
+              visible: root.cardRoots.length > 0 && root.visibleBoardRoots.length === 0
+              width: parent.width
+              text: "No cards match “" + root.searchQuery + "”."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
+
             Repeater {
               model: root.statuses
 
@@ -527,14 +539,14 @@ Panel {
 
           Column {
             id: detailCard
-            visible: root.viewMode === "entry" && root.cardMap[root.selectedCardId]
+            visible: root.viewMode === "entry" && !!root.cardMap[root.selectedCardId]
             width: parent.width
             spacing: Style.space(10)
 
             readonly property var card: root.cardMap[root.selectedCardId]
 
             Text {
-              visible: detailCard.card && detailCard.card.parentId
+              visible: !!(detailCard.card && detailCard.card.parentId)
               text: "↑ " + (detailCard.card && detailCard.card.parentId ? root.resolvedCard(detailCard.card.parentId).title : "")
               color: root.dim
               font.family: root.fontFamily
@@ -577,7 +589,7 @@ Panel {
             }
 
             PanelSectionHeader {
-              visible: detailCard.card && detailCard.card.blocked_by && detailCard.card.blocked_by.length > 0
+              visible: !!(detailCard.card && detailCard.card.blocked_by && detailCard.card.blocked_by.length > 0)
               text: "BLOCKED BY"
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -595,7 +607,7 @@ Panel {
             }
 
             PanelSectionHeader {
-              visible: detailCard.card && detailCard.card.children && detailCard.card.children.length > 0
+              visible: !!(detailCard.card && detailCard.card.children && detailCard.card.children.length > 0)
               text: "CHILDREN"
               foreground: root.foreground
               fontFamily: root.fontFamily
