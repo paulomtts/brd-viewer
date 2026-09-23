@@ -46,7 +46,9 @@ TestCase {
     p.chooseProject(pB)
     compare(p.handleGlobalKey(ctrl(Qt.Key_1)), true)
     compare(p.viewMode, "board")
-    compare(p.handleGlobalKey(ctrl(Qt.Key_2)), true)      // Documents is not enabled yet
+    compare(p.handleGlobalKey(ctrl(Qt.Key_2)), true)
+    compare(p.viewMode, "documents")
+    compare(p.handleGlobalKey(ctrl(Qt.Key_1)), true)
     compare(p.viewMode, "board")
   }
 

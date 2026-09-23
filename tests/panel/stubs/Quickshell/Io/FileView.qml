@@ -5,5 +5,6 @@ QtObject {
   signal fileChanged()
   signal loaded()
   signal loadFailed(int error)
+  function reload() {}
   function text() { return stubText }
 }

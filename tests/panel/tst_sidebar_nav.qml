@@ -113,15 +113,6 @@ TestCase {
     compare(p.dropdownOpen, false)
   }
 
-  function test_documents_section_is_unavailable_in_phase_a() {
-    var p = make(); if (!p) return
-    p.applyProjectsList([pA])
-    compare(p.documentsEnabled, false)
-    p.showSection("documents")
-    compare(p.viewMode, "board")
-    compare(p.section, "board")
-  }
-
   function test_back_from_the_board_does_nothing_and_from_a_card_returns_to_the_board() {
     var p = make(); if (!p) return
     p.applyProjectsList([pA])

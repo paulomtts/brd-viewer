@@ -32,7 +32,7 @@ Panel {
 
   readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents" : "board"
   readonly property string sectionTitle: section === "documents" ? "Documents" : "Board"
-  readonly property bool documentsEnabled: false   // Task 11 turns this on
+  readonly property bool documentsEnabled: true
   property var projects: []            // [{ root_path, name }]
   property var selectedProject: null   // { root_path, name } | null
   property string loadError: ""
@@ -55,6 +55,18 @@ Panel {
   property int returnCursor: 0
   property real returnScrollY: 0
 
+  property var docs: []
+  property bool docsLoading: false
+  property string docsError: ""
+  property bool docsTruncated: false
+  property string selectedDocPath: ""
+  property string docText: ""
+  property string docError: ""
+  property bool docTooLargeFlag: false
+  property string docsRoot: ""
+
+  readonly property var filteredDocs: Logic.filterDocs(root.docs, root.searchQuery)
+
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
   readonly property var filteredProjects: Logic.filterProjects(root.projects, root.dropdownQuery)
@@ -62,6 +74,7 @@ Panel {
   function currentList() {
     if (root.viewMode === "board") return root.boardCards
     if (root.viewMode === "entry") return root.detailLinkList
+    if (root.viewMode === "documents") return root.filteredDocs
     return []
   }
 
@@ -125,7 +138,8 @@ Panel {
   function activateCursor() {
     var list = root.currentList()
     if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
-    root.openCard(list[root.cursorIndex].id)
+    if (root.viewMode === "documents") root.openDoc(list[root.cursorIndex].path)
+    else root.openCard(list[root.cursorIndex].id)
   }
 
   function openDelete(project) {
@@ -201,12 +215,14 @@ Panel {
     root.watchedDbPath = ""
     root.applyTreeData([])
     root.viewMode = "board"
+    root.docs = []; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
   }
 
   function selectProject(project) {
     selectedProject = project
     resetSearch()
     viewMode = "board"
+    root.docs = []; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     root.watchedDbPath = ""
     resolveDbPathProc.command = ["python3", root.pluginDir + "resolve-db-path.py", project.root_path]
     resolveDbPathProc.running = false
@@ -291,6 +307,7 @@ Panel {
     root.resetSearch()
     root.scrollOnCursor = false
     root.viewMode = name === "documents" ? "documents" : "board"
+    if (name === "documents") root.fetchDocs()
     Qt.callLater(root.scrollToTop)
     root.focusForView()
   }
@@ -382,8 +399,59 @@ Panel {
     focusForView()
   }
 
+  function fetchDocs() {
+    if (!root.selectedProject) return
+    root.docsRoot = root.selectedProject.root_path
+    root.docs = []
+    root.docsError = ""
+    root.docsTruncated = false
+    root.docsLoading = true
+    listDocsProc.command = ["python3", root.pluginDir + "list-docs.py", root.docsRoot]
+    listDocsProc.running = false
+    listDocsProc.running = true
+  }
+
+  function applyDocsResult(text, exitCode, forRoot) {
+    if (forRoot !== undefined && (!root.selectedProject || forRoot !== root.selectedProject.root_path)) return
+    var result = Logic.parseDocsResult(text, exitCode)
+    root.docsLoading = false
+    root.docs = result.docs
+    root.docsTruncated = result.truncated
+    root.docsError = result.ok ? "" : result.error
+  }
+
+  function openDoc(path) {
+    var entry = null
+    for (var i = 0; i < root.docs.length; i++) if (root.docs[i].path === path) entry = root.docs[i]
+    if (!entry || !root.selectedProject) return
+    root.returnCursor = root.cursorIndex
+    root.returnScrollY = panelFlick ? panelFlick.contentY : 0
+    root.selectedDocPath = path
+    root.docText = ""
+    root.docError = ""
+    root.docTooLargeFlag = Logic.docTooLarge(entry.size)
+    root.viewMode = "document"
+    root.scrollOnCursor = false
+    root.cursorIndex = 0
+    Qt.callLater(root.scrollToTop)
+    root.focusForView()
+  }
+
+  function restoreDocumentsList() {
+    root.selectedDocPath = ""
+    root.docText = ""
+    root.docError = ""
+    root.docTooLargeFlag = false
+    root.viewMode = "documents"
+    root.scrollOnCursor = false
+    root.cursorIndex = root.returnCursor
+    Qt.callLater(function() { if (panelFlick) root.scrollBy(root.returnScrollY - panelFlick.contentY) })
+    root.focusForView()
+  }
+
   function goBack() {
     if (viewMode === "entry") { restoreListView(); return }
+    if (viewMode === "document") { restoreDocumentsList(); return }
   }
 
   function resolvedCard(id) {
@@ -484,6 +552,34 @@ Panel {
     }
   }
 
+  Process {
+    id: listDocsProc
+    objectName: "listDocsProc"
+    property string outText: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: listDocsProc.outText = String(text || "")
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      var out = listDocsProc.outText
+      listDocsProc.outText = ""
+      root.applyDocsResult(out, exitCode, root.docsRoot)
+    }
+  }
+
+  FileView {
+    id: docFile
+    objectName: "docFile"
+    path: root.viewMode === "document" && !root.docTooLargeFlag && root.selectedProject && root.selectedDocPath !== ""
+      ? Logic.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath) : ""
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: { root.docError = ""; root.docText = docFile.text() }
+    onLoadFailed: root.docError = "Could not read this document."
+  }
+
   FileView {
     id: dbFile
     path: root.watchedDbPath !== "" ? root.watchedDbPath : ""
@@ -572,12 +668,12 @@ Panel {
       onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
         if (dx < 0 && (root.viewMode === "entry" || root.viewMode === "document")) { root.goBack(); return }
-        if (root.viewMode !== "entry") return
-        if (dx > 0) { root.activateCursor(); return }
+        if (root.viewMode !== "entry" && root.viewMode !== "document") return
+        if (dx > 0) { if (root.viewMode === "entry") root.activateCursor(); return }
         if (dy === 0) return
         // Links are the cursor's targets; a card without any is just text,
         // so the arrows scroll it instead.
-        if (root.detailLinkList.length > 0) root.moveCursor(dy)
+        if (root.viewMode === "entry" && root.detailLinkList.length > 0) root.moveCursor(dy)
         else root.scrollBy(dy * Style.space(56))
       }
       onActivateRequested: if (root.viewMode === "entry") root.activateCursor()
@@ -868,6 +964,60 @@ Panel {
                   }
                 }
               }
+            }
+          }
+
+          DocumentsView {
+            visible: root.viewMode === "documents" && !!root.selectedProject
+            width: parent.width
+            docs: root.filteredDocs
+            query: root.searchQuery
+            cursorIndex: root.cursorIndex
+            loading: root.docsLoading
+            error: root.docsError
+            truncated: root.docsTruncated
+            scrollOnCursor: root.scrollOnCursor
+            foreground: root.foreground
+            dim: root.dim
+            fontFamily: root.fontFamily
+            onDocChosen: function(path) { root.openDoc(path) }
+            onHovered: function(index) { root.hoverCursor(index) }
+            onRevealRequested: function(item) { root.scrollItemIntoView(item) }
+          }
+
+          Column {
+            visible: root.viewMode === "document"
+            width: parent.width
+            spacing: Style.space(10)
+
+            Text {
+              width: parent.width
+              text: root.selectedDocPath
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              elide: Text.ElideMiddle
+            }
+
+            Text {
+              visible: root.docTooLargeFlag || root.docError !== ""
+              width: parent.width
+              text: root.docTooLargeFlag ? "This document is too large to display." : root.docError
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              visible: !root.docTooLargeFlag && root.docError === ""
+              width: parent.width
+              text: root.docText !== "" ? root.docText : "Loading…"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+              textFormat: Text.MarkdownText
             }
           }
 
