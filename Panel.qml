@@ -423,7 +423,10 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: root.viewMode === "entry" ? keyCatcher : (root.deleteTarget ? confirmField : searchField)
-    contentWidth: panel.fittedContentWidth(Style.space(380))
+    // Centered under the bar rather than under the icon, and wide enough for
+    // the sidebar that is coming.
+    centerOnBar: true
+    contentWidth: panel.fittedContentWidth(Style.space(720))
     contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
 
     PanelKeyCatcher {
