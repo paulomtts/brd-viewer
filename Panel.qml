@@ -38,6 +38,7 @@ Panel {
 
   function currentList() {
     if (root.viewMode === "projects") return root.filteredProjects
+    if (root.viewMode === "tree") return root.visibleTreeRows
     return []
   }
 
@@ -63,10 +64,15 @@ Panel {
     root.cursorIndex = index
   }
 
+  readonly property var visibleTreeRows: root.treeRows.filter(function(row) {
+    return Logic.subtreeMatches(root.cardMap[row.id], root.searchQuery)
+  })
+
   function activateCursor() {
     var list = root.currentList()
     if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
     if (root.viewMode === "projects") root.selectProject(list[root.cursorIndex])
+    else if (root.viewMode === "tree") root.openCard(list[root.cursorIndex].id)
   }
 
   function refreshProjects() {
@@ -270,7 +276,10 @@ Panel {
               fontFamily: root.fontFamily
               fontSize: Style.font.bodySmall
               verticalPadding: Style.spacing.controlPaddingY
-              onClicked: root.viewMode = (root.viewMode === "board" ? "tree" : "board")
+              onClicked: {
+                root.viewMode = (root.viewMode === "board" ? "tree" : "board")
+                root.cursorIndex = 0
+              }
             }
           }
 
@@ -400,6 +409,48 @@ Panel {
               }
             }
           }
+
+          Column {
+            visible: root.viewMode === "tree"
+            width: parent.width
+            spacing: Style.space(2)
+
+            Text {
+              visible: root.treeRows.length === 0 && root.loadError === ""
+              width: parent.width
+              text: "This project's board is empty."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              visible: root.treeRows.length > 0 && root.visibleTreeRows.length === 0
+              width: parent.width
+              text: "No cards match “" + root.searchQuery + "”."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
+
+            Repeater {
+              id: treeRepeater
+              model: root.visibleTreeRows
+
+              TreeRow {
+                required property var modelData
+                required property int index
+                width: parent.width
+                rowIndex: index
+                depth: modelData.depth
+                card: root.cardMap[modelData.id]
+                blocked: Logic.isBlocked(root.cardMap[modelData.id], root.cardMap)
+                onActivated: root.openCard(modelData.id)
+              }
+            }
+          }
         }
       }
     }
@@ -439,6 +490,59 @@ Panel {
       cursorShape: Qt.PointingHandCursor
       onEntered: root.hoverCursor(projectRow.rowIndex)
       onClicked: projectRow.activated()
+    }
+  }
+
+  component TreeRow: CursorSurface {
+    id: treeRow
+    property int rowIndex: 0
+    property int depth: 0
+    property var card: null
+    property bool blocked: false
+    signal activated()
+
+    hasCursor: root.cursorIndex === rowIndex
+    foreground: root.foreground
+    implicitHeight: treeRowLayout.implicitHeight + Style.spacing.rowPaddingX
+
+    RowLayout {
+      id: treeRowLayout
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10) + treeRow.depth * Style.space(16)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(6)
+
+      Text {
+        visible: treeRow.blocked
+        text: "⛔"
+        font.pixelSize: Style.font.body
+      }
+
+      Text {
+        Layout.fillWidth: true
+        text: treeRow.card ? treeRow.card.title : ""
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
+      }
+
+      Text {
+        text: treeRow.card ? "[" + treeRow.card.status + "]" : ""
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onEntered: root.hoverCursor(treeRow.rowIndex)
+      onClicked: treeRow.activated()
     }
   }
 
