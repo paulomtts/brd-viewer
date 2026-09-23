@@ -63,6 +63,17 @@ of copying it, so `git pull` updates the plugin (then run
 
 Requires `brd` on `PATH` to show anything. See <https://github.com/paulomtts/brd>.
 
+## Keybinding (optional)
+
+Add to `~/.config/hypr/bindings.lua` (Hyprland reloads it on save):
+
+```lua
+o.bind("CTRL + SUPER + J", "brd Viewer", "omarchy-shell shell toggle paulomtts.brd-viewer")
+```
+
+`CTRL + SUPER + J` is free in a stock Omarchy setup (check yours with
+`hyprctl binds`); pick another key if it clashes.
+
 ## Uninstall
 
 ```bash
