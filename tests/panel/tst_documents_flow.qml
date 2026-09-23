@@ -33,9 +33,11 @@ TestCase {
   function test_documents_are_enabled_and_fetched_when_the_section_opens() {
     var p = make(); if (!p) return
     compare(p.documentsEnabled, true)
-    var proc = named(p, "listDocsProc")
-    verify(proc, "listDocsProc")
+    verify(!p.docsProc, "no listing before the section opens")
     p.showSection("documents")
+    var proc = p.docsProc
+    verify(proc, "listDocsProc")
+    compare(proc.objectName, "listDocsProc")
     compare(p.viewMode, "documents")
     compare(p.section, "documents")
     compare(p.docsLoading, true)
@@ -141,20 +143,9 @@ TestCase {
     p.chooseProject(pB)
     compare(p.viewMode, "board")
     p.showSection("documents")
-    compare(named(p, "listDocsProc").command[2], "/home/u/b")
+    compare(p.docsProc.command[2], "/home/u/b")
     compare(p.docs.length, 0)
     compare(p.docsLoading, true)
-  }
-
-  function test_a_stale_reply_from_the_previous_project_is_ignored() {
-    var p = make(); if (!p) return
-    p.showSection("documents")
-    p.chooseProject(pB)
-    p.showSection("documents")
-    p.applyDocsResult(docList, 0, "/home/u/my proj")   // the reply for the project we left
-    compare(p.docs.length, 0)
-    p.applyDocsResult(docList, 0, "/home/u/b")
-    compare(p.docs.length, 3)
   }
 
   function test_ctrl_1_leaves_an_open_document() {
@@ -166,48 +157,76 @@ TestCase {
     compare(p.viewMode, "board")
   }
 
-  function test_a_superseded_run_exit_is_ignored() {
+  function test_a_normal_single_run_fills_the_list() {
     var p = make(); if (!p) return
     p.showSection("documents")
-    p.chooseProject(pB)
-    p.showSection("documents")
-    var proc = named(p, "listDocsProc")
-    compare(proc.forRoot, "/home/u/b")
-    proc.running = true; proc.outText = ""
-    proc.exited(1)
-    compare(p.docsError, "")
-    compare(p.docsLoading, true)
-    compare(p.docs.length, 0)
-    proc.running = false; proc.outText = docList
+    var proc = p.docsProc
+    compare(proc.forRoot, "/home/u/my proj")
+    proc.outText = docList
     proc.exited(0)
     compare(p.docs.length, 3)
     compare(p.docsLoading, false)
+    compare(p.docsError, "")
   }
 
-  function test_an_exit_for_a_root_that_is_no_longer_selected_is_ignored() {
+  function test_a_stale_exit_before_the_newer_run_completes_is_ignored() {
     var p = make(); if (!p) return
     p.showSection("documents")
-    p.chooseProject(pB)
-    p.showSection("documents")
-    var proc = named(p, "listDocsProc")
-    proc.running = false
-    proc.forRoot = "/home/u/my proj"
-    proc.outText = docList
-    proc.exited(0)
-    compare(p.docs.length, 0)
-  }
-
-  function test_same_project_refetch_ignores_the_first_exit() {
-    var p = make(); if (!p) return
-    p.showSection("documents")
+    var first = p.docsProc
     p.fetchDocs()
-    var proc = named(p, "listDocsProc")
-    proc.running = true; proc.outText = ""
-    proc.exited(1)
+    var second = p.docsProc
+    verify(first !== second, "each launch has its own process")
+    compare(first.running, false)
+    first.outText = ""
+    first.exited(1)
     compare(p.docsError, "")
     compare(p.docsLoading, true)
-    proc.running = false; proc.outText = docList
-    proc.exited(0)
+    second.outText = docList
+    second.exited(0)
     compare(p.docs.length, 3)
+  }
+
+  function test_a_stale_exit_after_the_newer_run_finished_keeps_the_good_list() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    var first = p.docsProc
+    p.fetchDocs()
+    var second = p.docsProc
+    second.outText = docList
+    second.exited(0)
+    compare(p.docs.length, 3)
+    first.outText = ""
+    first.exited(1)
+    compare(p.docs.length, 3)
+    compare(p.docsError, "")
+    compare(p.docsLoading, false)
+  }
+
+  function test_a_late_exit_from_the_previous_project_is_ignored() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    var first = p.docsProc
+    compare(first.forRoot, "/home/u/my proj")
+    p.chooseProject(pB)
+    p.showSection("documents")
+    var second = p.docsProc
+    compare(second.forRoot, "/home/u/b")
+    second.outText = docList
+    second.exited(0)
+    compare(p.docs.length, 3)
+    first.outText = '{"ok": false, "error": "old"}'
+    first.exited(1)
+    compare(p.docs.length, 3)
+    compare(p.docsError, "")
+  }
+
+  function test_a_late_exit_after_leaving_the_project_before_any_refetch_is_ignored() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    var first = p.docsProc
+    p.chooseProject(pB)
+    first.outText = docList
+    first.exited(0)
+    compare(p.docs.length, 0)
   }
 }

@@ -63,7 +63,8 @@ Panel {
   property string docText: ""
   property string docError: ""
   property bool docTooLargeFlag: false
-  property string docsRoot: ""
+  property int docsSeq: 0
+  property var docsProc: null
 
   readonly property var filteredDocs: Logic.filterDocs(root.docs, root.searchQuery)
 
@@ -401,19 +402,21 @@ Panel {
 
   function fetchDocs() {
     if (!root.selectedProject) return
-    root.docsRoot = root.selectedProject.root_path
+    var old = root.docsProc
+    if (old) old.running = false
     root.docs = []
     root.docsError = ""
     root.docsTruncated = false
     root.docsLoading = true
-    listDocsProc.forRoot = root.docsRoot
-    listDocsProc.command = ["python3", root.pluginDir + "list-docs.py", root.docsRoot]
-    listDocsProc.running = false
-    listDocsProc.running = true
+    root.docsSeq += 1
+    var rootPath = root.selectedProject.root_path
+    var proc = docsProcC.createObject(root, { forRoot: rootPath, seq: root.docsSeq })
+    proc.command = ["python3", root.pluginDir + "list-docs.py", rootPath]
+    root.docsProc = proc
+    proc.running = true
   }
 
-  function applyDocsResult(text, exitCode, forRoot) {
-    if (forRoot !== undefined && (!root.selectedProject || forRoot !== root.selectedProject.root_path)) return
+  function applyDocsResult(text, exitCode) {
     var result = Logic.parseDocsResult(text, exitCode)
     root.docsLoading = false
     root.docs = result.docs
@@ -553,22 +556,26 @@ Panel {
     }
   }
 
-  Process {
-    id: listDocsProc
-    objectName: "listDocsProc"
-    property string outText: ""
-    property string forRoot: ""
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: listDocsProc.outText = String(text || "")
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      var out = listDocsProc.outText
-      listDocsProc.outText = ""
-      // fetchDocs restarts this process; the killed run's exit arrives while a newer run is already active.
-      if (listDocsProc.running) return
-      root.applyDocsResult(out, exitCode, listDocsProc.forRoot)
+  // One process per listing: each carries the project and sequence number it
+  // was launched for, so a late exit can never be mistaken for the current run.
+  Component {
+    id: docsProcC
+    Process {
+      id: dp
+      objectName: "listDocsProc"
+      property string outText: ""
+      property string forRoot: ""
+      property int seq: 0
+      stdout: StdioCollector {
+        waitForEnd: true
+        onStreamFinished: dp.outText = String(text || "")
+      }
+      stderr: StdioCollector { waitForEnd: true }
+      onExited: function(exitCode) {
+        var current = root.selectedProject ? root.selectedProject.root_path : ""
+        if (dp.seq === root.docsSeq && dp.forRoot === current) root.applyDocsResult(dp.outText, exitCode)
+        dp.destroy()
+      }
     }
   }
 
