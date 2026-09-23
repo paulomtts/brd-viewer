@@ -126,3 +126,33 @@ function parseDeleteResult(stdout, exitCode) {
   var message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : generic
   return { ok: false, snapshot: "", error: message }
 }
+
+function filterProjects(projects, query) {
+  return (projects || []).filter(function(p) { return matchesQuery(p.name, query) })
+}
+
+// Which project the panel should show: the one already on screen if it is
+// still registered, else the one remembered from last time, else the first.
+function chooseProject(projects, currentPath, storedPath) {
+  var list = projects || []
+  if (list.length === 0) return null
+  function byPath(path) {
+    if (!path) return null
+    for (var i = 0; i < list.length; i++) if (list[i].root_path === path) return list[i]
+    return null
+  }
+  return byPath(currentPath) || byPath(storedPath) || list[0]
+}
+
+// viewer-state.py get: its last stdout line is {"last_project": path|null}.
+function parseStateResult(stdout, exitCode) {
+  if (exitCode !== 0) return null
+  var lines = String(stdout || "").split("\n").filter(function(l) { return l.trim() !== "" })
+  if (lines.length === 0) return null
+  try {
+    var last = JSON.parse(lines[lines.length - 1]).last_project
+    return typeof last === "string" && last !== "" ? last : null
+  } catch (e) {
+    return null
+  }
+}
