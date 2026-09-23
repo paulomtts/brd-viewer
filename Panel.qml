@@ -33,6 +33,15 @@ Panel {
   // themselves into view. Hover must not scroll, or the list would move
   // under a stationary pointer and re-trigger hover.
   property bool scrollOnCursor: false
+
+  // Deleting a project (brd forget). Always gated behind typing "delete", and
+  // snapshot-and-forget.py saves a snapshot first and refuses to forget if it
+  // cannot.
+  property var deleteTarget: null      // { root_path, name } | null
+  property string confirmText: ""
+  property bool deleting: false
+  property string deleteError: ""
+  property string lastSnapshot: ""
   property int returnCursor: 0
   property real returnScrollY: 0
 
@@ -53,7 +62,9 @@ Panel {
   function focusForView() {
     Qt.callLater(function() {
       if (!root.opened) return
-      if (root.viewMode === "entry") {
+      if (root.deleteTarget) {
+        if (confirmField) confirmField.forceActiveFocus()
+      } else if (root.viewMode === "entry") {
         if (keyCatcher) keyCatcher.forceActiveFocus()
       } else if (searchField) {
         searchField.forceActiveFocus()
@@ -117,6 +128,45 @@ Panel {
     else root.openCard(list[root.cursorIndex].id)
   }
 
+  function openDelete(project) {
+    if (root.deleting || !project) return
+    root.deleteTarget = project
+    root.confirmText = ""
+    root.deleteError = ""
+    root.lastSnapshot = ""
+    root.focusForView()
+  }
+
+  // The Delete key: acts on the highlighted project row.
+  function deleteCurrentProject() {
+    if (root.viewMode !== "projects" || root.deleteTarget) return
+    var list = root.filteredProjects
+    if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
+    root.openDelete(list[root.cursorIndex])
+  }
+
+  function cancelDelete() {
+    if (root.deleting) return
+    root.deleteTarget = null
+    root.confirmText = ""
+    root.deleteError = ""
+    root.focusForView()
+  }
+
+  function performDelete() {
+    if (root.deleting || !root.deleteTarget) return
+    if (!Logic.isDeleteConfirmed(root.confirmText)) return
+    root.deleteError = ""
+    root.deleting = true
+    deleteProc.command = ["python3", root.pluginDir + "snapshot-and-forget.py",
+      root.deleteTarget.root_path, root.deleteTarget.name]
+    deleteProc.running = true
+  }
+
+  function displayPath(path) {
+    return String(path || "").replace(/^\/home\/[^\/]+/, "~")
+  }
+
   function refreshProjects() {
     loadError = ""
     listProc.running = false
@@ -126,6 +176,7 @@ Panel {
   function openProjects() {
     viewMode = "projects"
     selectedProject = null
+    if (!root.deleting) { root.deleteTarget = null; root.confirmText = ""; root.deleteError = "" }
     resetSearch()
     refreshProjects()
     focusForView()
@@ -138,6 +189,7 @@ Panel {
 
   function selectProject(project) {
     selectedProject = project
+    root.lastSnapshot = ""
     resetSearch()
     viewMode = "board"
     root.watchedDbPath = ""
@@ -346,20 +398,47 @@ Panel {
     }
   }
 
+  // snapshot-and-forget.py prints one JSON line and exits 0/1; nothing here
+  // assumes success until Logic.parseDeleteResult says so.
+  Process {
+    id: deleteProc
+    property string outText: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: deleteProc.outText = String(text || "")
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      var result = Logic.parseDeleteResult(deleteProc.outText, exitCode)
+      deleteProc.outText = ""
+      root.deleting = false
+      if (result.ok) {
+        root.deleteTarget = null
+        root.confirmText = ""
+        root.lastSnapshot = result.snapshot
+        root.cursorIndex = 0
+        root.refreshProjects()
+        root.focusForView()
+      } else {
+        root.deleteError = result.error
+      }
+    }
+  }
+
   KeyboardPanel {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: root.viewMode === "entry" ? keyCatcher : searchField
+    focusTarget: root.viewMode === "entry" ? keyCatcher : (root.deleteTarget ? confirmField : searchField)
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onCloseRequested: root.viewMode === "projects" ? root.close() : root.goBack()
+      onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.viewMode === "projects" ? root.close() : root.goBack())
       onMoveRequested: function(dx, dy) {
         if (dx < 0 && root.viewMode !== "projects") { root.goBack(); return }
         if (root.viewMode !== "entry") return
@@ -439,7 +518,7 @@ Panel {
 
           TextField {
             id: searchField
-            visible: root.viewMode === "projects" || root.viewMode === "board" || root.viewMode === "tree"
+            visible: !root.deleteTarget && (root.viewMode === "projects" || root.viewMode === "board" || root.viewMode === "tree")
             width: parent.width
             foreground: root.foreground
             placeholderText: root.viewMode === "projects" ? "Search projects…" : "Search cards…"
@@ -469,6 +548,13 @@ Panel {
               if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 root.activateCursor(); event.accepted = true; return
               }
+              // Delete removes the character after the caret, so it only
+              // means "delete this project" once there is nothing left to
+              // delete in the search text.
+              if (event.key === Qt.Key_Delete && root.viewMode === "projects"
+                  && searchField.cursorPosition === searchField.text.length) {
+                root.deleteCurrentProject(); event.accepted = true; return
+              }
               if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
                 root.switchPanel((event.modifiers & Qt.ShiftModifier) || event.key === Qt.Key_Backtab ? -1 : 1)
                 event.accepted = true
@@ -488,7 +574,97 @@ Panel {
           }
 
           Column {
-            visible: root.viewMode === "projects"
+            visible: root.viewMode === "projects" && !!root.deleteTarget
+            width: parent.width
+            spacing: Style.space(8)
+
+            Text {
+              width: parent.width
+              text: "Type delete to permanently remove “" + (root.deleteTarget ? root.deleteTarget.name : "")
+                + "” from brd. This can't be undone, but a snapshot of its board is saved first."
+              color: root.urgent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              width: parent.width
+              text: root.deleteTarget ? root.displayPath(root.deleteTarget.root_path) : ""
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              elide: Text.ElideMiddle
+            }
+
+            TextField {
+              id: confirmField
+              width: parent.width
+              foreground: root.foreground
+              placeholderText: "delete"
+              enabled: !root.deleting
+              text: root.confirmText
+
+              onTextChanged: root.confirmText = text
+
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Escape) { root.cancelDelete(); event.accepted = true; return }
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                  root.performDelete(); event.accepted = true; return
+                }
+              }
+            }
+
+            Text {
+              visible: root.deleteError !== ""
+              width: parent.width
+              text: root.deleteError
+              color: root.urgent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+
+            Row {
+              spacing: Style.spacing.md
+
+              Button {
+                text: "Cancel"
+                enabled: !root.deleting
+                bordered: true
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                fontSize: Style.font.bodySmall
+                verticalPadding: Style.spacing.controlPaddingY
+                onClicked: root.cancelDelete()
+              }
+
+              Button {
+                text: root.deleting ? "Deleting…" : "Confirm delete"
+                enabled: !root.deleting && Logic.isDeleteConfirmed(root.confirmText)
+                opacity: enabled ? 1 : 0.5
+                bordered: true
+                foreground: root.urgent
+                fontFamily: root.fontFamily
+                fontSize: Style.font.bodySmall
+                verticalPadding: Style.spacing.controlPaddingY
+                onClicked: root.performDelete()
+              }
+            }
+          }
+
+          Text {
+            visible: root.viewMode === "projects" && !root.deleteTarget && root.lastSnapshot !== ""
+            width: parent.width
+            text: "Removed. Snapshot saved to " + root.displayPath(root.lastSnapshot)
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WrapAnywhere
+          }
+
+          Column {
+            visible: root.viewMode === "projects" && !root.deleteTarget
             width: parent.width
             spacing: Style.space(6)
 
@@ -523,6 +699,7 @@ Panel {
                 rowIndex: index
                 label: modelData.name
                 onActivated: root.selectProject(modelData)
+                onDeleteRequested: root.openDelete(modelData)
               }
             }
           }
@@ -800,6 +977,7 @@ Panel {
     property int rowIndex: 0
     property string label: ""
     signal activated()
+    signal deleteRequested()
 
     hasCursor: root.cursorIndex === rowIndex
     onHasCursorChanged: if (hasCursor && root.scrollOnCursor) root.scrollItemIntoView(projectRow)
@@ -822,6 +1000,15 @@ Panel {
         font.pixelSize: Style.font.body
         elide: Text.ElideMiddle
       }
+
+      Text {
+        Layout.preferredWidth: Style.space(22)
+        horizontalAlignment: Text.AlignHCenter
+        text: "🗑"
+        color: trashArea.containsMouse ? root.urgent : root.dim
+        opacity: projectRow.hasCursor || trashArea.containsMouse ? 1 : 0.55
+        font.pixelSize: Style.font.body
+      }
     }
 
     MouseArea {
@@ -830,6 +1017,19 @@ Panel {
       cursorShape: Qt.PointingHandCursor
       onEntered: root.hoverCursor(projectRow.rowIndex)
       onClicked: projectRow.activated()
+    }
+
+    // Declared after the row's own MouseArea, so it wins clicks on the icon.
+    MouseArea {
+      id: trashArea
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      width: Style.space(34)
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onEntered: root.hoverCursor(projectRow.rowIndex)
+      onClicked: projectRow.deleteRequested()
     }
   }
 

@@ -17,14 +17,14 @@ the same shape as the existing `paulomtts.claude-memory` plugin.
 
 ## Non-goals
 
-- **No writes.** Nothing in this plugin calls `brd add`/`update`/`delete`/
-  `block`. Purely a viewer; card status changes still happen via the CLI
-  or an agent.
+- **No card writes.** Nothing in this plugin calls `brd add`/`update`/
+  `delete`/`block`. Card changes still happen via the CLI or an agent. The
+  single exception is removing a whole project, see "Deleting a project".
 - **No direct SQLite access.** All data comes from `brd`'s own JSON output
   (`brd projects`, `brd tree`). A helper script computes a project's DB
   *path* (to watch for changes) but never reads it — see Live refresh.
-- **No project registration UI.** `brd init`/`forget` stay CLI-only; the
-  plugin only lists what's already registered.
+- **No project registration UI.** `brd init` stays CLI-only; the plugin only
+  lists what's already registered (and can remove one, see below).
 - **No card creation/editing/manage-mode-style deletion**, unlike the
   memory plugin's manage mode. Out of scope for v1.
 
@@ -169,3 +169,28 @@ way the memory plugin's `logic.js` is, via `tests/qml/tst_logic.qml`),
 layout (`test_resolve_db_path.py` at minimum — verifying the hash matches
 `brd`'s own `paths.project_db_path` for a handful of inputs, including one
 with `$XDG_DATA_HOME` set).
+
+## Deleting a project
+
+Added after the original design, deliberately relaxing the read-only rule for
+one operation: removing a registered project from brd (`brd forget <path>`),
+which deletes that project's stored board and its `.brd` marker but not the
+project's files.
+
+- **Trigger:** a 🗑 button on each row of the Projects list, or the Delete key
+  on the highlighted row (only when the search caret is at the end of the text,
+  so Delete keeps deleting characters while editing a query).
+- **Confirmation:** the list is replaced by a prompt naming the project and its
+  path; typing `delete` (trimmed, case-insensitive) enables **Confirm delete**;
+  Enter confirms, Escape cancels. Same gate as the Claude Memory plugin.
+- **Snapshot first, always:** `snapshot-and-forget.py` saves the project to
+  `~/Snapshots/brd-viewer/<name>-<UTC timestamp>/` (`BRD_VIEWER_SNAPSHOT_DIR`
+  overrides) before running `brd forget`, and refuses to forget if nothing could
+  be saved. The snapshot is `brd tree` JSON (restorable with `brd init` +
+  `brd import`); if `brd tree` cannot run (e.g. the project directory is gone) a
+  raw copy of the project's database is saved instead. `RESTORE.txt` lists the
+  commands. A failed `brd forget` reports its error and keeps the snapshot.
+- **Scope:** only projects, only from the Projects list. The panel never
+  assumes success: it trusts the helper's exit code and JSON result
+  (`Logic.parseDeleteResult`).
+

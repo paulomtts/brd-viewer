@@ -2,8 +2,9 @@
 
 An [Omarchy](https://omarchy.org/) shell plugin that visualizes a
 [`brd`](https://github.com/paulomtts/brd) project's board — its cards,
-their kanban status, and their dependency/hierarchy structure — read-only,
-right from the bar.
+their kanban status, and their dependency/hierarchy structure — right from
+the bar. Cards are strictly read-only; the one thing it can change is removing
+a whole project from brd (see below).
 
 ## Features
 
@@ -31,8 +32,15 @@ right from the bar.
   goes Back (from Board, Tree, or card detail; in the Projects list Escape
   closes the panel), and going Back from a card restores the list position.
   A card without links scrolls with Up/Down instead. Tab switches bar panels.
-- Entirely read-only: no card is ever created, edited, or deleted from
-  the panel.
+- **Delete a project** — press Delete on a highlighted project (or click its
+  🗑 button), then type `delete` to confirm, as in the Claude Memory plugin.
+  This runs `brd forget`, which removes the project's board from brd. Your
+  project's files are not touched. **A snapshot is always saved first**, to
+  `~/Snapshots/brd-viewer/<name>-<timestamp>/` (override with
+  `BRD_VIEWER_SNAPSHOT_DIR`), and if a snapshot can't be saved the project is
+  not removed. Each snapshot holds `tree.json` and a `RESTORE.txt` with the
+  exact commands (`brd init`, then `brd import tree.json`).
+- No card is ever created, edited, or deleted from the panel.
 
 ## Install
 
