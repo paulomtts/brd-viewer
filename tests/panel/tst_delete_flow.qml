@@ -19,7 +19,7 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return }
     var p = comp.createObject(host)
     p.opened = true
-    p.projects = [{ root_path: "/home/u/a", name: "alpha" }, { root_path: "/home/u/b", name: "beta" }]
+    p.applyProjectsList([{ root_path: "/home/u/a", name: "alpha" }, { root_path: "/home/u/b", name: "beta" }])
     wait(50)
     var proc = procByName(p, "deleteProc")
     verify(proc, "deleteProc found (Task 1 gives it objectName deleteProc)")
@@ -53,5 +53,7 @@ TestCase {
     proc.exited(0)
     compare(p.deleting, false); compare(p.deleteTarget, null)
     compare(p.lastSnapshot, "/home/u/Snapshots/brd-viewer/alpha-1")
+    p.applyProjectsList([{ root_path: "/home/u/b", name: "beta" }])
+    compare(p.selectedProject.root_path, "/home/u/b")
   }
 }

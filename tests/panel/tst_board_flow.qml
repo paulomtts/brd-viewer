@@ -18,8 +18,7 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return }
     var p = comp.createObject(host)
     p.opened = true
-    p.projects = [{ root_path: "/x", name: "proj" }]
-    p.selectProject(p.projects[0])
+    p.applyProjectsList([{ root_path: "/x", name: "proj" }])
     var t1 = card("t1", "Task1", "blocked", [], ["x1"])
     var t2 = card("t2", "Task2", "done")
     var s1 = card("s1", "Story", "in_progress", [t1, t2])

@@ -22,7 +22,16 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string pluginDir: Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
 
-  property string viewMode: "projects" // "projects" | "board" | "entry"
+  property string viewMode: "board"   // "board" | "entry" | "documents" | "document"
+  property bool dropdownOpen: false
+  property string dropdownQuery: ""
+  property int dropdownCursor: 0
+  property string storedProject: ""
+  property bool stateLoaded: true     // Task 6: false until viewer-state.py answers
+
+  readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents" : "board"
+  readonly property string sectionTitle: section === "documents" ? "Documents" : "Board"
+  readonly property bool documentsEnabled: false   // Task 11 turns this on
   property var projects: []            // [{ root_path, name }]
   property var selectedProject: null   // { root_path, name } | null
   property string loadError: ""
@@ -47,12 +56,9 @@ Panel {
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
-  readonly property var filteredProjects: root.projects.filter(function(p) {
-    return Logic.matchesQuery(p.name, root.searchQuery)
-  })
+  readonly property var filteredProjects: Logic.filterProjects(root.projects, root.dropdownQuery)
 
   function currentList() {
-    if (root.viewMode === "projects") return root.filteredProjects
     if (root.viewMode === "board") return root.boardCards
     if (root.viewMode === "entry") return root.detailLinkList
     return []
@@ -63,7 +69,9 @@ Panel {
       if (!root.opened) return
       if (root.deleteTarget) {
         if (confirmField) confirmField.forceActiveFocus()
-      } else if (root.viewMode === "entry") {
+      } else if (root.dropdownOpen) {
+        if (sidebar) sidebar.focusFilter()
+      } else if (root.viewMode === "entry" || root.viewMode === "document") {
         if (keyCatcher) keyCatcher.forceActiveFocus()
       } else if (searchField) {
         searchField.forceActiveFocus()
@@ -119,25 +127,17 @@ Panel {
   function activateCursor() {
     var list = root.currentList()
     if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
-    if (root.viewMode === "projects") root.selectProject(list[root.cursorIndex])
-    else root.openCard(list[root.cursorIndex].id)
+    root.openCard(list[root.cursorIndex].id)
   }
 
   function openDelete(project) {
     if (root.deleting || !project) return
+    root.dropdownOpen = false
     root.deleteTarget = project
     root.confirmText = ""
     root.deleteError = ""
     root.lastSnapshot = ""
     root.focusForView()
-  }
-
-  // The Delete key: acts on the highlighted project row.
-  function deleteCurrentProject() {
-    if (root.viewMode !== "projects" || root.deleteTarget) return
-    var list = root.filteredProjects
-    if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
-    root.openDelete(list[root.cursorIndex])
   }
 
   function cancelDelete() {
@@ -168,22 +168,44 @@ Panel {
     listProc.running = true
   }
 
-  function openProjects() {
-    viewMode = "projects"
-    selectedProject = null
-    if (!root.deleting) { root.deleteTarget = null; root.confirmText = ""; root.deleteError = "" }
-    resetSearch()
-    refreshProjects()
-    focusForView()
-  }
-
   property var cardRoots: []   // top-level cards from the last brd tree fetch
   property var cardMap: ({})   // id -> card, from Logic.indexTree
   readonly property var statuses: ["todo", "in_progress", "done"]
 
+  // The panel was just opened: refresh the registry and drop any half-finished
+  // UI state. The project on screen stays selected while it is still registered.
+  function onPanelOpened() {
+    root.dropdownOpen = false
+    root.dropdownQuery = ""
+    if (!root.deleting) { root.deleteTarget = null; root.confirmText = ""; root.deleteError = "" }
+    root.refreshProjects()
+    root.focusForView()
+  }
+  onOpenedChanged: if (opened) onPanelOpened()
+
+  function applyProjectsList(list) {
+    root.projects = list
+    root.maybeSelectInitial()
+  }
+
+  function maybeSelectInitial() {
+    if (!root.stateLoaded) return
+    var current = root.selectedProject ? root.selectedProject.root_path : ""
+    var chosen = Logic.chooseProject(root.projects, current, root.storedProject)
+    if (!chosen) { root.clearSelection(); return }
+    if (chosen.root_path !== current) root.selectProject(chosen)
+    else root.selectedProject = chosen
+  }
+
+  function clearSelection() {
+    root.selectedProject = null
+    root.watchedDbPath = ""
+    root.applyTreeData([])
+    root.viewMode = "board"
+  }
+
   function selectProject(project) {
     selectedProject = project
-    root.lastSnapshot = ""
     resetSearch()
     viewMode = "board"
     root.watchedDbPath = ""
@@ -192,6 +214,63 @@ Panel {
     resolveDbPathProc.running = true
     fetchBoard()
     focusForView()
+  }
+
+  // The user picked a project in the dropdown.
+  function chooseProject(project) {
+    root.closeDropdown()
+    if (!project) return
+    root.lastSnapshot = ""
+    var current = root.selectedProject ? root.selectedProject.root_path : ""
+    if (project.root_path !== current) {
+      root.selectProject(project)
+      root.persistLastProject(project.root_path)
+    }
+    root.focusForView()
+  }
+
+  function persistLastProject(path) { root.storedProject = path }   // Task 6 also saves it
+
+  function toggleDropdown() {
+    if (root.deleteTarget) return
+    if (root.dropdownOpen) { root.closeDropdown(); return }
+    root.dropdownQuery = ""
+    var index = 0
+    for (var i = 0; i < root.projects.length; i++)
+      if (root.selectedProject && root.projects[i].root_path === root.selectedProject.root_path) index = i
+    root.dropdownCursor = index
+    root.dropdownOpen = true
+    root.focusForView()
+  }
+
+  function closeDropdown() {
+    if (!root.dropdownOpen) return
+    root.dropdownOpen = false
+    root.dropdownQuery = ""
+    root.focusForView()
+  }
+
+  function moveDropdown(delta) {
+    var n = root.filteredProjects.length
+    if (n === 0) return
+    root.dropdownCursor = root.clamp(root.dropdownCursor + delta, 0, n - 1)
+  }
+
+  function acceptDropdown() {
+    var list = root.filteredProjects
+    if (root.dropdownCursor < 0 || root.dropdownCursor >= list.length) return
+    root.chooseProject(list[root.dropdownCursor])
+  }
+
+  function showSection(name) {
+    if (!root.selectedProject || root.deleteTarget) return
+    if (name === "documents" && !root.documentsEnabled) return
+    if (root.dropdownOpen) root.dropdownOpen = false
+    root.resetSearch()
+    root.scrollOnCursor = false
+    root.viewMode = name === "documents" ? "documents" : "board"
+    Qt.callLater(root.scrollToTop)
+    root.focusForView()
   }
 
   function fetchBoard() {
@@ -283,7 +362,6 @@ Panel {
 
   function goBack() {
     if (viewMode === "entry") { restoreListView(); return }
-    openProjects()
   }
 
   function resolvedCard(id) {
@@ -291,8 +369,6 @@ Panel {
     return card ? { id: id, title: card.title, status: card.status, inBoard: true }
                 : { id: id, title: id, status: "", inBoard: false }
   }
-
-  onOpenedChanged: if (opened) openProjects()
 
   visible: true
   implicitWidth: button.implicitWidth
@@ -305,7 +381,7 @@ Panel {
     function show(): void { root.open() }
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
-    function refresh(): string { root.openProjects(); return "ok" }
+    function refresh(): string { root.refreshProjects(); return "ok" }
   }
 
   BarIconButton {
@@ -327,9 +403,10 @@ Panel {
       onStreamFinished: {
         try {
           var parsed = JSON.parse(text || "{}")
-          root.projects = (parsed.data || []).map(function(p) {
+          var list = (parsed.data || []).map(function(p) {
             return { root_path: p.root_path, name: p.name }
           }).sort(function(a, b) { return a.name.localeCompare(b.name) })
+          root.applyProjectsList(list)
         } catch (e) {
           root.loadError = "Could not parse brd's project list."
         }
@@ -426,19 +503,19 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: root.viewMode === "entry" ? keyCatcher : (root.deleteTarget ? confirmField : searchField)
+    focusTarget: (root.viewMode === "entry" || root.viewMode === "document") ? keyCatcher : (root.deleteTarget ? confirmField : (root.dropdownOpen ? sidebar.filterItem : searchField))
     // Centered under the bar rather than under the icon, and wide enough for
-    // the sidebar that is coming.
+    // the sidebar.
     centerOnBar: true
-    contentWidth: panel.fittedContentWidth(Style.space(720))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
+    contentWidth: panel.fittedContentWidth(Style.space(840))
+    contentHeight: panel.fittedContentHeight(Math.max(column.implicitHeight, sidebar.implicitHeight), Style.space(620))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.viewMode === "projects" ? root.close() : root.goBack())
+      onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
-        if (dx < 0 && root.viewMode !== "projects") { root.goBack(); return }
+        if (dx < 0 && (root.viewMode === "entry" || root.viewMode === "document")) { root.goBack(); return }
         if (root.viewMode !== "entry") return
         if (dx > 0) { root.activateCursor(); return }
         if (dy === 0) return
@@ -450,9 +527,42 @@ Panel {
       onActivateRequested: if (root.viewMode === "entry") root.activateCursor()
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
+      Sidebar {
+        id: sidebar
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: Style.space(200)
+        projects: root.filteredProjects
+        selectedProject: root.selectedProject
+        section: root.section
+        dropdownOpen: root.dropdownOpen
+        dropdownQuery: root.dropdownQuery
+        dropdownCursor: root.dropdownCursor
+        canDelete: !!root.selectedProject && !root.deleting && !root.deleteTarget
+        documentsEnabled: root.documentsEnabled
+        foreground: root.foreground
+        dim: root.dim
+        urgent: root.urgent
+        fontFamily: root.fontFamily
+        onDropdownToggled: root.toggleDropdown()
+        onProjectChosen: function(project) { root.chooseProject(project) }
+        onQueryEdited: function(text) { root.dropdownQuery = text; root.dropdownCursor = 0 }
+        onSectionChosen: function(name) { root.showSection(name) }
+        onDeleteRequested: root.openDelete(root.selectedProject)
+        onCursorHovered: function(index) { root.dropdownCursor = index }
+        onDropdownMove: function(delta) { root.moveDropdown(delta) }
+        onDropdownAccept: root.acceptDropdown()
+        onDropdownCancel: root.closeDropdown()
+      }
+
       Flickable {
         id: panelFlick
-        anchors.fill: parent
+        anchors.left: sidebar.right
+        anchors.leftMargin: Style.space(12)
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
         contentWidth: width
         contentHeight: column.implicitHeight
         clip: true
@@ -471,7 +581,7 @@ Panel {
             spacing: Style.spacing.md
 
             Text {
-              visible: root.viewMode !== "projects"
+              visible: root.viewMode === "entry" || root.viewMode === "document"
               text: "‹ Back"
               color: root.foreground
               font.family: root.fontFamily
@@ -481,8 +591,7 @@ Panel {
 
             Text {
               Layout.fillWidth: true
-              text: root.viewMode === "projects" ? "brd Viewer"
-                : root.selectedProject ? root.selectedProject.name : "brd Viewer"
+              text: root.selectedProject ? root.sectionTitle : "brd Viewer"
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.heading
@@ -502,10 +611,10 @@ Panel {
 
           TextField {
             id: searchField
-            visible: !root.deleteTarget && (root.viewMode === "projects" || root.viewMode === "board")
+            visible: !root.deleteTarget && !!root.selectedProject && (root.viewMode === "board" || root.viewMode === "documents")
             width: parent.width
             foreground: root.foreground
-            placeholderText: root.viewMode === "projects" ? "Search projects…" : "Search cards…"
+            placeholderText: root.viewMode === "documents" ? "Search documents…" : "Search cards…"
             text: root.searchQuery
 
             onTextChanged: {
@@ -516,13 +625,9 @@ Panel {
             Keys.onPressed: function(event) {
               if (event.key === Qt.Key_Escape) {
                 if (root.searchQuery !== "") { root.searchQuery = "" }
-                else if (root.viewMode === "projects") root.close()
-                else root.goBack()
+                else root.close()
                 event.accepted = true
                 return
-              }
-              if (event.key === Qt.Key_Left && searchField.cursorPosition === 0 && root.viewMode !== "projects") {
-                root.goBack(); event.accepted = true; return
               }
               if (event.key === Qt.Key_Right && searchField.cursorPosition === searchField.text.length) {
                 root.activateCursor(); event.accepted = true; return
@@ -531,13 +636,6 @@ Panel {
               if (event.key === Qt.Key_Up) { root.moveCursor(-1); event.accepted = true; return }
               if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 root.activateCursor(); event.accepted = true; return
-              }
-              // Delete removes the character after the caret, so it only
-              // means "delete this project" once there is nothing left to
-              // delete in the search text.
-              if (event.key === Qt.Key_Delete && root.viewMode === "projects"
-                  && searchField.cursorPosition === searchField.text.length) {
-                root.deleteCurrentProject(); event.accepted = true; return
               }
               if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
                 root.switchPanel((event.modifiers & Qt.ShiftModifier) || event.key === Qt.Key_Backtab ? -1 : 1)
@@ -558,7 +656,7 @@ Panel {
           }
 
           Column {
-            visible: root.viewMode === "projects" && !!root.deleteTarget
+            visible: !!root.deleteTarget
             width: parent.width
             spacing: Style.space(8)
 
@@ -638,7 +736,7 @@ Panel {
           }
 
           Text {
-            visible: root.viewMode === "projects" && !root.deleteTarget && root.lastSnapshot !== ""
+            visible: !root.deleteTarget && root.lastSnapshot !== ""
             width: parent.width
             text: "Removed. Snapshot saved to " + root.displayPath(root.lastSnapshot)
             color: root.dim
@@ -647,49 +745,18 @@ Panel {
             wrapMode: Text.WrapAnywhere
           }
 
-          Column {
-            visible: root.viewMode === "projects" && !root.deleteTarget
+          Text {
+            visible: !root.selectedProject && root.loadError === ""
             width: parent.width
-            spacing: Style.space(6)
-
-            Text {
-              visible: root.projects.length === 0 && root.loadError === ""
-              width: parent.width
-              text: "No projects registered with brd."
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              wrapMode: Text.WordWrap
-            }
-
-            Text {
-              visible: root.projects.length > 0 && root.filteredProjects.length === 0
-              width: parent.width
-              text: "No projects match “" + root.searchQuery + "”."
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              wrapMode: Text.WordWrap
-            }
-
-            Repeater {
-              id: projectsRepeater
-              model: root.filteredProjects
-
-              ProjectRow {
-                required property var modelData
-                required property int index
-                width: parent.width
-                rowIndex: index
-                label: modelData.name
-                onActivated: root.selectProject(modelData)
-                onDeleteRequested: root.openDelete(modelData)
-              }
-            }
+            text: "No projects registered with brd."
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            wrapMode: Text.WordWrap
           }
 
           Column {
-            visible: root.viewMode === "board"
+            visible: root.viewMode === "board" && !!root.selectedProject
             width: parent.width
             spacing: Style.space(10)
 
@@ -911,67 +978,6 @@ Panel {
       cursorShape: detailLink.resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
       onEntered: if (detailLink.rowIndex >= 0) root.hoverCursor(detailLink.rowIndex)
       onClicked: detailLink.activated()
-    }
-  }
-
-  component ProjectRow: CursorSurface {
-    id: projectRow
-    property int rowIndex: 0
-    property string label: ""
-    signal activated()
-    signal deleteRequested()
-
-    hasCursor: root.cursorIndex === rowIndex
-    onHasCursorChanged: if (hasCursor && root.scrollOnCursor) root.scrollItemIntoView(projectRow)
-    foreground: root.foreground
-    implicitHeight: projectRowLayout.implicitHeight + Style.spacing.rowPaddingX
-
-    RowLayout {
-      id: projectRowLayout
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(10)
-      anchors.rightMargin: Style.space(10)
-
-      Text {
-        Layout.fillWidth: true
-        text: projectRow.label
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideMiddle
-      }
-
-      Text {
-        Layout.preferredWidth: Style.space(22)
-        horizontalAlignment: Text.AlignHCenter
-        text: "🗑"
-        color: trashArea.containsMouse ? root.urgent : root.dim
-        opacity: projectRow.hasCursor || trashArea.containsMouse ? 1 : 0.55
-        font.pixelSize: Style.font.body
-      }
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onEntered: root.hoverCursor(projectRow.rowIndex)
-      onClicked: projectRow.activated()
-    }
-
-    // Declared after the row's own MouseArea, so it wins clicks on the icon.
-    MouseArea {
-      id: trashArea
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.bottom: parent.bottom
-      width: Style.space(34)
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onEntered: root.hoverCursor(projectRow.rowIndex)
-      onClicked: projectRow.deleteRequested()
     }
   }
 
