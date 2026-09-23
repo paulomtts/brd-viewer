@@ -37,13 +37,23 @@ right from the bar.
 ## Install
 
 ```bash
-git clone https://github.com/paulomtts/brd-viewer.git \
-  ~/.config/omarchy/plugins/paulomtts.brd-viewer
-omarchy-shell shell rescanPlugins
-omarchy plugin enable paulomtts.brd-viewer
+git clone https://github.com/paulomtts/brd-viewer.git
+cd brd-viewer
+./install.sh              # links the plugin, rescans, enables it
+./install.sh --with-brd   # ...and installs the brd CLI first if it is missing
 ```
 
-Requires `brd` on `PATH`. See <https://github.com/paulomtts/brd>.
+The plugin only reads from `brd`, and the two are separate projects, so
+installing `brd` is optional: without `--with-brd` (or `--no-brd`) you are
+asked when it is missing, and a non-interactive run skips it. `--with-brd` uses
+`uv tool install` (or `pipx`) on `git+https://github.com/paulomtts/brd.git`, so
+it needs access to that repository; if the install fails the plugin is still
+installed. Set `BRD_SOURCE` to install `brd` from somewhere else. Use
+`--dry-run` to see what would happen. The installer links the checkout instead
+of copying it, so `git pull` updates the plugin (then run
+`omarchy-restart-shell`).
+
+Requires `brd` on `PATH` to show anything. See <https://github.com/paulomtts/brd>.
 
 ## Uninstall
 
