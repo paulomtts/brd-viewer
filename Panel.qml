@@ -122,7 +122,11 @@ Panel {
   })
 
   function boardColumn(status) {
-    return root.visibleBoardRoots.filter(function(c) { return c.status === status })
+    return root.visibleBoardRoots.filter(function(c) {
+      // brd derives "blocked" for cards with unresolved blockers; show them under Todo.
+      var effective = c.status === "blocked" ? "todo" : c.status
+      return effective === status
+    })
   }
 
   function statusLabel(status) {
