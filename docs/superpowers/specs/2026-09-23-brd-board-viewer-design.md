@@ -10,7 +10,7 @@ path, with a global registry (`~/.local/share/brd/master.db`) listing every
 registered project. There's no way to see the shape of a board — its
 columns, its hierarchy, which cards are blocked — without hand-composing
 `brd list`/`brd tree` calls and reading raw JSON. This adds an
-[Omarchy](https://omarchy.org/) bar-widget plugin, `paulomtts.brd-board`,
+[Omarchy](https://omarchy.org/) bar-widget plugin, `paulomtts.brd-viewer`,
 that gives every registered project a Board view (kanban columns) and a
 Tree view (hierarchy + dependencies), one bar icon and one panel, following
 the same shape as the existing `paulomtts.claude-memory` plugin.
