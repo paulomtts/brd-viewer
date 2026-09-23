@@ -83,10 +83,51 @@ Panel {
     focusForView()
   }
 
+  property var cardRoots: []   // top-level cards from the last brd tree fetch
+  property var cardMap: ({})   // id -> card, from Logic.indexTree
+  property var treeRows: []    // [{id, depth}], from Logic.indexTree
+  readonly property var statuses: ["todo", "in_progress", "done"]
+
   function selectProject(project) {
     selectedProject = project
     resetSearch()
-    // Task 5 wires the brd tree fetch and switches viewMode to "board".
+    viewMode = "board"
+    fetchBoard()
+    focusForView()
+  }
+
+  function fetchBoard() {
+    if (!root.selectedProject) return
+    loadError = ""
+    treeProc.workingDirectory = root.selectedProject.root_path
+    treeProc.running = false
+    treeProc.running = true
+  }
+
+  function applyTreeData(roots) {
+    root.cardRoots = roots
+    var indexed = Logic.indexTree(roots)
+    root.cardMap = indexed.cardMap
+    root.treeRows = indexed.rows
+  }
+
+  readonly property var visibleBoardRoots: root.cardRoots.filter(function(c) {
+    return Logic.subtreeMatches(c, root.searchQuery)
+  })
+
+  function boardColumn(status) {
+    return root.visibleBoardRoots.filter(function(c) { return c.status === status })
+  }
+
+  function statusLabel(status) {
+    if (status === "todo") return "Todo"
+    if (status === "in_progress") return "In Progress"
+    return "Done"
+  }
+
+  function openCard(id) {
+    // Task 7 implements card detail; this is the single entry point every
+    // Board/Tree row calls, so Task 7 only has to fill this function in.
   }
 
   function goBack() {
@@ -142,6 +183,29 @@ Panel {
     }
   }
 
+  Process {
+    id: treeProc
+    command: ["brd", "tree"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var parsed = JSON.parse(text || "{}")
+          root.applyTreeData(parsed.data || [])
+        } catch (e) {
+          root.loadError = "Could not load the board for this project."
+        }
+      }
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) {
+        root.applyTreeData([])
+        root.loadError = "Could not load the board for this project."
+      }
+    }
+  }
+
   KeyboardPanel {
     id: panel
     anchorItem: button
@@ -179,22 +243,43 @@ Panel {
             spacing: Style.spacing.md
 
             Text {
+              visible: root.viewMode !== "projects"
+              text: "‹ Back"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.goBack() }
+            }
+
+            Text {
               Layout.fillWidth: true
-              text: "brd Viewer"
+              text: root.viewMode === "projects" ? "brd Viewer"
+                : root.selectedProject ? root.selectedProject.name : "brd Viewer"
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.heading
               font.bold: true
               elide: Text.ElideMiddle
             }
+
+            Button {
+              visible: root.viewMode === "board" || root.viewMode === "tree"
+              text: root.viewMode === "board" ? "Tree ›" : "‹ Board"
+              bordered: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              fontSize: Style.font.bodySmall
+              verticalPadding: Style.spacing.controlPaddingY
+              onClicked: root.viewMode = (root.viewMode === "board" ? "tree" : "board")
+            }
           }
 
           TextField {
             id: searchField
-            visible: root.viewMode === "projects"
+            visible: root.viewMode === "projects" || root.viewMode === "board" || root.viewMode === "tree"
             width: parent.width
             foreground: root.foreground
-            placeholderText: "Search projects…"
+            placeholderText: root.viewMode === "projects" ? "Search projects…" : "Search cards…"
             text: root.searchQuery
 
             onTextChanged: {
@@ -271,6 +356,50 @@ Panel {
               }
             }
           }
+
+          Column {
+            visible: root.viewMode === "board"
+            width: parent.width
+            spacing: Style.space(10)
+
+            Text {
+              visible: root.cardRoots.length === 0 && root.loadError === ""
+              width: parent.width
+              text: "This project's board is empty."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
+
+            Repeater {
+              model: root.statuses
+
+              Column {
+                required property string modelData
+                width: parent.width
+                spacing: Style.space(6)
+
+                PanelSectionHeader {
+                  text: root.statusLabel(modelData) + " (" + root.boardColumn(modelData).length + ")"
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                }
+
+                Repeater {
+                  model: root.boardColumn(modelData)
+
+                  BoardCard {
+                    required property var modelData
+                    width: parent.width
+                    title: modelData.title
+                    progress: Logic.subtreeCounts(modelData)
+                    onActivated: root.openCard(modelData.id)
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -310,6 +439,49 @@ Panel {
       cursorShape: Qt.PointingHandCursor
       onEntered: root.hoverCursor(projectRow.rowIndex)
       onClicked: projectRow.activated()
+    }
+  }
+
+  component BoardCard: Rectangle {
+    id: boardCard
+    property string title: ""
+    property var progress: ({ done: 0, total: 0 })
+    signal activated()
+
+    color: "transparent"
+    border.color: Qt.darker(root.foreground, 2.0)
+    border.width: 1
+    radius: Style.space(4)
+    implicitHeight: cardLayout.implicitHeight + Style.space(16)
+
+    ColumnLayout {
+      id: cardLayout
+      anchors.fill: parent
+      anchors.margins: Style.space(8)
+      spacing: Style.space(4)
+
+      Text {
+        Layout.fillWidth: true
+        text: boardCard.title
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        wrapMode: Text.WordWrap
+      }
+
+      Text {
+        visible: boardCard.progress.total > 0
+        text: boardCard.progress.done + "/" + boardCard.progress.total + " done"
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      cursorShape: Qt.PointingHandCursor
+      onClicked: boardCard.activated()
     }
   }
 }
