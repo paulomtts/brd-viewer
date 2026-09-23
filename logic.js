@@ -118,3 +118,25 @@ function detailLinks(card, cardMap) {
   })
   return links
 }
+
+// The word the user has to type before a project is removed; deliberately the
+// same gate the Claude Memory plugin uses for its deletes.
+function isDeleteConfirmed(text) {
+  return String(text === undefined || text === null ? "" : text).trim().toLowerCase() === "delete"
+}
+
+// snapshot-and-forget.py's answer (its last stdout line, a JSON object) plus
+// its exit code, as { ok, snapshot, error }. Anything that isn't a clear
+// success counts as a failure: a delete is never assumed to have worked.
+function parseDeleteResult(stdout, exitCode) {
+  var generic = "Could not delete the project."
+  var lines = String(stdout || "").split("\n").filter(function(l) { return l.trim() !== "" })
+  var payload = null
+  if (lines.length > 0) {
+    try { payload = JSON.parse(lines[lines.length - 1]) } catch (e) { payload = null }
+  }
+  if (exitCode === 0 && payload && payload.ok === true)
+    return { ok: true, snapshot: String(payload.snapshot || ""), error: "" }
+  var message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : generic
+  return { ok: false, snapshot: "", error: message }
+}

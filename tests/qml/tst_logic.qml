@@ -223,4 +223,51 @@ TestCase {
     compare(Logic.detailLinks(card, map).length, 0)
     compare(Logic.detailLinks(undefined, {}).length, 0)
   }
+
+  // ---- delete confirmation and result parsing -----------------------------
+
+  function test_is_delete_confirmed_data() {
+    return [
+      { tag: "exact", text: "delete", ok: true },
+      { tag: "padded", text: "  delete  ", ok: true },
+      { tag: "case", text: "DeLeTe", ok: true },
+      { tag: "partial", text: "delet", ok: false },
+      { tag: "extra", text: "delete it", ok: false },
+      { tag: "empty", text: "", ok: false },
+      { tag: "undefined", text: undefined, ok: false }
+    ]
+  }
+
+  function test_is_delete_confirmed(data) {
+    compare(Logic.isDeleteConfirmed(data.text), data.ok)
+  }
+
+  function test_parse_delete_result_success() {
+    var r = Logic.parseDeleteResult('{"ok": true, "snapshot": "/h/Snapshots/x"}\n', 0)
+    compare(r.ok, true)
+    compare(r.snapshot, "/h/Snapshots/x")
+    compare(r.error, "")
+  }
+
+  function test_parse_delete_result_reports_the_helpers_error() {
+    var r = Logic.parseDeleteResult('{"ok": false, "error": "could not snapshot"}', 1)
+    compare(r.ok, false)
+    compare(r.error, "could not snapshot")
+  }
+
+  function test_parse_delete_result_uses_the_last_line() {
+    var r = Logic.parseDeleteResult('noise\n{"ok": true, "snapshot": "/s"}\n', 0)
+    compare(r.ok, true)
+  }
+
+  function test_parse_delete_result_failure_when_exit_code_nonzero_even_if_ok_true() {
+    compare(Logic.parseDeleteResult('{"ok": true, "snapshot": "/s"}', 1).ok, false)
+  }
+
+  function test_parse_delete_result_unparseable_or_empty_output() {
+    compare(Logic.parseDeleteResult("", 1).ok, false)
+    compare(Logic.parseDeleteResult("", 1).error, "Could not delete the project.")
+    compare(Logic.parseDeleteResult("not json", 0).ok, false)
+    compare(Logic.parseDeleteResult(undefined, 0).ok, false)
+  }
 }
