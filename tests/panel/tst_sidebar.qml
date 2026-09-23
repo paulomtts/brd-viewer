@@ -1,0 +1,130 @@
+import QtQuick
+import QtTest
+TestCase {
+  id: tc
+  name: "Sidebar"
+  when: windowShown
+  visible: true
+  width: 300; height: 500
+
+  Component { id: sbC; Sidebar { width: 200; height: 460 } }
+  SignalSpy { id: toggled; signalName: "dropdownToggled" }
+  SignalSpy { id: chosen; signalName: "projectChosen" }
+  SignalSpy { id: sectionSpy; signalName: "sectionChosen" }
+  SignalSpy { id: deleteSpy; signalName: "deleteRequested" }
+  SignalSpy { id: querySpy; signalName: "queryEdited" }
+  SignalSpy { id: hoverSpy; signalName: "cursorHovered" }
+  SignalSpy { id: moveSpy; signalName: "dropdownMove" }
+  SignalSpy { id: acceptSpy; signalName: "dropdownAccept" }
+  SignalSpy { id: cancelSpy; signalName: "dropdownCancel" }
+  SignalSpy { id: keySpy; signalName: "filterKey" }
+
+  property var projects: [{ root_path: "/a", name: "alpha" }, { root_path: "/b", name: "beta" }, { root_path: "/c", name: "gamma" }]
+
+  function find(item, name) {
+    if (item.objectName === name) return item
+    for (var i = 0; i < item.children.length; i++) {
+      var r = find(item.children[i], name)
+      if (r) return r
+    }
+    return null
+  }
+  function click(item) { mouseClick(item, item.width / 2, item.height / 2) }
+
+  function make() {
+    var sb = createTemporaryObject(sbC, tc)
+    sb.projects = projects
+    sb.selectedProject = projects[0]
+    sb.canDelete = true
+    var spies = [toggled, chosen, sectionSpy, deleteSpy, querySpy, hoverSpy, moveSpy, acceptSpy, cancelSpy, keySpy]
+    for (var i = 0; i < spies.length; i++) { spies[i].target = sb; spies[i].clear() }
+    wait(20)
+    return sb
+  }
+
+  function test_button_shows_project_and_toggles() {
+    var sb = make()
+    var btn = find(sb, "projectButton")
+    verify(btn, "projectButton")
+    click(btn)
+    compare(toggled.count, 1)
+    sb.selectedProject = null
+    compare(sb.hasProject, false)
+  }
+
+  function test_dropdown_lists_projects_and_chooses() {
+    var sb = make()
+    sb.dropdownOpen = true
+    wait(20)
+    compare(find(sb, "dropdown").visible, true)
+    verify(find(sb, "projectRow2"), "three rows")
+    verify(!find(sb, "projectRow3"), "no fourth row")
+    click(find(sb, "projectRow1"))
+    compare(chosen.count, 1)
+    compare(chosen.signalArguments[0][0].root_path, "/b")
+  }
+
+  function test_dropdown_is_hidden_when_closed() {
+    var sb = make()
+    compare(find(sb, "dropdown").visible, false)
+  }
+
+  function test_dropdown_shows_an_empty_message() {
+    var sb = make()
+    sb.projects = []
+    sb.dropdownOpen = true
+    wait(20)
+    verify(!find(sb, "projectRow0"))
+  }
+
+  function test_filter_field_emits_query_and_keys() {
+    var sb = make()
+    sb.dropdownOpen = true
+    var f = find(sb, "filterField")
+    verify(f)
+    f.text = "be"
+    compare(querySpy.count, 1)
+    compare(querySpy.signalArguments[0][0], "be")
+  }
+
+  function test_navigation_rows_emit_sections_and_respect_enabled() {
+    var sb = make()
+    click(find(sb, "navDocuments"))
+    compare(sectionSpy.count, 1)
+    compare(sectionSpy.signalArguments[0][0], "documents")
+    click(find(sb, "navBoard"))
+    compare(sectionSpy.signalArguments[1][0], "board")
+    sb.documentsEnabled = false
+    click(find(sb, "navDocuments"))
+    compare(sectionSpy.count, 2)
+    sb.documentsEnabled = true
+    sb.selectedProject = null
+    click(find(sb, "navBoard"))
+    click(find(sb, "navDocuments"))
+    compare(sectionSpy.count, 2)
+  }
+
+  function test_delete_button_follows_canDelete() {
+    var sb = make()
+    var b = find(sb, "deleteButton")
+    verify(b)
+    compare(b.enabled, true)
+    b.clicked()
+    compare(deleteSpy.count, 1)
+    sb.canDelete = false
+    compare(b.enabled, false)
+    sb.canDelete = true
+    sb.selectedProject = null
+    compare(b.enabled, false)
+  }
+
+  function test_row_hover_reports_the_index() {
+    var sb = make()
+    sb.dropdownOpen = true
+    wait(20)
+    var row = find(sb, "projectRow2")
+    mouseMove(row, row.width / 2, row.height / 2)
+    verify(hoverSpy.count >= 1)
+    compare(hoverSpy.signalArguments[hoverSpy.count - 1][0], 2)
+  }
+}
