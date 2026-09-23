@@ -45,7 +45,11 @@ Panel {
   function focusForView() {
     Qt.callLater(function() {
       if (!root.opened) return
-      if (searchField) searchField.forceActiveFocus()
+      if (root.viewMode === "entry") {
+        if (keyCatcher) keyCatcher.forceActiveFocus()
+      } else if (searchField) {
+        searchField.forceActiveFocus()
+      }
     })
   }
 
@@ -235,14 +239,17 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: searchField
+    focusTarget: root.viewMode === "entry" ? keyCatcher : searchField
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onCloseRequested: root.close()
+      onCloseRequested: root.viewMode === "projects" ? root.close() : root.goBack()
+      onMoveRequested: function(dx, dy) {
+        if (dx < 0 && root.viewMode !== "projects") root.goBack()
+      }
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
       Flickable {
@@ -316,9 +323,16 @@ Panel {
             Keys.onPressed: function(event) {
               if (event.key === Qt.Key_Escape) {
                 if (root.searchQuery !== "") { root.searchQuery = "" }
-                else root.close()
+                else if (root.viewMode === "projects") root.close()
+                else root.goBack()
                 event.accepted = true
                 return
+              }
+              if (event.key === Qt.Key_Left && searchField.cursorPosition === 0 && root.viewMode !== "projects") {
+                root.goBack(); event.accepted = true; return
+              }
+              if (event.key === Qt.Key_Right && searchField.cursorPosition === searchField.text.length) {
+                root.activateCursor(); event.accepted = true; return
               }
               if (event.key === Qt.Key_Down) { root.moveCursor(1); event.accepted = true; return }
               if (event.key === Qt.Key_Up) { root.moveCursor(-1); event.accepted = true; return }
