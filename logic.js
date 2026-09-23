@@ -2,7 +2,7 @@
 
 // Card shape, as returned by `brd tree`:
 // {id, title, description, status, blocked_by, created_at, updated_at, children}
-// indexTree() additionally injects `parentId` onto every card it visits.
+// indexTree() additionally injects `parentId` and `depth` onto every card it visits.
 
 // Walks the forest depth-first, pre-order. Mutates every card in place to
 // add parentId (null for a root), and returns a flat id -> card lookup
@@ -14,6 +14,7 @@ function indexTree(roots) {
 
   function visit(card, parentId, depth) {
     card.parentId = parentId
+    card.depth = depth
     cardMap[card.id] = card
     rows.push({ id: card.id, depth: depth })
     ;(card.children || []).forEach(function(child) {
@@ -65,4 +66,55 @@ function isBlocked(card, cardMap) {
     var blocker = cardMap[id]
     return !blocker || blocker.status !== "done"
   })
+}
+
+// The shell theme has no green/orange tokens, so these hues are fixed; todo
+// (and anything unrecognised) takes the caller's neutral colour so it still
+// follows the theme.
+function statusColor(status, fallback) {
+  if (status === "done") return "#7fb069"
+  if (status === "blocked") return "#e8954a"
+  if (status === "in_progress") return "#5fa8d3"
+  return fallback
+}
+
+// Depth in the brd hierarchy: milestone > story > subtask.
+function kindLabel(depth) {
+  if (typeof depth !== "number" || depth < 0) return "Card"
+  if (depth === 0) return "Milestone"
+  if (depth === 1) return "Story"
+  return "Subtask"
+}
+
+// brd derives "blocked" on top of a stored "todo"; the Board has no blocked
+// section, so such a card lives in Todo.
+function effectiveStatus(card) {
+  if (!card || card.status === "blocked") return "todo"
+  return card.status
+}
+
+// Top-level cards in the order the Board shows them: section by section.
+function boardOrder(roots, statuses) {
+  var out = []
+  statuses.forEach(function(status) {
+    ;(roots || []).forEach(function(card) {
+      if (effectiveStatus(card) === status) out.push(card)
+    })
+  })
+  return out
+}
+
+// The clickable rows of a card's detail view, in display order. Dangling
+// blockers (not in cardMap) are not navigable, so they are not listed.
+function detailLinks(card, cardMap) {
+  if (!card) return []
+  var links = []
+  if (card.parentId && cardMap[card.parentId]) links.push({ section: "parent", id: card.parentId })
+  ;(card.blocked_by || []).forEach(function(id) {
+    if (cardMap[id]) links.push({ section: "blocker", id: id })
+  })
+  ;(card.children || []).forEach(function(child) {
+    links.push({ section: "child", id: child.id })
+  })
+  return links
 }

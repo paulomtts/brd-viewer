@@ -154,4 +154,73 @@ TestCase {
   function test_subtree_matches_false_for_undefined_card() {
     compare(Logic.subtreeMatches(undefined, "x"), false)
   }
+
+  // ---- colors, kinds, board order, detail links --------------------------
+
+  function test_status_color_maps_known_statuses() {
+    compare(Logic.statusColor("done", "#111111"), "#7fb069")
+    compare(Logic.statusColor("blocked", "#111111"), "#e8954a")
+    compare(Logic.statusColor("in_progress", "#111111"), "#5fa8d3")
+  }
+
+  function test_status_color_falls_back_for_todo_and_unknown() {
+    compare(Logic.statusColor("todo", "#111111"), "#111111")
+    compare(Logic.statusColor("weird", "#111111"), "#111111")
+    compare(Logic.statusColor(undefined, "#111111"), "#111111")
+  }
+
+  function test_kind_label_by_depth() {
+    compare(Logic.kindLabel(0), "Milestone")
+    compare(Logic.kindLabel(1), "Story")
+    compare(Logic.kindLabel(2), "Subtask")
+    compare(Logic.kindLabel(7), "Subtask")
+    compare(Logic.kindLabel(undefined), "Card")
+    compare(Logic.kindLabel(-1), "Card")
+  }
+
+  function test_index_tree_annotates_depth() {
+    var leaf = makeCard("leaf", "todo")
+    var mid = makeCard("mid", "todo", [leaf])
+    var root = makeCard("root", "todo", [mid])
+    var map = Logic.indexTree([root]).cardMap
+    compare(map["root"].depth, 0)
+    compare(map["mid"].depth, 1)
+    compare(map["leaf"].depth, 2)
+  }
+
+  function test_effective_status_folds_blocked_into_todo() {
+    compare(Logic.effectiveStatus(makeCard("a", "blocked")), "todo")
+    compare(Logic.effectiveStatus(makeCard("a", "done")), "done")
+    compare(Logic.effectiveStatus(undefined), "todo")
+  }
+
+  function test_board_order_groups_by_section_in_order() {
+    var a = makeCard("a", "done")
+    var b = makeCard("b", "todo")
+    var c = makeCard("c", "blocked")
+    var d = makeCard("d", "in_progress")
+    var ids = Logic.boardOrder([a, b, c, d], ["todo", "in_progress", "done"]).map(function(x) { return x.id })
+    compare(ids.join(","), "b,c,d,a")
+  }
+
+  function test_board_order_empty() {
+    compare(Logic.boardOrder([], ["todo", "in_progress", "done"]).length, 0)
+  }
+
+  function test_detail_links_orders_parent_blockers_children() {
+    var kid = makeCard("kid", "todo")
+    var dep = makeCard("dep", "todo")
+    var mid = makeCard("mid", "todo", [kid], ["dep", "ghost"])
+    var root = makeCard("root", "todo", [mid])
+    var map = Logic.indexTree([root, dep]).cardMap
+    var links = Logic.detailLinks(map["mid"], map)
+    compare(links.map(function(l) { return l.section + ":" + l.id }).join(","), "parent:root,blocker:dep,child:kid")
+  }
+
+  function test_detail_links_skips_dangling_blockers_and_missing_parent() {
+    var card = makeCard("c", "todo", [], ["ghost"])
+    var map = Logic.indexTree([card]).cardMap
+    compare(Logic.detailLinks(card, map).length, 0)
+    compare(Logic.detailLinks(undefined, {}).length, 0)
+  }
 }
