@@ -146,4 +146,12 @@ TestCase {
     var card = makeCard("c", "todo", [], ["ghost"])
     compare(Logic.isBlocked(card, {}), true)
   }
+
+  function test_is_blocked_false_for_undefined_card() {
+    compare(Logic.isBlocked(undefined, {}), false)
+  }
+
+  function test_subtree_matches_false_for_undefined_card() {
+    compare(Logic.subtreeMatches(undefined, "x"), false)
+  }
 }

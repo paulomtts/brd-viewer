@@ -51,6 +51,7 @@ function matchesQuery(text, query) {
 // True if `card` itself matches, or any descendant does -- so an ancestor
 // of a match stays visible even though it doesn't match on its own title.
 function subtreeMatches(card, query) {
+  if (!card) return false
   if (matchesQuery(card.title, query)) return true
   return (card.children || []).some(function(child) { return subtreeMatches(child, query) })
 }
@@ -59,6 +60,7 @@ function subtreeMatches(card, query) {
 // cleaning up the reference) is treated as still-blocking: its completion
 // can't be verified, so it's conservatively not "done".
 function isBlocked(card, cardMap) {
+  if (!card) return false
   return (card.blocked_by || []).some(function(id) {
     var blocker = cardMap[id]
     return !blocker || blocker.status !== "done"
