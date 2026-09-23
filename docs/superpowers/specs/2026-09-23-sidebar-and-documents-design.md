@@ -1,6 +1,6 @@
 # Sidebar, project dropdown, and Documents — design
 
-Status: approved in conversation, not yet implemented. Builds on
+Status: implemented. Builds on
 `2026-09-23-brd-board-viewer-design.md` (the Tree view described there has
 since been removed).
 
@@ -99,6 +99,8 @@ appears in the project list, else the first. Each later open re-runs
 `brd projects` and keeps the current project if it is still registered (else
 falls back the same way), so state survives close and reopen without rereading
 the state file.
+`stateReadOk` gates persistence: it is true only when `viewer-state.py get`
+succeeded, so a failed state read never overwrites the stored project.
 Deleting the current project selects the first remaining project (or shows the
 empty state) and persists that.
 
@@ -130,6 +132,10 @@ Properties: `docs` (list from the helper), `query`, `cursorIndex`, `loading`,
 (title, dim path), with the same highlight, hover and auto-scroll behaviour as
 the Board. Filtering by title/path uses the content header's search field.
 
+`applyDocsResult` ignores a reply for a project other than the current one and
+a reply from a superseded run (`fetchDocs` restarts the process; the killed
+run's exit is dropped while a newer run is active).
+
 ### Viewing a document
 
 Opening a doc sets `viewMode: "document"` and points a `FileView` at the absolute
@@ -147,7 +153,13 @@ Explicit interface, no access to `Panel.qml` ids:
   `dim`, `urgent`, `fontFamily`.
 - Signals: `dropdownToggled()`, `projectChosen(var project)`,
   `queryEdited(string text)`, `sectionChosen(string section)`,
-  `deleteRequested()`, `cursorHovered(int index)`.
+  `deleteRequested()`, `cursorHovered(int index)`, and, added while designing
+  the component, `dropdownMove(int delta)`, `dropdownAccept()`,
+  `dropdownCancel()`, `filterKey(var event)`.
+- Also: property `documentsEnabled`, and the read-only property `filterItem`
+  (the dropdown's filter field).
+- `Panel.qml`'s `focusItem` is the single source of which item holds focus
+  (confirm field, dropdown filter, key catcher or search field).
 - Function: `focusFilter()` so `Panel.qml`'s focus logic can put the caret in the
   dropdown's filter field.
 

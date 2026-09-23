@@ -1,43 +1,66 @@
 # brd-viewer
 
-An [Omarchy](https://omarchy.org/) shell plugin that visualizes a
-[`brd`](https://github.com/paulomtts/brd) project's board — its cards,
-their kanban status and how they nest — right from the bar. Cards are strictly read-only; the one thing it can change is removing
-a whole project from brd (see below).
+An [Omarchy](https://omarchy.org/) shell plugin that browses a
+[`brd`](https://github.com/paulomtts/brd) project's board (its cards, their
+kanban status and how they nest) and the project's Markdown documents, right
+from the bar. Cards and documents are strictly read-only; the one thing the
+plugin can change is removing a whole project from brd (see below).
+
+The panel is a centered popup, 840 wide, with a sidebar on the left (project
+dropdown, Board / Documents navigation, Delete project...) and the current
+section on the right.
 
 ## Features
 
-- **Projects list** — every project `brd` already has registered
-  (`brd projects`), searchable.
-- **Board view** — top-level cards in three status sections (Todo / In
-  Progress / Done), each showing a done/total progress badge for its
-  subtasks. A card reporting as blocked (derived status) appears in the Todo
-  section, flagged in orange.
-- **Card detail** — kind and status badges (Milestone / Story / Subtask by
+- **Project dropdown** - the sidebar's top button shows the current project;
+  click it or press **Ctrl+P** to open a searchable list of every project
+  `brd` has registered (`brd projects`). Up/Down move, Enter or click selects.
+- **Remembered project** - the panel reopens on the project you last viewed,
+  also after a shell restart. It is stored in
+  `~/.local/state/brd-viewer/state.json` (`$XDG_STATE_HOME` is respected). If
+  that project is no longer registered, the first one is shown.
+- **Sections** - **Board** (**Ctrl+1**) and **Documents** (**Ctrl+2**), also
+  reachable from the sidebar with the mouse.
+- **Board** - top-level cards in three status sections (Todo / In Progress /
+  Done), each showing a done/total progress badge for its subtasks. A card
+  reporting as blocked (derived status) appears in Todo, flagged in orange.
+- **Card detail** - kind and status badges (Milestone / Story / Subtask by
   depth; Todo / In progress / Done / Blocked), full description, a parent link
   and clickable blocked-by/children lists, resolving ids to titles.
-- **Status colors** — done is green, in progress is blue, blocked is orange;
+- **Documents** - lists the project's root `README.md` plus every `.md` file
+  under `docs/` (at most 500; a note says when the list was cut off).
+  Documents over 1 MB (1048576 bytes) are not displayed. A document is
+  rendered as Markdown and reloads live when the file changes. With none
+  found the list says "No Markdown documents found in this project."
+- **Status colors** - done is green, in progress is blue, blocked is orange;
   todo follows the theme's dim color.
-- **Live refresh** — watches the selected project's `brd` database file
+- **Live refresh** - watches the selected project's `brd` database file
   and re-fetches automatically when it changes on disk (e.g. an agent
   updates the board while the panel is open), plus a manual refresh
   button.
-- **Keyboard navigation** everywhere: Up/Down moves the highlight (the panel
-  scrolls to keep it visible) through projects, Board cards, and,
-  inside a card, its parent/blocked-by/children links; Enter or
-  Right-at-end opens the highlighted item. Escape or Left-at-start-of-search-box
-  goes Back (from the Board or card detail; in the Projects list Escape
-  closes the panel), and going Back from a card restores the Board position.
-  A card without links scrolls with Up/Down instead. Tab switches bar panels.
-- **Delete a project** — press Delete on a highlighted project (or click its
-  🗑 button), then type `delete` to confirm, as in the Claude Memory plugin.
-  This runs `brd forget`, which removes the project's board from brd. Your
-  project's files are not touched. **A snapshot is always saved first**, to
+- **Keyboard navigation** - Up/Down moves the highlight (the panel scrolls to
+  keep it visible) through Board cards or documents and, inside a card, its
+  parent/blocked-by/children links; Enter or Right-at-end opens the
+  highlighted item. A card or document without links scrolls with Up/Down.
+  Tab switches bar panels. Left goes Back from a card or document.
+- **Escape** closes the project dropdown first; otherwise, from a card or
+  document, goes Back; from a section list, closes the panel. If you have
+  typed a search, Escape clears it first. Going Back restores the list
+  highlight and scroll position you left.
+- **Delete a project** - click **Delete project...** in the sidebar footer,
+  then type `delete` to confirm, as in the Claude Memory plugin. This runs
+  `brd forget`, which removes the project's board from brd. Your project's
+  files are not touched. **A snapshot is always saved first**, to
   `~/Snapshots/brd-viewer/<name>-<timestamp>/` (override with
   `BRD_VIEWER_SNAPSHOT_DIR`), and if a snapshot can't be saved the project is
   not removed. Each snapshot holds `tree.json` and a `RESTORE.txt` with the
   exact commands (`brd init`, then `brd import tree.json`).
-- No card is ever created, edited, or deleted from the panel.
+- No card or document is ever created or edited from the panel.
+
+The plugin runs `brd` (`brd projects`, `brd tree`), plus small helpers in its
+directory: `resolve-db-path.py`, `viewer-state.py` (remembers the last
+project), `list-docs.py` (lists a project's documents) and
+`snapshot-and-forget.py` (the delete flow).
 
 ## Install
 
