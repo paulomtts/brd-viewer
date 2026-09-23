@@ -9,9 +9,9 @@ right from the bar.
 
 - **Projects list** — every project `brd` already has registered
   (`brd projects`), searchable.
-- **Board view** — top-level cards in three columns (Todo / In Progress /
-  Done), each showing a done/total progress badge for its subtasks. A card
-  reporting as blocked (derived status) appears in the Todo column.
+- **Board view** — top-level cards in three status sections (Todo / In
+  Progress / Done), each showing a done/total progress badge for its subtasks. A card
+  reporting as blocked (derived status) appears in the Todo section.
 - **Tree view** — the full nested hierarchy, indented, with a ⛔ marker on
   any card still blocked by an unfinished dependency.
 - **Card detail** — full description, parent breadcrumb, and clickable
@@ -21,7 +21,8 @@ right from the bar.
   updates the board while the panel is open), plus a manual refresh
   button.
 - Keyboard navigation in Projects and Tree views: Up/Down/Enter to navigate,
-  Escape or Left-at-start-of-search-box to go Back, Right-at-end to open
+  Escape or Left-at-start-of-search-box to go Back (from Board, Tree, or card
+  detail; in the Projects list Escape closes the panel), Right-at-end to open
   the highlighted item, and Tab to switch bar panels. Board view is
   mouse-first.
 - Entirely read-only: no card is ever created, edited, or deleted from
