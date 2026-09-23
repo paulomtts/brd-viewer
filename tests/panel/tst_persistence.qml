@@ -145,4 +145,42 @@ TestCase {
     p.applyProjectsList([pA, pB])
     compare(save.command[3], "/home/u/a")
   }
+
+  function test_the_watchdog_selects_the_first_project_when_the_state_never_answers() {
+    var p = make(); if (!p) return
+    var save = proc(p, "saveStateProc")
+    var dog = proc(p, "stateWatchdog")
+    verify(dog, "stateWatchdog exists")
+    compare(dog.interval, 2000)
+    p.applyProjectsList([pA, pB])
+    compare(p.selectedProject, null)
+    dog.triggered()
+    compare(p.stateLoaded, true)
+    compare(p.selectedProject.root_path, "/home/u/a")
+    compare(save.command, undefined)
+  }
+
+  function test_the_watchdog_does_nothing_once_the_state_has_answered() {
+    var p = make(); if (!p) return
+    var dog = proc(p, "stateWatchdog")
+    verify(dog, "stateWatchdog exists")
+    p.applyStoredState('{"last_project": "/home/u/b"}', 0)
+    p.applyProjectsList([pA, pB])
+    dog.triggered()
+    compare(p.selectedProject.root_path, "/home/u/b")
+    compare(p.storedProject, "/home/u/b")
+    compare(p.stateReadOk, true)
+  }
+
+  function test_a_late_state_reply_after_the_watchdog_changes_nothing() {
+    var p = make(); if (!p) return
+    var dog = proc(p, "stateWatchdog")
+    verify(dog, "stateWatchdog exists")
+    p.applyProjectsList([pA, pB])
+    dog.triggered()
+    p.applyStoredState('{"last_project": "/home/u/b"}', 0)
+    compare(p.selectedProject.root_path, "/home/u/a")
+    compare(p.storedProject, "")
+    compare(p.stateReadOk, false)
+  }
 }

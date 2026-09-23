@@ -246,6 +246,7 @@ Panel {
   }
 
   function applyStoredState(text, exitCode) {
+    if (root.stateLoaded) return
     root.storedProject = Logic.parseStateResult(text, exitCode) || ""
     root.stateReadOk = (exitCode === 0 && String(text || "").trim() !== "")
     root.stateLoaded = true
@@ -536,6 +537,16 @@ Panel {
     objectName: "saveStateProc"
     stdout: StdioCollector { waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true }
+  }
+
+  // If the state helper never answers (python3 missing, spawn failure) the
+  // project list must not stay blocked: treat it as a failed read.
+  Timer {
+    id: stateWatchdog
+    objectName: "stateWatchdog"
+    interval: 2000
+    running: true
+    onTriggered: if (!root.stateLoaded) root.applyStoredState("", 1)
   }
 
   Component.onCompleted: stateGetProc.running = true
