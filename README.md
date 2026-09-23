@@ -10,21 +10,27 @@ right from the bar.
 - **Projects list** — every project `brd` already has registered
   (`brd projects`), searchable.
 - **Board view** — top-level cards in three status sections (Todo / In
-  Progress / Done), each showing a done/total progress badge for its subtasks. A card
-  reporting as blocked (derived status) appears in the Todo section.
+  Progress / Done), each showing a done/total progress badge for its
+  subtasks. A card reporting as blocked (derived status) appears in the Todo
+  section, flagged in orange.
 - **Tree view** — the full nested hierarchy, indented, with a ⛔ marker on
   any card still blocked by an unfinished dependency.
-- **Card detail** — full description, parent breadcrumb, and clickable
-  blocked-by/children lists, resolving ids to titles.
+- **Card detail** — kind and status badges (Milestone / Story / Subtask by
+  depth; Todo / In progress / Done / Blocked), full description, a parent link
+  and clickable blocked-by/children lists, resolving ids to titles.
+- **Status colors** — done is green, in progress is blue, blocked is orange;
+  todo follows the theme's dim color.
 - **Live refresh** — watches the selected project's `brd` database file
   and re-fetches automatically when it changes on disk (e.g. an agent
   updates the board while the panel is open), plus a manual refresh
   button.
-- Keyboard navigation in Projects and Tree views: Up/Down/Enter to navigate,
-  Escape or Left-at-start-of-search-box to go Back (from Board, Tree, or card
-  detail; in the Projects list Escape closes the panel), Right-at-end to open
-  the highlighted item, and Tab to switch bar panels. Board view is
-  mouse-first.
+- **Keyboard navigation** everywhere: Up/Down moves the highlight (the panel
+  scrolls to keep it visible) through projects, Board cards, Tree rows, and,
+  inside a card, its parent/blocked-by/children links; Enter or
+  Right-at-end opens the highlighted item. Escape or Left-at-start-of-search-box
+  goes Back (from Board, Tree, or card detail; in the Projects list Escape
+  closes the panel), and going Back from a card restores the list position.
+  A card without links scrolls with Up/Down instead. Tab switches bar panels.
 - Entirely read-only: no card is ever created, edited, or deleted from
   the panel.
 
