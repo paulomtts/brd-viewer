@@ -17,10 +17,9 @@ TestCase {
   function test_index_tree_on_empty_forest() {
     var result = Logic.indexTree([])
     compare(Object.keys(result.cardMap).length, 0)
-    compare(result.rows.length, 0)
   }
 
-  function test_index_tree_builds_flat_map_and_depth_first_rows() {
+  function test_index_tree_builds_a_flat_map_of_every_card() {
     var leaf = makeCard("c2", "todo")
     var mid = makeCard("c1", "todo", [leaf])
     var root = makeCard("root", "todo", [mid])
@@ -28,13 +27,8 @@ TestCase {
 
     compare(Object.keys(result.cardMap).length, 3)
     compare(result.cardMap["c2"].id, "c2")
-    compare(result.rows.length, 3)
-    compare(result.rows[0].id, "root")
-    compare(result.rows[0].depth, 0)
-    compare(result.rows[1].id, "c1")
-    compare(result.rows[1].depth, 1)
-    compare(result.rows[2].id, "c2")
-    compare(result.rows[2].depth, 2)
+    compare(result.cardMap["c1"].id, "c1")
+    compare(result.cardMap["root"].id, "root")
   }
 
   function test_index_tree_annotates_parent_id() {
@@ -47,7 +41,7 @@ TestCase {
 
   function test_index_tree_handles_multiple_roots() {
     var result = Logic.indexTree([makeCard("a", "todo"), makeCard("b", "todo")])
-    compare(result.rows.length, 2)
+    compare(Object.keys(result.cardMap).length, 2)
     compare(result.cardMap["a"].parentId, null)
     compare(result.cardMap["b"].parentId, null)
   }
@@ -117,38 +111,6 @@ TestCase {
     var root = makeCard("root", "todo", [child])
     root.title = "Also unrelated"
     compare(Logic.subtreeMatches(root, "parsers"), false)
-  }
-
-  // ---- blocked state ---------------------------------------------------
-
-  function test_is_blocked_false_with_no_blockers() {
-    var card = makeCard("c", "todo", [], [])
-    compare(Logic.isBlocked(card, {}), false)
-  }
-
-  function test_is_blocked_true_when_a_blocker_is_not_done() {
-    var blocker = makeCard("b1", "in_progress")
-    var card = makeCard("c", "todo", [], ["b1"])
-    var map = Logic.indexTree([blocker]).cardMap
-    compare(Logic.isBlocked(card, map), true)
-  }
-
-  function test_is_blocked_false_when_every_blocker_is_done() {
-    var blocker = makeCard("b1", "done")
-    var card = makeCard("c", "todo", [], ["b1"])
-    var map = Logic.indexTree([blocker]).cardMap
-    compare(Logic.isBlocked(card, map), false)
-  }
-
-  // Dangling blocked_by reference (blocker deleted from the board):
-  // treated as still-blocking, not silently ignored.
-  function test_is_blocked_true_when_a_blocker_id_is_missing_from_the_map() {
-    var card = makeCard("c", "todo", [], ["ghost"])
-    compare(Logic.isBlocked(card, {}), true)
-  }
-
-  function test_is_blocked_false_for_undefined_card() {
-    compare(Logic.isBlocked(undefined, {}), false)
   }
 
   function test_subtree_matches_false_for_undefined_card() {

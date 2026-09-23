@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "paulomtts",
   "license": "MIT",
-  "description": "Browse brd's local kanban board per project, as a Board or a Tree, right from the bar.",
+  "description": "Browse brd's local kanban board per project, as a Board, right from the bar.",
   "kinds": ["bar-widget"],
   "activation": "on-demand",
   "entryPoints": {
@@ -13,7 +13,7 @@
   },
   "barWidget": {
     "displayName": "brd Viewer",
-    "description": "One bar icon and one panel: pick a project, view its board or tree.",
+    "description": "One bar icon and one panel: pick a project, view its board.",
     "category": "Productivity",
     "aliases": ["brd", "brd-viewer", "board"],
     "allowMultiple": false

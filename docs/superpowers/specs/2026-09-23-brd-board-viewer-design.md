@@ -194,3 +194,12 @@ project's files.
   assumes success: it trusts the helper's exit code and JSON result
   (`Logic.parseDeleteResult`).
 
+## Removed: Tree view
+
+The Tree view described above (the indented hierarchy list, its ⛔ blocked
+marker, and the Board/Tree toggle) was removed. The plugin now has a Board
+view only: the Projects list, the Board, and card detail. The nesting is still
+reachable from a card's detail (parent link, blocked-by and children lists).
+Back from a card always returns to the Board. Where the sections above mention
+the Tree, they describe the original design and no longer apply.
+

@@ -8,7 +8,7 @@ import qs.Ui
 import "logic.js" as Logic
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
-// project: pick a project, then view its cards as a Board or a Tree.
+// project: pick a project, then view its cards as a Board.
 // Read-only -- nothing here ever calls brd add/update/delete/block.
 Panel {
   id: root
@@ -22,7 +22,7 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string pluginDir: Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
 
-  property string viewMode: "projects" // "projects" | "board" | "tree" | "entry"
+  property string viewMode: "projects" // "projects" | "board" | "entry"
   property var projects: []            // [{ root_path, name }]
   property var selectedProject: null   // { root_path, name } | null
   property string loadError: ""
@@ -53,7 +53,6 @@ Panel {
 
   function currentList() {
     if (root.viewMode === "projects") return root.filteredProjects
-    if (root.viewMode === "tree") return root.visibleTreeRows
     if (root.viewMode === "board") return root.boardCards
     if (root.viewMode === "entry") return root.detailLinkList
     return []
@@ -116,10 +115,6 @@ Panel {
     if (!panelFlick) return
     panelFlick.contentY = root.clamp(panelFlick.contentY + pixels, 0, Math.max(0, panelFlick.contentHeight - panelFlick.height))
   }
-
-  readonly property var visibleTreeRows: root.treeRows.filter(function(row) {
-    return Logic.subtreeMatches(root.cardMap[row.id], root.searchQuery)
-  })
 
   function activateCursor() {
     var list = root.currentList()
@@ -184,7 +179,6 @@ Panel {
 
   property var cardRoots: []   // top-level cards from the last brd tree fetch
   property var cardMap: ({})   // id -> card, from Logic.indexTree
-  property var treeRows: []    // [{id, depth}], from Logic.indexTree
   readonly property var statuses: ["todo", "in_progress", "done"]
 
   function selectProject(project) {
@@ -212,7 +206,6 @@ Panel {
     root.cardRoots = roots
     var indexed = Logic.indexTree(roots)
     root.cardMap = indexed.cardMap
-    root.treeRows = indexed.rows
     if (root.viewMode === "entry" && !root.cardMap[root.selectedCardId]) root.restoreListView()
   }
 
@@ -263,12 +256,10 @@ Panel {
   }
 
   property string selectedCardId: ""
-  property string detailReturnView: "board"
 
   function openCard(id) {
     if (!root.cardMap[id]) return
-    if (root.viewMode === "board" || root.viewMode === "tree") {
-      root.detailReturnView = root.viewMode
+    if (root.viewMode === "board") {
       root.returnCursor = root.cursorIndex
       root.returnScrollY = panelFlick ? panelFlick.contentY : 0
     }
@@ -280,10 +271,10 @@ Panel {
     focusForView()
   }
 
-  // Leaving a card puts the list back exactly as it was: same view, same
-  // highlighted row, same scroll position.
+  // Leaving a card puts the Board back exactly as it was: same highlighted
+  // card, same scroll position.
   function restoreListView() {
-    viewMode = root.detailReturnView
+    viewMode = "board"
     root.scrollOnCursor = false
     root.cursorIndex = root.returnCursor
     Qt.callLater(function() { if (panelFlick) root.scrollBy(root.returnScrollY - panelFlick.contentY) })
@@ -493,32 +484,18 @@ Panel {
             }
 
             Text {
-              visible: root.viewMode === "board" || root.viewMode === "tree"
+              visible: root.viewMode === "board"
               text: "⟳"
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
               MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.fetchBoard() }
             }
-
-            Button {
-              visible: root.viewMode === "board" || root.viewMode === "tree"
-              text: root.viewMode === "board" ? "Tree ›" : "‹ Board"
-              bordered: true
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              fontSize: Style.font.bodySmall
-              verticalPadding: Style.spacing.controlPaddingY
-              onClicked: {
-                root.viewMode = (root.viewMode === "board" ? "tree" : "board")
-                root.cursorIndex = 0
-              }
-            }
           }
 
           TextField {
             id: searchField
-            visible: !root.deleteTarget && (root.viewMode === "projects" || root.viewMode === "board" || root.viewMode === "tree")
+            visible: !root.deleteTarget && (root.viewMode === "projects" || root.viewMode === "board")
             width: parent.width
             foreground: root.foreground
             placeholderText: root.viewMode === "projects" ? "Search projects…" : "Search cards…"
@@ -761,48 +738,6 @@ Panel {
           }
 
           Column {
-            visible: root.viewMode === "tree"
-            width: parent.width
-            spacing: Style.space(2)
-
-            Text {
-              visible: root.treeRows.length === 0 && root.loadError === ""
-              width: parent.width
-              text: "This project's board is empty."
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              wrapMode: Text.WordWrap
-            }
-
-            Text {
-              visible: root.treeRows.length > 0 && root.visibleTreeRows.length === 0
-              width: parent.width
-              text: "No cards match “" + root.searchQuery + "”."
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              wrapMode: Text.WordWrap
-            }
-
-            Repeater {
-              id: treeRepeater
-              model: root.visibleTreeRows
-
-              TreeRow {
-                required property var modelData
-                required property int index
-                width: parent.width
-                rowIndex: index
-                depth: modelData.depth
-                card: root.cardMap[modelData.id]
-                blocked: Logic.isBlocked(root.cardMap[modelData.id], root.cardMap)
-                onActivated: root.openCard(modelData.id)
-              }
-            }
-          }
-
-          Column {
             id: detailCard
             visible: root.viewMode === "entry" && !!root.cardMap[root.selectedCardId]
             width: parent.width
@@ -1030,60 +965,6 @@ Panel {
       cursorShape: Qt.PointingHandCursor
       onEntered: root.hoverCursor(projectRow.rowIndex)
       onClicked: projectRow.deleteRequested()
-    }
-  }
-
-  component TreeRow: CursorSurface {
-    id: treeRow
-    property int rowIndex: 0
-    property int depth: 0
-    property var card: null
-    property bool blocked: false
-    signal activated()
-
-    hasCursor: root.cursorIndex === rowIndex
-    onHasCursorChanged: if (hasCursor && root.scrollOnCursor) root.scrollItemIntoView(treeRow)
-    foreground: root.foreground
-    implicitHeight: treeRowLayout.implicitHeight + Style.spacing.rowPaddingX
-
-    RowLayout {
-      id: treeRowLayout
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(10) + treeRow.depth * Style.space(16)
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(6)
-
-      Text {
-        visible: treeRow.blocked
-        text: "⛔"
-        font.pixelSize: Style.font.body
-      }
-
-      Text {
-        Layout.fillWidth: true
-        text: treeRow.card ? treeRow.card.title : ""
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
-      }
-
-      Text {
-        text: treeRow.card ? "[" + treeRow.card.status + "]" : ""
-        color: treeRow.card ? Logic.statusColor(treeRow.card.status, root.dim) : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-      }
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onEntered: root.hoverCursor(treeRow.rowIndex)
-      onClicked: treeRow.activated()
     }
   }
 

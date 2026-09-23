@@ -2,8 +2,7 @@
 
 An [Omarchy](https://omarchy.org/) shell plugin that visualizes a
 [`brd`](https://github.com/paulomtts/brd) project's board — its cards,
-their kanban status, and their dependency/hierarchy structure — right from
-the bar. Cards are strictly read-only; the one thing it can change is removing
+their kanban status and how they nest — right from the bar. Cards are strictly read-only; the one thing it can change is removing
 a whole project from brd (see below).
 
 ## Features
@@ -14,8 +13,6 @@ a whole project from brd (see below).
   Progress / Done), each showing a done/total progress badge for its
   subtasks. A card reporting as blocked (derived status) appears in the Todo
   section, flagged in orange.
-- **Tree view** — the full nested hierarchy, indented, with a ⛔ marker on
-  any card still blocked by an unfinished dependency.
 - **Card detail** — kind and status badges (Milestone / Story / Subtask by
   depth; Todo / In progress / Done / Blocked), full description, a parent link
   and clickable blocked-by/children lists, resolving ids to titles.
@@ -26,11 +23,11 @@ a whole project from brd (see below).
   updates the board while the panel is open), plus a manual refresh
   button.
 - **Keyboard navigation** everywhere: Up/Down moves the highlight (the panel
-  scrolls to keep it visible) through projects, Board cards, Tree rows, and,
+  scrolls to keep it visible) through projects, Board cards, and,
   inside a card, its parent/blocked-by/children links; Enter or
   Right-at-end opens the highlighted item. Escape or Left-at-start-of-search-box
-  goes Back (from Board, Tree, or card detail; in the Projects list Escape
-  closes the panel), and going Back from a card restores the list position.
+  goes Back (from the Board or card detail; in the Projects list Escape
+  closes the panel), and going Back from a card restores the Board position.
   A card without links scrolls with Up/Down instead. Tab switches bar panels.
 - **Delete a project** — press Delete on a highlighted project (or click its
   🗑 button), then type `delete` to confirm, as in the Claude Memory plugin.
