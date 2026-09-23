@@ -135,13 +135,26 @@ Panel {
     return "Done"
   }
 
+  property string selectedCardId: ""
+  property string detailReturnView: "board"
+
   function openCard(id) {
-    // Task 7 implements card detail; this is the single entry point every
-    // Board/Tree row calls, so Task 7 only has to fill this function in.
+    if (!root.cardMap[id]) return
+    if (root.viewMode === "board" || root.viewMode === "tree") root.detailReturnView = root.viewMode
+    selectedCardId = id
+    viewMode = "entry"
+    focusForView()
   }
 
   function goBack() {
+    if (viewMode === "entry") { viewMode = root.detailReturnView; return }
     openProjects()
+  }
+
+  function resolvedCard(id) {
+    var card = root.cardMap[id]
+    return card ? { id: id, title: card.title, status: card.status, inBoard: true }
+                : { id: id, title: id, status: "", inBoard: false }
   }
 
   onOpenedChanged: if (opened) openProjects()
@@ -455,8 +468,124 @@ Panel {
               }
             }
           }
+
+          Column {
+            id: detailCard
+            visible: root.viewMode === "entry" && root.cardMap[root.selectedCardId]
+            width: parent.width
+            spacing: Style.space(10)
+
+            readonly property var card: root.cardMap[root.selectedCardId]
+
+            Text {
+              visible: detailCard.card && detailCard.card.parentId
+              text: "↑ " + (detailCard.card && detailCard.card.parentId ? root.resolvedCard(detailCard.card.parentId).title : "")
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.openCard(detailCard.card.parentId)
+              }
+            }
+
+            Text {
+              width: parent.width
+              text: detailCard.card ? detailCard.card.title : ""
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.heading
+              font.bold: true
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              text: detailCard.card ? "[" + detailCard.card.status + "]" : ""
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
+
+            PanelSeparator { foreground: root.foreground }
+
+            Text {
+              width: parent.width
+              text: (detailCard.card && detailCard.card.description) ? detailCard.card.description : "No description."
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+              textFormat: Text.MarkdownText
+            }
+
+            PanelSectionHeader {
+              visible: detailCard.card && detailCard.card.blocked_by && detailCard.card.blocked_by.length > 0
+              text: "BLOCKED BY"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            Repeater {
+              model: (detailCard.card && detailCard.card.blocked_by) ? detailCard.card.blocked_by : []
+
+              DetailLink {
+                required property string modelData
+                width: parent.width
+                resolved: root.resolvedCard(modelData)
+                onActivated: resolved.inBoard ? root.openCard(modelData) : undefined
+              }
+            }
+
+            PanelSectionHeader {
+              visible: detailCard.card && detailCard.card.children && detailCard.card.children.length > 0
+              text: "CHILDREN"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            Repeater {
+              model: (detailCard.card && detailCard.card.children) ? detailCard.card.children : []
+
+              DetailLink {
+                required property var modelData
+                width: parent.width
+                resolved: root.resolvedCard(modelData.id)
+                onActivated: root.openCard(modelData.id)
+              }
+            }
+          }
         }
       }
+    }
+  }
+
+  component DetailLink: RowLayout {
+    property var resolved: ({ title: "", status: "", inBoard: true })
+    signal activated()
+
+    Text {
+      Layout.fillWidth: true
+      text: resolved.title + (resolved.inBoard ? "" : " (not in this board)")
+      color: resolved.inBoard ? root.foreground : root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      elide: Text.ElideRight
+    }
+
+    Text {
+      visible: resolved.inBoard
+      text: "[" + resolved.status + "]"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      cursorShape: resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
+      onClicked: parent.activated()
     }
   }
 
