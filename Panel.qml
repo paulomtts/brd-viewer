@@ -102,6 +102,10 @@ Panel {
     selectedProject = project
     resetSearch()
     viewMode = "board"
+    root.watchedDbPath = ""
+    resolveDbPathProc.command = ["python3", root.pluginDir + "resolve-db-path.py", project.root_path]
+    resolveDbPathProc.running = false
+    resolveDbPathProc.running = true
     fetchBoard()
     focusForView()
   }
@@ -119,7 +123,13 @@ Panel {
     var indexed = Logic.indexTree(roots)
     root.cardMap = indexed.cardMap
     root.treeRows = indexed.rows
+    if (root.viewMode === "entry" && !root.cardMap[root.selectedCardId]) {
+      root.viewMode = root.detailReturnView
+      focusForView()
+    }
   }
+
+  property string watchedDbPath: ""
 
   readonly property var visibleBoardRoots: root.cardRoots.filter(function(c) {
     return Logic.subtreeMatches(c, root.searchQuery)
@@ -211,6 +221,29 @@ Panel {
   }
 
   Process {
+    id: resolveDbPathProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var path = String(text || "").trim()
+        root.watchedDbPath = path
+      }
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) root.watchedDbPath = ""
+    }
+  }
+
+  FileView {
+    id: dbFile
+    path: root.watchedDbPath !== "" ? root.watchedDbPath : ""
+    watchChanges: true
+    printErrors: false
+    onFileChanged: root.fetchBoard()
+  }
+
+  Process {
     id: treeProc
     command: ["brd", "tree"]
     stdout: StdioCollector {
@@ -290,6 +323,15 @@ Panel {
               font.pixelSize: Style.font.heading
               font.bold: true
               elide: Text.ElideMiddle
+            }
+
+            Text {
+              visible: root.viewMode === "board" || root.viewMode === "tree"
+              text: "⟳"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.fetchBoard() }
             }
 
             Button {
