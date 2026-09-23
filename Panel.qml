@@ -151,7 +151,7 @@ Panel {
   }
 
   function goBack() {
-    if (viewMode === "entry") { viewMode = root.detailReturnView; return }
+    if (viewMode === "entry") { viewMode = root.detailReturnView; focusForView(); return }
     openProjects()
   }
 
