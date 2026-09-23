@@ -64,18 +64,15 @@ Panel {
     return []
   }
 
+  readonly property Item focusItem: root.deleteTarget ? confirmField
+    : root.dropdownOpen ? sidebar.filterItem
+    : (root.viewMode === "entry" || root.viewMode === "document" || !root.selectedProject) ? keyCatcher
+    : searchField
+
   function focusForView() {
     Qt.callLater(function() {
       if (!root.opened) return
-      if (root.deleteTarget) {
-        if (confirmField) confirmField.forceActiveFocus()
-      } else if (root.dropdownOpen) {
-        if (sidebar) sidebar.focusFilter()
-      } else if (root.viewMode === "entry" || root.viewMode === "document") {
-        if (keyCatcher) keyCatcher.forceActiveFocus()
-      } else if (searchField) {
-        searchField.forceActiveFocus()
-      }
+      if (root.focusItem) root.focusItem.forceActiveFocus()
     })
   }
 
@@ -503,7 +500,7 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: (root.viewMode === "entry" || root.viewMode === "document") ? keyCatcher : (root.deleteTarget ? confirmField : (root.dropdownOpen ? sidebar.filterItem : searchField))
+    focusTarget: root.focusItem
     // Centered under the bar rather than under the icon, and wide enough for
     // the sidebar.
     centerOnBar: true
@@ -512,6 +509,7 @@ Panel {
 
     PanelKeyCatcher {
       id: keyCatcher
+      objectName: "keyCatcher"
       anchors.fill: parent
       onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
@@ -611,6 +609,7 @@ Panel {
 
           TextField {
             id: searchField
+            objectName: "searchField"
             visible: !root.deleteTarget && !!root.selectedProject && (root.viewMode === "board" || root.viewMode === "documents")
             width: parent.width
             foreground: root.foreground
@@ -681,6 +680,7 @@ Panel {
 
             TextField {
               id: confirmField
+              objectName: "confirmField"
               width: parent.width
               foreground: root.foreground
               placeholderText: "delete"

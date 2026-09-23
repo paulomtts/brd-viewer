@@ -140,4 +140,21 @@ TestCase {
     p.opened = false; p.opened = true
     compare(p.dropdownOpen, false); compare(p.dropdownQuery, "")
   }
+
+  function test_focus_item_follows_state() {
+    var p = make(); if (!p) return
+    compare(p.focusItem.objectName, "keyCatcher")
+    p.applyProjectsList([pA])
+    compare(p.focusItem.objectName, "searchField")
+    p.toggleDropdown()
+    compare(p.focusItem.objectName, "filterField")
+    p.closeDropdown()
+    p.openDelete(p.selectedProject)
+    compare(p.focusItem.objectName, "confirmField")
+    p.cancelDelete()
+    compare(p.focusItem.objectName, "searchField")
+    p.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
+    p.cursorIndex = 0; p.activateCursor()
+    compare(p.focusItem.objectName, "keyCatcher")
+  }
 }
