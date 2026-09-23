@@ -27,7 +27,7 @@ Panel {
   property string dropdownQuery: ""
   property int dropdownCursor: 0
   property string storedProject: ""
-  property bool stateLoaded: true     // Task 6: false until viewer-state.py answers
+  property bool stateLoaded: false
 
   readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents" : "board"
   readonly property string sectionTitle: section === "documents" ? "Documents" : "Board"
@@ -190,6 +190,7 @@ Panel {
     var current = root.selectedProject ? root.selectedProject.root_path : ""
     var chosen = Logic.chooseProject(root.projects, current, root.storedProject)
     if (!chosen) { root.clearSelection(); return }
+    if (chosen.root_path !== root.storedProject) root.persistLastProject(chosen.root_path)
     if (chosen.root_path !== current) root.selectProject(chosen)
     else root.selectedProject = chosen
   }
@@ -226,7 +227,18 @@ Panel {
     root.focusForView()
   }
 
-  function persistLastProject(path) { root.storedProject = path }   // Task 6 also saves it
+  function applyStoredState(text, exitCode) {
+    root.storedProject = Logic.parseStateResult(text, exitCode) || ""
+    root.stateLoaded = true
+    root.maybeSelectInitial()
+  }
+
+  function persistLastProject(path) {
+    root.storedProject = path
+    saveStateProc.command = ["python3", root.pluginDir + "viewer-state.py", "set-project", path]
+    saveStateProc.running = false
+    saveStateProc.running = true
+  }
 
   function toggleDropdown() {
     if (root.deleteTarget) return
@@ -415,6 +427,33 @@ Panel {
         root.loadError = "Could not list brd projects (is brd installed and on PATH?)."
     }
   }
+
+  Process {
+    id: stateGetProc
+    objectName: "stateGetProc"
+    property string outText: ""
+    command: ["python3", root.pluginDir + "viewer-state.py", "get"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: stateGetProc.outText = String(text || "")
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      var out = stateGetProc.outText
+      stateGetProc.outText = ""
+      root.applyStoredState(out, exitCode)
+    }
+  }
+
+  // A failed save is deliberately silent: it never blocks navigation.
+  Process {
+    id: saveStateProc
+    objectName: "saveStateProc"
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector { waitForEnd: true }
+  }
+
+  Component.onCompleted: stateGetProc.running = true
 
   Process {
     id: resolveDbPathProc

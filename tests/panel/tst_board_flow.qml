@@ -18,6 +18,7 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return }
     var p = comp.createObject(host)
     p.opened = true
+    p.stateLoaded = true
     p.applyProjectsList([{ root_path: "/x", name: "proj" }])
     var t1 = card("t1", "Task1", "blocked", [], ["x1"])
     var t2 = card("t2", "Task2", "done")

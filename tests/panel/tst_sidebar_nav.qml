@@ -17,6 +17,7 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return null }
     var p = comp.createObject(host)
     p.opened = true
+    p.stateLoaded = true
     return p
   }
   function names(list) { return list.map(function(x) { return x.name }).join(",") }

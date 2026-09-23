@@ -19,6 +19,7 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return }
     var p = comp.createObject(host)
     p.opened = true
+    p.stateLoaded = true
     p.applyProjectsList([{ root_path: "/home/u/a", name: "alpha" }, { root_path: "/home/u/b", name: "beta" }])
     wait(50)
     var proc = procByName(p, "deleteProc")
