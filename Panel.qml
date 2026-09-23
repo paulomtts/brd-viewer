@@ -583,6 +583,7 @@ Panel {
     }
 
     MouseArea {
+      Layout.ignore: true
       anchors.fill: parent
       cursorShape: resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
       onClicked: parent.activated()
