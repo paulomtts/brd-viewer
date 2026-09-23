@@ -157,12 +157,57 @@ TestCase {
     compare(p.docs.length, 3)
   }
 
-  function test_keyboard_scrolls_an_open_document_and_ctrl_1_leaves_it() {
+  function test_ctrl_1_leaves_an_open_document() {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
     p.cursorIndex = 0; p.activateCursor()
     compare(p.handleGlobalKey({ modifiers: Qt.ControlModifier, key: Qt.Key_1 }), true)
     compare(p.viewMode, "board")
+  }
+
+  function test_a_superseded_run_exit_is_ignored() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.chooseProject(pB)
+    p.showSection("documents")
+    var proc = named(p, "listDocsProc")
+    compare(proc.forRoot, "/home/u/b")
+    proc.running = true; proc.outText = ""
+    proc.exited(1)
+    compare(p.docsError, "")
+    compare(p.docsLoading, true)
+    compare(p.docs.length, 0)
+    proc.running = false; proc.outText = docList
+    proc.exited(0)
+    compare(p.docs.length, 3)
+    compare(p.docsLoading, false)
+  }
+
+  function test_an_exit_for_a_root_that_is_no_longer_selected_is_ignored() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.chooseProject(pB)
+    p.showSection("documents")
+    var proc = named(p, "listDocsProc")
+    proc.running = false
+    proc.forRoot = "/home/u/my proj"
+    proc.outText = docList
+    proc.exited(0)
+    compare(p.docs.length, 0)
+  }
+
+  function test_same_project_refetch_ignores_the_first_exit() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.fetchDocs()
+    var proc = named(p, "listDocsProc")
+    proc.running = true; proc.outText = ""
+    proc.exited(1)
+    compare(p.docsError, "")
+    compare(p.docsLoading, true)
+    proc.running = false; proc.outText = docList
+    proc.exited(0)
+    compare(p.docs.length, 3)
   }
 }

@@ -406,6 +406,7 @@ Panel {
     root.docsError = ""
     root.docsTruncated = false
     root.docsLoading = true
+    listDocsProc.forRoot = root.docsRoot
     listDocsProc.command = ["python3", root.pluginDir + "list-docs.py", root.docsRoot]
     listDocsProc.running = false
     listDocsProc.running = true
@@ -556,6 +557,7 @@ Panel {
     id: listDocsProc
     objectName: "listDocsProc"
     property string outText: ""
+    property string forRoot: ""
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: listDocsProc.outText = String(text || "")
@@ -564,7 +566,9 @@ Panel {
     onExited: function(exitCode) {
       var out = listDocsProc.outText
       listDocsProc.outText = ""
-      root.applyDocsResult(out, exitCode, root.docsRoot)
+      // fetchDocs restarts this process; the killed run's exit arrives while a newer run is already active.
+      if (listDocsProc.running) return
+      root.applyDocsResult(out, exitCode, listDocsProc.forRoot)
     }
   }
 
