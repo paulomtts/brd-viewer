@@ -42,3 +42,25 @@ function subtreeCounts(card) {
   visit(card)
   return { done: done, total: total }
 }
+
+function matchesQuery(text, query) {
+  var q = String(query || "").trim().toLowerCase()
+  return q === "" || String(text || "").toLowerCase().indexOf(q) >= 0
+}
+
+// True if `card` itself matches, or any descendant does -- so an ancestor
+// of a match stays visible even though it doesn't match on its own title.
+function subtreeMatches(card, query) {
+  if (matchesQuery(card.title, query)) return true
+  return (card.children || []).some(function(child) { return subtreeMatches(child, query) })
+}
+
+// A missing blocker (id not in cardMap -- e.g. deleted without --cascade
+// cleaning up the reference) is treated as still-blocking: its completion
+// can't be verified, so it's conservatively not "done".
+function isBlocked(card, cardMap) {
+  return (card.blocked_by || []).some(function(id) {
+    var blocker = cardMap[id]
+    return !blocker || blocker.status !== "done"
+  })
+}

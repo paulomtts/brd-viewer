@@ -77,4 +77,73 @@ TestCase {
     compare(counts.total, 3)
     compare(counts.done, 1)
   }
+
+  // ---- search --------------------------------------------------------
+
+  function test_matches_query_is_case_insensitive_substring() {
+    compare(Logic.matchesQuery("Write the Parser", "parser"), true)
+    compare(Logic.matchesQuery("Write the Parser", "PARSER"), true)
+    compare(Logic.matchesQuery("Write the Parser", "xyz"), false)
+  }
+
+  function test_matches_query_empty_query_matches_everything() {
+    compare(Logic.matchesQuery("anything", ""), true)
+    compare(Logic.matchesQuery("anything", "   "), true)
+  }
+
+  function test_subtree_matches_on_own_title() {
+    var card = makeCard("root", "todo")
+    card.title = "Fix the parser"
+    compare(Logic.subtreeMatches(card, "parser"), true)
+    compare(Logic.subtreeMatches(card, "nope"), false)
+  }
+
+  // Keeping ancestors of a match visible: a non-matching root whose
+  // grandchild matches must still report true.
+  function test_subtree_matches_true_for_ancestor_of_a_nested_match() {
+    var grandchild = makeCard("g", "todo")
+    grandchild.title = "Deep task about parsers"
+    var child = makeCard("c", "todo", [grandchild])
+    child.title = "Middle"
+    var root = makeCard("root", "todo", [child])
+    root.title = "Top"
+    compare(Logic.subtreeMatches(root, "parsers"), true)
+    compare(Logic.subtreeMatches(child, "parsers"), true)
+  }
+
+  function test_subtree_matches_false_when_nothing_in_subtree_matches() {
+    var child = makeCard("c", "todo")
+    child.title = "Unrelated"
+    var root = makeCard("root", "todo", [child])
+    root.title = "Also unrelated"
+    compare(Logic.subtreeMatches(root, "parsers"), false)
+  }
+
+  // ---- blocked state ---------------------------------------------------
+
+  function test_is_blocked_false_with_no_blockers() {
+    var card = makeCard("c", "todo", [], [])
+    compare(Logic.isBlocked(card, {}), false)
+  }
+
+  function test_is_blocked_true_when_a_blocker_is_not_done() {
+    var blocker = makeCard("b1", "in_progress")
+    var card = makeCard("c", "todo", [], ["b1"])
+    var map = Logic.indexTree([blocker]).cardMap
+    compare(Logic.isBlocked(card, map), true)
+  }
+
+  function test_is_blocked_false_when_every_blocker_is_done() {
+    var blocker = makeCard("b1", "done")
+    var card = makeCard("c", "todo", [], ["b1"])
+    var map = Logic.indexTree([blocker]).cardMap
+    compare(Logic.isBlocked(card, map), false)
+  }
+
+  // Dangling blocked_by reference (blocker deleted from the board):
+  // treated as still-blocking, not silently ignored.
+  function test_is_blocked_true_when_a_blocker_id_is_missing_from_the_map() {
+    var card = makeCard("c", "todo", [], ["ghost"])
+    compare(Logic.isBlocked(card, {}), true)
+  }
 }
