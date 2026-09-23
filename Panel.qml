@@ -617,32 +617,42 @@ Panel {
     }
   }
 
-  component DetailLink: RowLayout {
+  component DetailLink: Item {
+    id: detailLink
     property var resolved: ({ title: "", status: "", inBoard: true })
     signal activated()
 
-    Text {
-      Layout.fillWidth: true
-      text: resolved.title + (resolved.inBoard ? "" : " (not in this board)")
-      color: resolved.inBoard ? root.foreground : root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.bodySmall
-      elide: Text.ElideRight
-    }
+    implicitWidth: detailLinkLayout.implicitWidth
+    implicitHeight: detailLinkLayout.implicitHeight
 
-    Text {
-      visible: resolved.inBoard
-      text: "[" + resolved.status + "]"
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
+    RowLayout {
+      id: detailLinkLayout
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+
+      Text {
+        Layout.fillWidth: true
+        text: detailLink.resolved.title + (detailLink.resolved.inBoard ? "" : " (not in this board)")
+        color: detailLink.resolved.inBoard ? root.foreground : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.bodySmall
+        elide: Text.ElideRight
+      }
+
+      Text {
+        visible: detailLink.resolved.inBoard
+        text: "[" + detailLink.resolved.status + "]"
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+      }
     }
 
     MouseArea {
-      Layout.ignore: true
       anchors.fill: parent
-      cursorShape: resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
-      onClicked: parent.activated()
+      cursorShape: detailLink.resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
+      onClicked: detailLink.activated()
     }
   }
 
