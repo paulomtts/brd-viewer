@@ -599,7 +599,11 @@ Panel {
     printErrors: false
     onFileChanged: reload()
     onLoaded: { root.docError = ""; root.docText = docFile.text() }
-    onLoadFailed: root.docError = "Could not read this document."
+    onLoadFailed: {
+      if (docFile.path === "" || !root.selectedProject || root.selectedDocPath === "") return
+      if (docFile.path === Logic.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath))
+        root.docError = "Could not read this document."
+    }
   }
 
   FileView {

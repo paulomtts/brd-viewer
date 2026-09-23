@@ -229,4 +229,24 @@ TestCase {
     first.exited(0)
     compare(p.docs.length, 0)
   }
+
+  function test_a_read_failure_while_in_the_list_does_not_set_an_error() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(docList, 0)
+    compare(named(p, "docFile").path, "")
+    named(p, "docFile").loadFailed(1)
+    compare(p.docError, "")
+  }
+
+  function test_a_stale_read_failure_does_not_poison_the_next_document() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(docList, 0)
+    p.cursorIndex = 0; p.activateCursor()
+    p.goBack()
+    p.cursorIndex = 1; p.activateCursor()
+    named(p, "docFile").loadFailed(1)
+    compare(p.docError, "Could not read this document.")
+  }
 }
