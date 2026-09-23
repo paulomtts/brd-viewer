@@ -1,4 +1,4 @@
-# omarchy-brd-viewer
+# brd-viewer
 
 An [Omarchy](https://omarchy.org/) shell plugin that visualizes a
 [`brd`](https://github.com/paulomtts/brd) project's board — its cards,
@@ -37,7 +37,7 @@ right from the bar.
 ## Install
 
 ```bash
-git clone https://github.com/paulomtts/omarchy-brd-viewer.git \
+git clone https://github.com/paulomtts/brd-viewer.git \
   ~/.config/omarchy/plugins/paulomtts.brd-viewer
 omarchy-shell shell rescanPlugins
 omarchy plugin enable paulomtts.brd-viewer
