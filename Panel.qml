@@ -273,6 +273,17 @@ Panel {
     root.chooseProject(list[root.dropdownCursor])
   }
 
+  // Shortcuts that work wherever the caret is. Returns true when it handled the
+  // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
+  // move things underneath it.
+  function handleGlobalKey(event) {
+    if (!(event.modifiers & Qt.ControlModifier) || root.deleteTarget) return false
+    if (event.key === Qt.Key_P) { root.toggleDropdown(); return true }
+    if (event.key === Qt.Key_1) { root.showSection("board"); return true }
+    if (event.key === Qt.Key_2) { root.showSection("documents"); return true }
+    return false
+  }
+
   function showSection(name) {
     if (!root.selectedProject || root.deleteTarget) return
     if (name === "documents" && !root.documentsEnabled) return
@@ -548,9 +559,15 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(840))
     contentHeight: panel.fittedContentHeight(Math.max(column.implicitHeight, sidebar.implicitHeight), Style.space(620))
 
+    Item {
+      id: globalKeys
+      Keys.onPressed: function(event) { if (root.handleGlobalKey(event)) event.accepted = true }
+    }
+
     PanelKeyCatcher {
       id: keyCatcher
       objectName: "keyCatcher"
+      Keys.forwardTo: [globalKeys]
       anchors.fill: parent
       onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
@@ -593,6 +610,7 @@ Panel {
         onDropdownMove: function(delta) { root.moveDropdown(delta) }
         onDropdownAccept: root.acceptDropdown()
         onDropdownCancel: root.closeDropdown()
+        onFilterKey: function(event) { if (root.handleGlobalKey(event)) event.accepted = true }
       }
 
       Flickable {
@@ -656,6 +674,7 @@ Panel {
             foreground: root.foreground
             placeholderText: root.viewMode === "documents" ? "Search documents…" : "Search cards…"
             text: root.searchQuery
+            Keys.forwardTo: [globalKeys]
 
             onTextChanged: {
               root.searchQuery = text
