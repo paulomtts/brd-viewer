@@ -28,6 +28,7 @@ Panel {
   property int dropdownCursor: 0
   property string storedProject: ""
   property bool stateLoaded: false
+  property bool stateReadOk: false
 
   readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents" : "board"
   readonly property string sectionTitle: section === "documents" ? "Documents" : "Board"
@@ -190,7 +191,7 @@ Panel {
     var current = root.selectedProject ? root.selectedProject.root_path : ""
     var chosen = Logic.chooseProject(root.projects, current, root.storedProject)
     if (!chosen) { root.clearSelection(); return }
-    if (chosen.root_path !== root.storedProject) root.persistLastProject(chosen.root_path)
+    if (root.stateReadOk && chosen.root_path !== root.storedProject) root.persistLastProject(chosen.root_path)
     if (chosen.root_path !== current) root.selectProject(chosen)
     else root.selectedProject = chosen
   }
@@ -229,6 +230,7 @@ Panel {
 
   function applyStoredState(text, exitCode) {
     root.storedProject = Logic.parseStateResult(text, exitCode) || ""
+    root.stateReadOk = (exitCode === 0 && String(text || "").trim() !== "")
     root.stateLoaded = true
     root.maybeSelectInitial()
   }

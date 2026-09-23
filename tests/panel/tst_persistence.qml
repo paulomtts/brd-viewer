@@ -106,4 +106,43 @@ TestCase {
     compare(p.selectedProject, null)
     compare(p.storedProject, "/home/u/b")
   }
+
+  function test_a_failed_read_does_not_overwrite_the_stored_state() {
+    var p = make(); if (!p) return
+    var save = proc(p, "saveStateProc")
+    verify(save, "saveStateProc exists")
+    p.applyStoredState("boom", 1)
+    p.applyProjectsList([pA, pB])
+    compare(p.selectedProject.root_path, "/home/u/a")
+    compare(save.command, undefined)
+  }
+
+  function test_an_empty_read_does_not_overwrite_the_stored_state() {
+    var p = make(); if (!p) return
+    var save = proc(p, "saveStateProc")
+    verify(save, "saveStateProc exists")
+    p.applyStoredState("", 0)
+    p.applyProjectsList([pA, pB])
+    compare(p.selectedProject.root_path, "/home/u/a")
+    compare(save.command, undefined)
+  }
+
+  function test_an_explicit_choice_after_a_failed_read_is_saved() {
+    var p = make(); if (!p) return
+    var save = proc(p, "saveStateProc")
+    verify(save, "saveStateProc exists")
+    p.applyStoredState("boom", 1)
+    p.applyProjectsList([pA, pB])
+    p.chooseProject(pB)
+    compare(save.command[3], "/home/u/b")
+  }
+
+  function test_a_good_null_read_saves_the_first_project() {
+    var p = make(); if (!p) return
+    var save = proc(p, "saveStateProc")
+    verify(save, "saveStateProc exists")
+    p.applyStoredState('{"last_project": null}', 0)
+    p.applyProjectsList([pA, pB])
+    compare(save.command[3], "/home/u/a")
+  }
 }
