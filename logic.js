@@ -156,3 +156,34 @@ function parseStateResult(stdout, exitCode) {
     return null
   }
 }
+
+var MAX_DOC_BYTES = 1048576
+
+function filterDocs(docs, query) {
+  return (docs || []).filter(function(d) {
+    return matchesQuery(d.title, query) || matchesQuery(d.path, query)
+  })
+}
+
+// list-docs.py's last stdout line plus its exit code, as
+// { ok, docs, truncated, error }. Anything but a clear success is a failure.
+function parseDocsResult(stdout, exitCode) {
+  var generic = "Could not list documents."
+  var lines = String(stdout || "").split("\n").filter(function(l) { return l.trim() !== "" })
+  var payload = null
+  if (lines.length > 0) {
+    try { payload = JSON.parse(lines[lines.length - 1]) } catch (e) { payload = null }
+  }
+  if (exitCode === 0 && payload && payload.ok === true)
+    return { ok: true, docs: Array.isArray(payload.docs) ? payload.docs : [], truncated: payload.truncated === true, error: "" }
+  var message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : generic
+  return { ok: false, docs: [], truncated: false, error: message }
+}
+
+function docAbsolutePath(rootPath, relPath) {
+  return String(rootPath).replace(/\/+$/, "") + "/" + relPath
+}
+
+function docTooLarge(size) {
+  return size > MAX_DOC_BYTES
+}

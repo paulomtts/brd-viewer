@@ -286,4 +286,55 @@ TestCase {
   function test_parse_state_result(data) {
     compare(Logic.parseStateResult(data.out, data.code), data.expect)
   }
+
+  // ---- documents ---------------------------------------------------------
+
+  property var docList: [
+    { path: "README.md", title: "Readme", size: 10 },
+    { path: "docs/specs/Design.md", title: "Sidebar design", size: 20 },
+    { path: "docs/plan.md", title: "Plan", size: 30 }
+  ]
+
+  function test_filter_docs_matches_title_and_path() {
+    compare(Logic.filterDocs(docList, "").length, 3)
+    compare(Logic.filterDocs(docList, "sidebar").map(function(d) { return d.path }).join(","), "docs/specs/Design.md")
+    compare(Logic.filterDocs(docList, "DOCS/").length, 2)
+    compare(Logic.filterDocs(docList, "zzz").length, 0)
+    compare(Logic.filterDocs(undefined, "a").length, 0)
+  }
+
+  function test_parse_docs_result_success() {
+    var r = Logic.parseDocsResult('{"ok": true, "docs": [{"path": "README.md", "title": "T", "size": 1}], "truncated": true}\n', 0)
+    compare(r.ok, true)
+    compare(r.docs.length, 1)
+    compare(r.truncated, true)
+    compare(r.error, "")
+  }
+
+  function test_parse_docs_result_failures_carry_a_message() {
+    var h = Logic.parseDocsResult('{"ok": false, "error": "nope"}', 1)
+    compare(h.ok, false); compare(h.error, "nope"); compare(h.docs.length, 0)
+    var g = Logic.parseDocsResult("garbage", 0)
+    compare(g.ok, false); compare(g.error, "Could not list documents.")
+    compare(Logic.parseDocsResult("", 1).ok, false)
+    compare(Logic.parseDocsResult(undefined, 0).ok, false)
+    compare(Logic.parseDocsResult('{"ok": true, "docs": []}', 1).ok, false)
+  }
+
+  function test_parse_docs_result_defaults() {
+    var r = Logic.parseDocsResult('{"ok": true}', 0)
+    compare(r.ok, true); compare(r.docs.length, 0); compare(r.truncated, false)
+  }
+
+  function test_doc_absolute_path() {
+    compare(Logic.docAbsolutePath("/home/u/p", "docs/a b.md"), "/home/u/p/docs/a b.md")
+    compare(Logic.docAbsolutePath("/home/u/p/", "README.md"), "/home/u/p/README.md")
+  }
+
+  function test_doc_too_large() {
+    compare(Logic.MAX_DOC_BYTES, 1048576)
+    compare(Logic.docTooLarge(1048576), false)
+    compare(Logic.docTooLarge(1048577), true)
+    compare(Logic.docTooLarge(0), false)
+  }
 }
