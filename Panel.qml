@@ -108,13 +108,19 @@ Panel {
     var list = root.currentList()
     if (list.length === 0) return
     root.scrollOnCursor = true
+    root.lastKeyMoveMs = Date.now()
     root.cursorIndex = root.clamp(root.cursorIndex + delta, 0, list.length - 1)
     // Headers and the search box live inside the flickable; reaching the
     // first row of a list should reveal them again.
     if (root.cursorIndex === 0 && root.viewMode !== "entry") Qt.callLater(root.scrollToTop)
   }
 
+  property double lastKeyMoveMs: 0
+
+  // Scrolling with the keys slides rows under a stationary pointer, which fires
+  // their hover handlers; those must not steal the cursor from the keyboard.
   function hoverCursor(index) {
+    if (Date.now() - root.lastKeyMoveMs < 300) return
     root.scrollOnCursor = false
     root.cursorIndex = index
   }

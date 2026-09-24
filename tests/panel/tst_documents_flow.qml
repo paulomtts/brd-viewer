@@ -300,4 +300,17 @@ TestCase {
     p.selectProject(pB)
     compare(p.docCategory, "")
   }
+
+  function test_hover_caused_by_keyboard_scrolling_does_not_steal_the_cursor() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(catList, 0)
+    p.moveCursor(1)
+    compare(p.cursorIndex, 1)
+    p.hoverCursor(0)
+    compare(p.cursorIndex, 1)
+    wait(400)
+    p.hoverCursor(0)
+    compare(p.cursorIndex, 0)
+  }
 }
