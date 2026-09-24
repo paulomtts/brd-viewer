@@ -286,19 +286,26 @@ Panel {
             elide: Text.ElideMiddle
           }
 
-          UI.ThemedText {
+          // Icon-only refresh, square and as tall as the New button beside it.
+          UI.ActionButton {
+            objectName: "refreshButton"
+            theme: panelTheme
+            visible: appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph" || appStores.nav.viewMode === "memories"
+            text: ""
+            iconText: ""
+            tooltipText: "Refresh"
+            Layout.preferredHeight: newMemoryButton.implicitHeight
+            Layout.preferredWidth: newMemoryButton.implicitHeight
+            onClicked: appStores.nav.viewMode === "memories" ? appStores.memories.fetchMemories() : appStores.board.fetchBoard()
+          }
+
+          UI.ActionButton {
+            id: newMemoryButton
             objectName: "newMemoryButton"
             theme: panelTheme
             visible: appStores.nav.viewMode === "memories" && appStores.memories.canCreateMemory
             text: "＋ New"
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.memories.openNewMemory() }
-          }
-
-          UI.ThemedText {
-            theme: panelTheme
-            visible: appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph" || appStores.nav.viewMode === "memories"
-            text: "⟳"
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.nav.viewMode === "memories" ? appStores.memories.fetchMemories() : appStores.board.fetchBoard() }
+            onClicked: appStores.memories.openNewMemory()
           }
         }
 
