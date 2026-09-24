@@ -184,7 +184,7 @@ Behaviour stays green at every step; each step is its own commit.
   children) works in both the harness and the real shell before any store is
   moved. If neither works, stores create their `Process`/`FileView` children with
   `Component.createObject` (already used for per-run processes), and this spec
-  is updated.
+  is updated. Spike outcome: a `Scope` root owning `Process` and `StdioCollector` children works in both the harness and the real shell (journal after `tests/live-check.sh` showed `qml: SPIKE store out=ok` from a `Scope` store instantiated in `Panel.qml`, with no plugin-load errors), so stores use `Scope`.
 - **The shell caches components.** Every step ends with a shell restart and a
   clean-log check, as before.
 - **Big diff, small commits.** Steps 2–3 are mechanical moves; steps 4–5 move
