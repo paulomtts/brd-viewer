@@ -206,6 +206,21 @@ TestCase {
     compare(Object.keys(Board.indexIssues([])).length, 0)
   }
 
+  function test_open_issue_counting_moved_here_and_ignores_closed_ones() {
+    var issueMap = { i1: { id: "i1", title: "A", status: "open" },
+                     i2: { id: "i2", title: "B", status: "closed" },
+                     i3: { id: "i3", title: "C", status: "open" } }
+    var card = makeCard("c", "blocked", [], ["i1", "i2", "i3", "other"])
+    compare(Board.openIssueCount(card, issueMap), 2)
+    compare(Board.openIssueLabel(card, issueMap), "2 open issues")
+    compare(Board.openIssueLabel(makeCard("d", "blocked", [], ["i1"]), issueMap), "1 open issue")
+    compare(Board.openIssueLabel(makeCard("e", "todo", [], []), issueMap), "")
+    compare(Board.openIssueLabel(null, issueMap), "")
+    compare(Board.openIssueCount(card, null), 0)
+    compare(Board.openIssueCount(makeCard("f", "blocked", [], ["i1", "i1"]), issueMap), 1,
+            "an id counts once, as the graph model has always counted it")
+  }
+
   function test_resolved_card_prefers_a_card_then_an_issue_then_the_bare_id() {
     var cardMap = { c1: { id: "c1", title: "Card one", status: "todo" } }
     var issueMap = { i1: { id: "i1", title: "Broken build", status: "open" },

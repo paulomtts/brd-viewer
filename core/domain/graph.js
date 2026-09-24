@@ -5,18 +5,10 @@
 var GRAPH_NODE_W = 230
 var GRAPH_NODE_H = 78
 
-// How many OPEN issues (from Board.indexIssues) block this card directly.
-// Closed issues stay in blocked_by but no longer block, so they add nothing.
+// Kept as graph.js's own name for the graph model; the counting itself lives
+// in board.js, which the card badge uses too -- one implementation, one test.
 function openIssueCount(card, issueMap) {
-  if (!card || !issueMap) return 0
-  var seen = {}
-  var count = 0
-  ;(card.blocked_by || []).forEach(function(id) {
-    if (seen[id]) return
-    seen[id] = true
-    if (issueMap[id] && issueMap[id].status === "open") count += 1
-  })
-  return count
+  return Board.openIssueCount(card, issueMap)
 }
 
 function openIssueLabel(count) {

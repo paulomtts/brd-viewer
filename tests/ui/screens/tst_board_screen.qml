@@ -5,6 +5,7 @@
 // and the REAL ui/Navigator.qml -- no bespoke mocks.
 import QtQuick
 import QtTest
+import "../../helpers/find.js" as H
 
 TestCase {
   id: tc
@@ -125,6 +126,20 @@ TestCase {
     mouseClick(list[1])
     compare(s.app.board.selectedCardId, "m2")
     compare(s.app.nav.viewMode, "entry")
+  }
+
+  function test_a_card_blocked_by_an_open_issue_carries_an_issue_badge() {
+    var s = make(); if (!s) return
+    s.app.board.applyTreeData([card("b1", "Blocked one", "blocked", [], ["i1"])])
+    s.app.board.applyIssueData([{ id: "i1", title: "Broken build", status: "open" }])
+    wait(50)
+    var badge = H.find(s, "boardCardIssues0")
+    verify(badge, "the issue badge of the first board card")
+    compare(badge.visible, true)
+    compare(badge.text, "1 open issue")
+    s.app.board.applyIssueData([{ id: "i1", title: "Broken build", status: "closed" }])
+    wait(50)
+    compare(H.find(s, "boardCardIssues0").visible, false, "a closed issue no longer flags the card")
   }
 
   function test_hovering_a_card_moves_the_cursor_through_the_navigator() {

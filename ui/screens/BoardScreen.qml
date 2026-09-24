@@ -63,6 +63,7 @@ Column {
           cardIndex: screen.app.board.boardIndexOf(modelData.id)
           title: modelData.title
           status: modelData.status
+          issueLabel: Board.openIssueLabel(modelData, screen.app.board.issueMap)
           progress: Board.subtreeCounts(modelData)
           onActivated: screen.navigator.openCard(modelData.id)
         }
@@ -75,6 +76,7 @@ Column {
     property int cardIndex: -1
     property string title: ""
     property string status: "todo"
+    property string issueLabel: ""
     property var progress: ({ done: 0, total: 0 })
     signal activated()
 
@@ -108,13 +110,27 @@ Column {
         wrapMode: Text.WordWrap
       }
 
-      UI.ThemedText {
-        variant: "caption"
-        theme: screen.theme
+      Row {
+        Layout.fillWidth: true
+        spacing: Style.space(6)
         visible: boardCard.status === "blocked"
-        text: "Blocked"
-        color: Board.statusColor("blocked", screen.theme.dim)
-        font.bold: true
+
+        UI.ThemedText {
+          variant: "caption"
+          theme: screen.theme
+          text: "Blocked"
+          color: Board.statusColor("blocked", screen.theme.dim)
+          font.bold: true
+        }
+
+        UI.ThemedText {
+          objectName: "boardCardIssues" + boardCard.cardIndex
+          variant: "caption"
+          theme: screen.theme
+          visible: text !== ""
+          text: boardCard.issueLabel
+          color: Board.statusColor("blocked", screen.theme.dim)
+        }
       }
 
       UI.ThemedText {

@@ -190,6 +190,24 @@ TestCase {
     compare(H.find(s, "commentBody0").text, "note")
   }
 
+  // The fixture's own cards are not blocked, so this test gives itself a blocked
+  // root; the badge is about the card's status plus its open blockers.
+  function test_the_card_detail_flags_an_open_issue_next_to_blocked() {
+    var s = make(); if (!s) return
+    s.app.board.applyTreeData([card("b1", "Blocked one", "blocked", "b desc", [], ["i1"])])
+    s.app.board.applyIssueData([{ id: "i1", title: "Broken build", status: "open" }])
+    s.app.nav.viewMode = "entry"
+    s.app.board.openCard("b1")
+    wait(50)
+    var badge = H.find(s, "cardDetailIssueBadge")
+    verify(badge, "the issue badge")
+    compare(badge.visible, true)
+    compare(badge.text, "1 open issue")
+    s.app.board.applyIssueData([{ id: "i1", title: "Broken build", status: "closed" }])
+    wait(50)
+    compare(H.find(s, "cardDetailIssueBadge").visible, false)
+  }
+
   function test_a_card_without_comments_says_so() {
     var s = make(); if (!s) return
     s.app.nav.viewMode = "entry"

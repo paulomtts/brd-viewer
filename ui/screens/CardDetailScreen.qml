@@ -57,6 +57,14 @@ Column {
       text: detailCard.card ? detailCard.app.board.statusText(detailCard.card.status) : ""
       tone: detailCard.card ? Board.statusColor(detailCard.card.status, detailCard.theme.dim) : detailCard.theme.dim
     }
+
+    // Only on a card brd reports blocked, and only while an open issue blocks it.
+    Badge {
+      objectName: "cardDetailIssueBadge"
+      visible: text !== ""
+      text: detailCard.card ? Board.openIssueLabel(detailCard.card, detailCard.app.board.issueMap) : ""
+      tone: Board.statusColor("blocked", detailCard.theme.dim)
+    }
   }
 
   PanelSeparator { foreground: detailCard.theme.foreground }

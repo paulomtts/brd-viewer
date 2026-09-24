@@ -101,6 +101,29 @@ function indexIssues(issues) {
   return issueMap
 }
 
+// How many OPEN issues (from indexIssues) block this card directly. Closed
+// issues stay in blocked_by but no longer block, so they add nothing, and a
+// repeated id counts once.
+function openIssueCount(card, issueMap) {
+  if (!card || !issueMap) return 0
+  var seen = {}
+  var count = 0
+  ;(card.blocked_by || []).forEach(function(id) {
+    if (seen[id]) return
+    seen[id] = true
+    if (issueMap[id] && issueMap[id].status === "open") count += 1
+  })
+  return count
+}
+
+// The badge a card blocked by an open issue carries. Only a card brd itself
+// reports as blocked is flagged -- one whose blockers are all resolved is not.
+function openIssueLabel(card, issueMap) {
+  if (!card || card.status !== "blocked") return ""
+  var count = openIssueCount(card, issueMap)
+  return count === 0 ? "" : count + (count === 1 ? " open issue" : " open issues")
+}
+
 // What a link row shows for an id: a card in this board, else an issue, else
 // the bare id. Only a card is inBoard (navigable).
 function resolvedCard(id, cardMap, issueMap) {
