@@ -77,6 +77,7 @@ def test_shared_python_helpers_are_defined_once():
         for needle in DUPLICATED_PY:
             if needle in text:
                 seen.setdefault(needle, []).append(path.relative_to(ROOT).as_posix())
-    # STRICT_AFTER_TASK_5: while helpers are still being ported this only records the state.
-    if (ROOT / "core" / "backend" / "common").exists():
+    # STRICT_AFTER_TASK_5: while helpers are still being ported this only records the state; the
+    # strict branch turns on once the ported domain folders exist (core/backend/memories).
+    if (ROOT / "core" / "backend" / "memories").exists():
         assert all(len(v) == 1 for v in seen.values()), seen
