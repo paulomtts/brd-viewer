@@ -103,6 +103,22 @@ Panel {
   }
   readonly property var navigator: navi
 
+  // Every key the panel reacts to. Like the navigator it owns no Items: closing
+  // the panel, scrolling, switching panel and "is the caret at the end of the
+  // search text?" are handed in.
+  Shortcuts {
+    id: sc
+    app: appStores
+    navigator: navi
+    actions: ({
+      close: function() { root.close() },
+      scrollBy: root.scrollBy,
+      switchPanel: function(direction) { root.switchPanel(direction) },
+      searchAtEnd: function() { return searchField.cursorPosition === searchField.text.length }
+    })
+  }
+  readonly property var shortcuts: sc
+
   readonly property Item focusItem: appStores.deleter.deleteTarget ? deleteModal.focusItem
     : appStores.memories.memoryDeleteOpen ? memoryConfirm.focusItem
     : appStores.memories.newMemoryOpen ? newMemoryDialog.focusItem
@@ -158,22 +174,6 @@ Panel {
 
   onOpenedChanged: if (opened) { appStores.projects.onPanelOpened(); root.focusForView() }
 
-  // Shortcuts that work wherever the caret is. Returns true when it handled the
-  // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
-  // move things underneath it.
-  function handleGlobalKey(event) {
-    if (!(event.modifiers & Qt.ControlModifier) || appStores.deleter.deleteTarget || appStores.memories.memoryDeleteOpen || appStores.memories.newMemoryOpen) return false
-    if (event.key === Qt.Key_P) { navi.toggleDropdown(); return true }
-    if (event.key === Qt.Key_1) { navi.showSection("board"); return true }
-    if (event.key === Qt.Key_2) { navi.showSection("documents"); return true }
-    if (event.key === Qt.Key_3) { navi.showSection("graph"); return true }
-    if (event.key === Qt.Key_4) { navi.showSection("memories"); return true }
-    if (event.key === Qt.Key_N && appStores.nav.viewMode === "memories") { appStores.memories.openNewMemory(); return true }
-    if (event.key === Qt.Key_E && appStores.nav.viewMode === "memory") { appStores.memories.startMemoryEdit(); return true }
-    return false
-  }
-
-
   visible: true
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -216,7 +216,7 @@ Panel {
 
     Item {
       id: globalKeys
-      Keys.onPressed: function(event) { if (root.handleGlobalKey(event)) event.accepted = true }
+      Keys.onPressed: function(event) { if (sc.handleGlobalKey(event)) event.accepted = true }
     }
 
     PanelKeyCatcher {
@@ -224,26 +224,9 @@ Panel {
       objectName: "keyCatcher"
       Keys.forwardTo: [globalKeys]
       anchors.fill: parent
-      onCloseRequested: appStores.deleter.deleteTarget ? appStores.deleter.cancelDelete() : appStores.memories.memoryDeleteOpen ? appStores.memories.cancelMemoryDelete() : appStores.memories.newMemoryOpen ? appStores.memories.cancelNewMemory() : (appStores.nav.dropdownOpen ? navi.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? navi.goBack() : root.close()))
-      onMoveRequested: function(dx, dy) {
-        if (appStores.nav.viewMode === "graph") {
-          if (dx !== 0) navi.moveGraph(dx < 0 ? "left" : "right")
-          else if (dy !== 0) navi.moveGraph(dy < 0 ? "up" : "down")
-          return
-        }
-        if (dx < 0 && (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory")) { navi.goBack(); return }
-        if (appStores.nav.viewMode !== "entry" && appStores.nav.viewMode !== "document" && appStores.nav.viewMode !== "memory") return
-        if (dx > 0) { if (appStores.nav.viewMode === "entry") navi.activateCursor(); return }
-        if (dy === 0) return
-        // Links are the cursor's targets; a card without any is just text,
-        // so the arrows scroll it instead.
-        if (appStores.nav.viewMode === "entry" && appStores.board.detailLinkList.length > 0) navi.moveCursor(dy)
-        else root.scrollBy(dy * Style.space(56))
-      }
-      onActivateRequested: {
-        if (appStores.nav.viewMode === "entry") navi.activateCursor()
-        else if (appStores.nav.viewMode === "graph") navi.activateGraphNode()
-      }
+      onCloseRequested: sc.closeRequested()
+      onMoveRequested: function(dx, dy) { sc.handleMove(dx, dy) }
+      onActivateRequested: sc.handleActivate()
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
       Sidebar {
@@ -270,7 +253,7 @@ Panel {
         onDropdownMove: function(delta) { navi.moveDropdown(delta) }
         onDropdownAccept: navi.acceptDropdown()
         onDropdownCancel: navi.closeDropdown()
-        onFilterKey: function(event) { if (root.handleGlobalKey(event)) event.accepted = true }
+        onFilterKey: function(event) { if (sc.handleGlobalKey(event)) event.accepted = true }
       }
 
       // Column 2 of the layout: a toolbar that never scrolls (heading, refresh,
@@ -336,27 +319,7 @@ Panel {
             appStores.nav.cursorIndex = 0
           }
 
-          Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape) {
-              if (appStores.nav.searchQuery !== "") { appStores.nav.searchQuery = "" }
-              else root.close()
-              event.accepted = true
-              return
-            }
-            if (event.key === Qt.Key_Right && searchField.cursorPosition === searchField.text.length) {
-              navi.activateCursor(); event.accepted = true; return
-            }
-            if (event.key === Qt.Key_Down) { navi.moveCursor(1); event.accepted = true; return }
-            if (event.key === Qt.Key_Up) { navi.moveCursor(-1); event.accepted = true; return }
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-              navi.activateCursor(); event.accepted = true; return
-            }
-            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-              root.switchPanel((event.modifiers & Qt.ShiftModifier) || event.key === Qt.Key_Backtab ? -1 : 1)
-              event.accepted = true
-              return
-            }
-          }
+          Keys.onPressed: function(event) { sc.handleSearchKey(event) }
         }
 
         UI.ThemedText {

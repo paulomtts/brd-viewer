@@ -30,36 +30,36 @@ TestCase {
   }
   function test_ctrl_p_toggles_the_dropdown() {
     var p = make(); if (!p) return
-    compare(p.handleGlobalKey(ctrl(Qt.Key_P)), true)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_P)), true)
     compare(p.app.nav.dropdownOpen, true)
-    compare(p.handleGlobalKey(ctrl(Qt.Key_P)), true)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_P)), true)
     compare(p.app.nav.dropdownOpen, false)
   }
 
   function test_ctrl_digits_switch_sections() {
     var p = make(); if (!p) return
     p.navigator.chooseProject(pB)
-    compare(p.handleGlobalKey(ctrl(Qt.Key_1)), true)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_1)), true)
     compare(p.app.nav.viewMode, "board")
-    compare(p.handleGlobalKey(ctrl(Qt.Key_2)), true)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_2)), true)
     compare(p.app.nav.viewMode, "documents")
-    compare(p.handleGlobalKey(ctrl(Qt.Key_1)), true)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_1)), true)
     compare(p.app.nav.viewMode, "board")
   }
 
   function test_other_keys_are_not_handled() {
     var p = make(); if (!p) return
-    compare(p.handleGlobalKey(plain(Qt.Key_P)), false)
-    compare(p.handleGlobalKey(ctrl(Qt.Key_X)), false)
-    compare(p.handleGlobalKey(plain(Qt.Key_1)), false)
+    compare(p.shortcuts.handleGlobalKey(plain(Qt.Key_P)), false)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_X)), false)
+    compare(p.shortcuts.handleGlobalKey(plain(Qt.Key_1)), false)
     compare(p.app.nav.dropdownOpen, false)
   }
 
   function test_shortcuts_are_ignored_while_confirming_a_delete() {
     var p = make(); if (!p) return
     p.app.deleter.openDelete(p.app.projects.selectedProject)
-    compare(p.handleGlobalKey(ctrl(Qt.Key_P)), false)
-    compare(p.handleGlobalKey(ctrl(Qt.Key_1)), false)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_P)), false)
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_1)), false)
     compare(p.app.nav.dropdownOpen, false)
   }
 

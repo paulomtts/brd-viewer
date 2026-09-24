@@ -45,7 +45,7 @@ TestCase {
 
   function test_ctrl_4_shows_memories() {
     var p = make(); if (!p) return
-    compare(p.handleGlobalKey({ key: Qt.Key_4, modifiers: Qt.ControlModifier, accepted: false }), true)
+    compare(p.shortcuts.handleGlobalKey({ key: Qt.Key_4, modifiers: Qt.ControlModifier, accepted: false }), true)
     compare(p.app.nav.viewMode, "memories")
     compare(p.app.memories.memoriesLoading, true, "the section fetches the listing")
   }
@@ -74,7 +74,7 @@ TestCase {
     var p = loaded(); if (!p) return
     p.navigator.openMemory("user_role.md")
     p.app.memories.requestMemoryDelete()
-    compare(p.handleGlobalKey({ key: Qt.Key_1, modifiers: Qt.ControlModifier, accepted: false }), false)
+    compare(p.shortcuts.handleGlobalKey({ key: Qt.Key_1, modifiers: Qt.ControlModifier, accepted: false }), false)
     compare(p.app.nav.viewMode, "memory")
     compare(p.focusItem.objectName, "confirmTyped")
     p.app.memories.cancelMemoryDelete()

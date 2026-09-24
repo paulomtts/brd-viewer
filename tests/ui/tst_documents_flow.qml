@@ -114,7 +114,7 @@ TestCase {
     p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(docList, 0)
     p.app.nav.cursorIndex = 0; p.navigator.activateCursor()
-    compare(p.handleGlobalKey({ modifiers: Qt.ControlModifier, key: Qt.Key_1 }), true)
+    compare(p.shortcuts.handleGlobalKey({ modifiers: Qt.ControlModifier, key: Qt.Key_1 }), true)
     compare(p.app.nav.viewMode, "board")
   }
 

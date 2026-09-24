@@ -52,7 +52,7 @@ TestCase {
   function test_ctrl_3_shows_the_graph() {
     var p = make(); if (!p) return
     var event = { key: Qt.Key_3, modifiers: Qt.ControlModifier, accepted: false }
-    compare(p.handleGlobalKey(event), true)
+    compare(p.shortcuts.handleGlobalKey(event), true)
     compare(p.app.nav.viewMode, "graph")
   }
 
