@@ -4,23 +4,29 @@
     run-setup-milestone.py <project_root> <spec_path>
     run-setup-milestone.py --describe
 
-Validates the project and the spec (the spec's real path must be inside the project's
-real path, so a symlink cannot escape it), resolves the agent with
-`omarchy-default-agent`, assembles the prompt (the setup-milestone prompt plus a
-"## This run" section naming the spec relative to the project) and runs the agent
-**in its own process group** with the project as the working directory and its output
-appended to a private log file.
+Validates the project and the spec, resolves the agent with `omarchy-default-agent`,
+assembles the prompt (the setup-milestone prompt plus a "## This run" section naming
+the spec relative to the project) and runs the agent **in its own process group** with
+the project as the working directory and its output appended to a private log file.
+
+Containment: the spec's real path must be inside the project's real path, so a symlink
+cannot escape the project. There is deliberately NO file-extension check — any regular
+file inside the project may be handed to the agent as the spec.
 
 Everything is an argv array: the prompt is the last argument of the agent's command
 and no shell is ever involved, so a spec's text cannot become a command.
 
 Cancel (SIGTERM/SIGINT) and the wall-clock limit (`OPM_AGENT_TIMEOUT_SECONDS`, default
-1800) kill the WHOLE process group (TERM, then KILL after 5 s), so no agent — nor
-anything it started — is left running.
+1800) kill the WHOLE process group: SIGTERM, then SIGKILL after a grace period
+(`OPM_AGENT_KILL_GRACE_SECONDS`, default 5). Two honest limits: an agent that
+double-forks or calls `setsid()` leaves that process group and cannot be reached this
+way, and if this runner is itself SIGKILLed it never gets to kill anything, so the
+group keeps running.
 
-Prints exactly one JSON line: {"ok", "agent", "log", "exit_code", "error"}.
-Exit 0 ok, 1 refused/failed/cancelled, 2 usage error. `--describe` prints
-{"agent", "supported", "restricted", "note", "installed"} and exits 0.
+Prints exactly one JSON line on stdout on EVERY path, including an unexpected failure:
+{"ok", "agent", "log", "exit_code", "error"}. Exit 0 ok, 1 refused/failed/cancelled,
+2 usage error. `--describe` prints {"agent", "supported", "restricted", "note",
+"installed"} and exits 0; there `installed` means only "the binary is on PATH".
 """
 import os
 import re
@@ -67,7 +73,9 @@ def default_agent():
 def describe():
     name = default_agent()
     info = agents.describe(name)
-    installed = bool(name) and info["supported"] and shutil.which(name) is not None
+    # `installed` means exactly "the binary is on PATH"; the UI decides what to say
+    # from `installed` and `supported` together.
+    installed = bool(name) and shutil.which(name) is not None
     return emit({"agent": name, "supported": info["supported"],
                  "restricted": info["restricted"], "note": info["note"],
                  "installed": installed})
@@ -90,49 +98,67 @@ def build_prompt(skill_text, rel_spec):
 
 # --- log --------------------------------------------------------------------
 
+def state_home():
+    """XDG_STATE_HOME, but only when it is absolute — the spec says a relative value
+    must be ignored (otherwise the log tree would land under whatever the runner's
+    working directory happens to be)."""
+    state = os.environ.get("XDG_STATE_HOME") or ""
+    if not os.path.isabs(state):
+        return os.path.join(os.path.expanduser("~"), ".local", "state")
+    return state
+
+
 def log_path(root_real):
-    state = os.environ.get("XDG_STATE_HOME") or os.path.join(
-        os.path.expanduser("~"), ".local", "state")
-    directory = os.path.join(state, "omarchy-project-manager", "agent-logs")
+    directory = os.path.join(state_home(), "omarchy-project-manager", "agent-logs")
     os.makedirs(directory, mode=0o700, exist_ok=True)
     os.chmod(directory, 0o700)
     project = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(root_real)) or "project"
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    return os.path.join(directory, stamp + "-" + project + ".log")
+    return os.path.abspath(os.path.join(directory, stamp + "-" + project + ".log"))
 
 
 # --- process group ----------------------------------------------------------
 
 def kill_group(proc):
-    """TERM the agent's whole process group, then KILL it, so nothing survives."""
+    """TERM the agent's whole process group, then KILL it after the grace period.
+
+    The KILL always goes to the group, so an agent that ignores SIGTERM and anything
+    it started die too (unless they left the group themselves; see the module docstring).
+    """
+    grace = env_seconds("OPM_AGENT_KILL_GRACE_SECONDS", KILL_GRACE)
     try:
         pgid = os.getpgid(proc.pid)
     except OSError:
         return
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            os.killpg(pgid, sig)
-        except OSError:
-            pass
-        if sig is signal.SIGKILL:
-            break
-        try:
-            proc.wait(timeout=KILL_GRACE)
-        except subprocess.TimeoutExpired:
-            pass
     try:
-        proc.wait(timeout=KILL_GRACE)
+        os.killpg(pgid, signal.SIGTERM)
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=grace)
     except subprocess.TimeoutExpired:
         pass
 
 
-def timeout_seconds():
-    raw = os.environ.get("OPM_AGENT_TIMEOUT_SECONDS", "")
+def env_seconds(name, default):
+    """A positive number of seconds from the environment, else the default."""
     try:
-        value = float(raw)
+        value = float(os.environ.get(name, ""))
     except ValueError:
-        return DEFAULT_TIMEOUT
-    return value if value > 0 else DEFAULT_TIMEOUT
+        return default
+    return value if value > 0 else default
+
+
+def timeout_seconds():
+    return env_seconds("OPM_AGENT_TIMEOUT_SECONDS", DEFAULT_TIMEOUT)
 
 
 def run_agent(argv, root, log):
@@ -226,5 +252,18 @@ def main(argv):
                  "error": error}, 0 if ok else 1)
 
 
+def guarded(argv):
+    """The panel parses stdout for exactly one JSON line, so no path — not even an
+    unexpected exception — may end without one."""
+    try:
+        return main(argv)
+    except SystemExit:
+        raise
+    except BaseException as e:  # noqa: BLE001 - deliberate catch-all
+        reason = str(e) or e.__class__.__name__
+        return emit({"ok": False, "agent": "", "log": "", "exit_code": None,
+                     "error": "The milestone run failed: " + reason}, 1)
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(guarded(sys.argv[1:]))

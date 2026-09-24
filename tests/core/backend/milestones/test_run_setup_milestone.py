@@ -29,8 +29,9 @@ print(name)
 # The fake agent records argv/cwd/env, then behaves per FAKE_AGENT_MODE:
 #   ok    -> exits 0;  fail -> exits 3
 #   hang  -> starts a grandchild (`sleep 300`), records both pids, sleeps forever
+#   deaf  -> like hang, but ignores SIGTERM (only the KILL escalation ends it)
 FAKE_AGENT = """#!/usr/bin/env python3
-import json, os, subprocess, sys, time
+import json, os, signal, subprocess, sys, time
 rec = {"argv": sys.argv, "cwd": os.getcwd()}
 with open(os.environ["FAKE_AGENT_REC"], "w") as f:
     json.dump(rec, f)
@@ -40,11 +41,14 @@ mode = os.environ.get("FAKE_AGENT_MODE", "ok")
 if mode == "fail":
     sys.stderr.write("agent failed\\n")
     sys.exit(3)
-if mode == "hang":
+if mode in ("hang", "deaf"):
+    if mode == "deaf":
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
     child = subprocess.Popen(["sleep", "300"])
     with open(os.environ["FAKE_AGENT_PIDS"], "w") as f:
         json.dump({"agent": os.getpid(), "child": child.pid}, f)
-    time.sleep(300)
+    while True:
+        time.sleep(300)
 sys.exit(0)
 """
 
@@ -270,7 +274,8 @@ def test_a_failing_agent_is_reported_with_its_status(world):
 # --- cancel and timeout kill the whole process group ------------------------
 
 def start_hanging(world, **extra):
-    e = env_for(world, FAKE_AGENT_MODE="hang", **extra)
+    extra.setdefault("FAKE_AGENT_MODE", "hang")
+    e = env_for(world, **extra)
     p = subprocess.Popen([sys.executable, SCRIPT, str(world["proj"]), str(world["spec"])],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=e)
     pids_file = world["tmp"] / "pids.json"
@@ -366,3 +371,125 @@ def test_describe_a_supported_agent_that_is_not_installed(world):
 def test_describe_never_starts_an_agent(world):
     run(world, ["--describe"])
     assert not (world["tmp"] / "rec.json").exists()
+
+
+def test_describe_reports_installed_for_an_unsupported_agent_that_is_on_path(world):
+    write_exec(world["bin"] / "openclaw", "#!/bin/sh\nexit 0\n")
+    code, res = run(world, ["--describe"], FAKE_DEFAULT_AGENT="openclaw")
+    assert code == 0
+    assert res == {"agent": "openclaw", "supported": False, "restricted": False,
+                   "note": "", "installed": True}
+
+
+# --- nothing ever leaves the panel without one JSON line --------------------
+
+def test_an_unwritable_state_directory_still_prints_one_json_line(world):
+    locked = world["tmp"] / "locked"
+    locked.mkdir()
+    locked.chmod(0o500)
+    try:
+        p = subprocess.run([sys.executable, SCRIPT, str(world["proj"]), str(world["spec"])],
+                           capture_output=True, text=True, timeout=60,
+                           env=env_for(world, XDG_STATE_HOME=str(locked / "state")))
+    finally:
+        locked.chmod(0o700)
+    lines = p.stdout.strip().splitlines()
+    assert len(lines) == 1, p.stdout
+    res = json.loads(lines[0])
+    assert p.returncode == 1
+    assert res["ok"] is False and res["exit_code"] is None
+    assert res["error"] and "Permission denied" in res["error"]
+    assert "Traceback" not in p.stderr
+    assert not (world["tmp"] / "rec.json").exists()
+
+
+def test_an_unexpected_failure_still_prints_one_json_line(world):
+    # XDG_STATE_HOME under a regular file: makedirs raises NotADirectoryError.
+    blocker = world["tmp"] / "afile"
+    blocker.write_text("x")
+    p = subprocess.run([sys.executable, SCRIPT, str(world["proj"]), str(world["spec"])],
+                       capture_output=True, text=True, timeout=60,
+                       env=env_for(world, XDG_STATE_HOME=str(blocker / "state")))
+    lines = p.stdout.strip().splitlines()
+    assert len(lines) == 1, p.stdout
+    res = json.loads(lines[0])
+    assert p.returncode == 1 and res["ok"] is False
+    assert res["error"].startswith("The milestone run failed:")
+    assert "Traceback" not in p.stderr
+
+
+def test_an_agent_binary_that_cannot_be_executed_is_reported(world):
+    # executable, so `command -v` finds it, but not a runnable image
+    write_exec(world["bin"] / "claude", "\x7fELF not really a program\n")
+    code, res = run(world, [str(world["proj"]), str(world["spec"])])
+    assert code == 1 and res["ok"] is False
+    assert res["agent"] == "claude"
+    assert res["error"].startswith("Could not start claude:")
+
+
+# --- XDG rules --------------------------------------------------------------
+
+def test_a_relative_xdg_state_home_is_ignored(world):
+    e = env_for(world, XDG_STATE_HOME="relstate")
+    p = subprocess.run([sys.executable, SCRIPT, str(world["proj"]), str(world["spec"])],
+                       capture_output=True, text=True, timeout=60, env=e,
+                       cwd=str(world["tmp"]))
+    res = json.loads(p.stdout.strip())
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert os.path.isabs(res["log"])
+    assert res["log"].startswith(str(world["home"] / ".local" / "state"
+                                     / "omarchy-project-manager" / "agent-logs") + os.sep)
+    assert not (world["tmp"] / "relstate").exists()
+
+
+# --- log permissions --------------------------------------------------------
+
+def test_the_log_is_private_even_under_a_permissive_umask(world):
+    p = subprocess.run([sys.executable, SCRIPT, str(world["proj"]), str(world["spec"])],
+                       capture_output=True, text=True, timeout=60, env=env_for(world),
+                       preexec_fn=lambda: os.umask(0))
+    res = json.loads(p.stdout.strip())
+    assert p.returncode == 0
+    assert stat.S_IMODE(os.stat(res["log"]).st_mode) == 0o600
+    assert stat.S_IMODE(os.stat(logdir(world)).st_mode) == 0o700
+
+
+def test_a_pre_existing_world_readable_log_is_tightened_and_appended_to(world):
+    directory = logdir(world)
+    os.makedirs(directory, mode=0o700)
+    now = time.time()
+    candidates = []
+    for offset in range(4):
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(now + offset))
+        path = directory / (stamp + "-proj.log")
+        path.write_text("old line\n")
+        path.chmod(0o644)
+        candidates.append(str(path))
+    code, res = run(world, [str(world["proj"]), str(world["spec"])])
+    assert code == 0
+    assert res["log"] in candidates, "the run did not reuse a pre-created log name"
+    assert stat.S_IMODE(os.stat(res["log"]).st_mode) == 0o600
+    text = open(res["log"]).read()
+    assert text.startswith("old line\n") and "agent said hello" in text
+
+
+# --- the kill escalation ----------------------------------------------------
+
+def test_an_agent_that_ignores_sigterm_is_killed_after_the_grace_period(world):
+    proc, pids = start_hanging(world, FAKE_AGENT_MODE="deaf",
+                               OPM_AGENT_KILL_GRACE_SECONDS="1")
+    started = time.monotonic()
+    proc.send_signal(signal.SIGTERM)
+    out, _ = proc.communicate(timeout=60)
+    elapsed = time.monotonic() - started
+    res = json.loads(out.strip().splitlines()[-1])
+    assert res["ok"] is False and res["error"] == "The run was cancelled."
+    assert wait_gone(pids["agent"]), "the TERM-ignoring agent survived"
+    assert wait_gone(pids["child"]), "the grandchild survived"
+    assert elapsed < 4, elapsed  # the 1 s grace, not the 5 s default
+
+
+def test_a_bad_kill_grace_value_falls_back_to_the_default(world):
+    code, res = run(world, [str(world["proj"]), str(world["spec"])],
+                    OPM_AGENT_KILL_GRACE_SECONDS="nonsense")
+    assert code == 0 and res["ok"] is True
