@@ -100,7 +100,103 @@ function storyPips(story, issueMap) {
   return { pips: pips, morePips: children.length - shown }
 }
 
-// The story graph: {nodes, edges, groups}. `nodes` are the stories of every
+function isNumber(value) {
+  return typeof value === "number" && isFinite(value)
+}
+
+// Where a story actually is: the position `at` holds for it (a dragged story,
+// a moved box), else the one the layout gave it. `at` is read with
+// hasOwnProperty, so an id like "constructor" cannot match Object.prototype.
+function positionOf(node, at) {
+  if (at && Object.prototype.hasOwnProperty.call(at, node.id)) return at[node.id]
+  return node
+}
+
+// A position map plus one entry, as a NEW map: QML only notices a var property
+// whose object changed, never one written in place. A junk position is no
+// position and is dropped rather than stored.
+function withPosition(at, id, x, y) {
+  var next = copyPositions(at)
+  if (isNumber(x) && isNumber(y)) next[id] = { x: x, y: y }
+  return next
+}
+
+function copyPositions(at) {
+  var next = {}
+  for (var key in at) {
+    if (Object.prototype.hasOwnProperty.call(at, key)) next[key] = at[key]
+  }
+  return next
+}
+
+// The nodes as they should be drawn: copies carrying the position `at` holds
+// for them. The caller's own nodes are never written (the canvas owns its
+// model, this only hands it one).
+function placedNodes(nodes, at) {
+  return (nodes || []).map(function(node) {
+    var position = positionOf(node, at)
+    var copy = {}
+    for (var key in node) {
+      if (Object.prototype.hasOwnProperty.call(node, key)) copy[key] = node[key]
+    }
+    copy.x = position.x
+    copy.y = position.y
+    return copy
+  })
+}
+
+// The live box of every group: its own stories' bounding box, padded, with the
+// strip at the top that carries the label. Membership is the story's
+// `milestoneId` and nothing else, so a story dragged over another milestone's
+// box is never adopted by it -- its own box follows it instead. A group with no
+// placed story draws no box.
+function storyGroupRects(groups, nodes, at) {
+  var bounds = {}
+  ;(nodes || []).forEach(function(node) {
+    var position = positionOf(node, at)
+    if (!isNumber(position.x) || !isNumber(position.y)) return
+    var w = isNumber(node.w) ? node.w : 0
+    var h = isNumber(node.h) ? node.h : 0
+    var box = bounds[node.milestoneId]
+    if (!box) {
+      bounds[node.milestoneId] = { minX: position.x, minY: position.y,
+                                   maxX: position.x + w, maxY: position.y + h }
+      return
+    }
+    box.minX = Math.min(box.minX, position.x)
+    box.minY = Math.min(box.minY, position.y)
+    box.maxX = Math.max(box.maxX, position.x + w)
+    box.maxY = Math.max(box.maxY, position.y + h)
+  })
+
+  var rects = []
+  ;(groups || []).forEach(function(group) {
+    var box = Object.prototype.hasOwnProperty.call(bounds, group.id) ? bounds[group.id] : null
+    if (!box) return
+    rects.push({ id: group.id, title: group.title,
+                 x: box.minX - GROUP_PAD, y: box.minY - GROUP_HEADER,
+                 w: (box.maxX - box.minX) + 2 * GROUP_PAD,
+                 h: (box.maxY - box.minY) + GROUP_HEADER + GROUP_PAD })
+  })
+  return rects
+}
+
+// Moving a whole box: every story of that milestone shifts by the same world
+// delta, from where it is NOW, and nothing else moves. Returns a new position
+// map (see withPosition); a junk delta moves nothing.
+function moveGroupPositions(nodes, groupId, dx, dy, at) {
+  var next = copyPositions(at)
+  if (!isNumber(dx) || !isNumber(dy)) return next
+  ;(nodes || []).forEach(function(node) {
+    if (node.milestoneId !== groupId) return
+    var position = positionOf(node, at)
+    if (!isNumber(position.x) || !isNumber(position.y)) return
+    next[node.id] = { x: position.x + dx, y: position.y + dy }
+  })
+  return next
+}
+
+// The story graph: {nodes, edges, groups, groupEdges}. `nodes` are the stories of every
 // milestone in board order, `edges` their story-to-story blocked_by links
 // (a blocker in another milestone simply draws across two boxes), and `groups`
 // one labelled box per milestone that HAS stories, enclosing exactly its own.
@@ -163,16 +259,26 @@ function storyGraphModel(roots, issueMap) {
     group.h = (maxY - minY) + GROUP_HEADER + GROUP_PAD
   })
 
-  // Between the boxes: a link whose ends live in two different milestones ranks
-  // those milestones, once per pair.
-  var groupEdges = []
+  // Between the boxes, and ONE derivation for both what ranks them and what is
+  // drawn between them: box A -> B when brd says milestone B is blocked by
+  // milestone A (the milestone view's own edges, restricted to the milestones
+  // that have a box), and when any story of B is blocked by a story of A.
+  // Deduplicated, never a box to itself, never to a milestone without a box.
+  var boxed = {}
+  var boxedCards = []
+  groups.forEach(function(group) { boxed[group.id] = true })
+  milestones.forEach(function(milestone) {
+    if (Object.prototype.hasOwnProperty.call(boxed, milestone.id)) boxedCards.push(milestone)
+  })
+  var groupEdges = dependencyEdges(boxedCards, boxed)
   var seenGroupEdge = {}
+  groupEdges.forEach(function(edge) { seenGroupEdge[edge.id] = true })
   edges.forEach(function(edge) {
     var from = groupOf[edge.from]
     var to = groupOf[edge.to]
     if (from === to) return
     var key = from + ">" + to
-    if (seenGroupEdge[key]) return
+    if (Object.prototype.hasOwnProperty.call(seenGroupEdge, key)) return
     seenGroupEdge[key] = true
     groupEdges.push({ id: key, from: from, to: to })
   })
@@ -189,10 +295,13 @@ function storyGraphModel(roots, issueMap) {
       node.x = group.x + offsets[node.id].x
       node.y = group.y + offsets[node.id].y
     })
-    delete group.stories
   })
 
-  return { nodes: nodes, edges: edges, groups: groups }
+  // The boxes themselves come from the stories' final positions, through the
+  // very function the view re-runs live while a story is dragged: the model's
+  // boxes and the drawn ones are one derivation, so they cannot drift apart.
+  return { nodes: nodes, edges: edges, groupEdges: groupEdges,
+           groups: storyGroupRects(groups, nodes, {}) }
 }
 
 // Keyboard selection on the graph: the nearest node whose centre lies in the

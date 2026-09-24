@@ -96,6 +96,18 @@ TestCase {
     compare(app.graph.currentNodes.length, app.graph.graph.nodes.length)
     compare(app.graph.currentEdges.length, app.graph.graph.edges.length)
     compare(app.graph.currentGroups.length, 0, "the milestone view has no group boxes")
+    compare(app.graph.currentGroupEdges.length, 0, "and no box-to-box edges")
+  }
+
+  function test_the_story_view_serves_the_box_to_box_edges() {
+    var app = make(); if (!app) return
+    app.board.applyTreeData(storyRoots())
+    app.graph.setGraphView("story")
+    // s3 (m2) is blocked by s1 (m1): the two boxes depend on each other.
+    compare(app.graph.currentGroupEdges.map(function(e) { return e.id }).join(","), "m1>m2")
+    compare(app.graph.storyGraph.groupEdges.length, 1)
+    app.graph.setGraphView("milestone")
+    compare(app.graph.currentGroupEdges.length, 0)
   }
 
   function test_the_story_view_serves_the_story_model_and_its_groups() {

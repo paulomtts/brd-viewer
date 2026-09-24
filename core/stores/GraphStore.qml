@@ -22,8 +22,10 @@ QtObject {
 
   readonly property var currentNodes: graphStore.graphView === "story" ? graphStore.storyGraph.nodes : graphStore.graph.nodes
   readonly property var currentEdges: graphStore.graphView === "story" ? graphStore.storyGraph.edges : graphStore.graph.edges
-  // Only the story view groups its nodes; the milestone view has no boxes.
+  // Only the story view groups its nodes; the milestone view has no boxes, and
+  // so no box-to-box dependency to draw between them either.
   readonly property var currentGroups: graphStore.graphView === "story" ? graphStore.storyGraph.groups : []
+  readonly property var currentGroupEdges: graphStore.graphView === "story" ? graphStore.storyGraph.groupEdges : []
 
   property string graphCursor: ""
 

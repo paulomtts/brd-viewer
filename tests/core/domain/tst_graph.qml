@@ -236,6 +236,133 @@ TestCase {
     compare(Graph.storyGraphModel([makeCard("m1", "todo", [makeCard("s1", "todo", [], ["toString"])])]).edges.length, 0)
   }
 
+  // ---- Box-to-box dependency: the milestone-level reading of the story view.
+
+  function test_box_edges_come_from_the_milestone_blocked_by_links() {
+    // No story links at all: the boxes are joined by what brd says about the
+    // milestones themselves -- the very links the milestone view draws.
+    var g = Graph.storyGraphModel([
+      makeCard("m1", "todo", [makeCard("s1", "todo", [])]),
+      makeCard("m2", "todo", [makeCard("s2", "todo", [])], ["m1", "ghost", "s1"]),
+      makeCard("m3", "todo", [], ["m1"])])
+    compare(g.groupEdges.map(function(e) { return e.id }).join(","), "m1>m2",
+            "a milestone with no box, an unknown id and a story id link nothing")
+    compare(g.groupEdges[0].from, "m1")
+    compare(g.groupEdges[0].to, "m2")
+    compare(g.edges.length, 0, "and no story edge was invented")
+  }
+
+  function test_box_edges_are_also_derived_from_the_story_links() {
+    var g = Graph.storyGraphModel(storyRoots())
+    // s1 (m1) blocks s3 (m2): milestone-level nothing is declared, yet the two
+    // boxes depend on each other.
+    compare(g.groupEdges.map(function(e) { return e.id }).join(","), "m1>m2")
+  }
+
+  function test_many_story_links_between_two_boxes_draw_one_box_edge() {
+    var g = Graph.storyGraphModel([
+      makeCard("m1", "todo", [makeCard("s1", "todo", []), makeCard("s2", "todo", [])]),
+      makeCard("m2", "todo", [makeCard("s3", "todo", [], ["s1", "s2"]),
+                              makeCard("s4", "todo", [], ["s1"])], ["m1"])])
+    compare(g.edges.length, 3, "three story links")
+    compare(g.groupEdges.map(function(e) { return e.id }).join(","), "m1>m2",
+            "declared and derived, deduplicated into one box edge")
+  }
+
+  function test_a_box_never_links_to_itself() {
+    var g = Graph.storyGraphModel([
+      makeCard("m1", "todo", [makeCard("s1", "todo", []), makeCard("s2", "todo", [], ["s1"])], ["m1"])])
+    compare(g.edges.map(function(e) { return e.id }).join(","), "s1>s2")
+    compare(g.groupEdges.length, 0, "a link inside one box is no box dependency")
+  }
+
+  function test_the_boxes_are_ranked_by_the_box_edges() {
+    var g = Graph.storyGraphModel([
+      makeCard("m1", "todo", [makeCard("s1", "todo", [])]),
+      makeCard("m2", "todo", [makeCard("s2", "todo", [])], ["m1"])])
+    verify(g.groups[1].x > g.groups[0].x, "the blocked milestone's box sits to the right")
+  }
+
+  // ---- Live boxes: the box is its stories' bounding box, wherever they are.
+
+  function test_a_group_box_is_the_bounding_box_of_its_stories() {
+    var nodes = [{ id: "s1", milestoneId: "m1", x: 100, y: 50, w: 200, h: 80 },
+                 { id: "s2", milestoneId: "m1", x: 400, y: 200, w: 200, h: 80 },
+                 { id: "s3", milestoneId: "m2", x: 0, y: 0, w: 200, h: 80 }]
+    var groups = [{ id: "m1", title: "One" }, { id: "m2", title: "Two" }]
+    var rects = Graph.storyGroupRects(groups, nodes, {})
+    compare(rects.length, 2)
+    compare(rects[0].id, "m1")
+    compare(rects[0].title, "One")
+    compare(rects[0].x, 100 - Graph.GROUP_PAD)
+    compare(rects[0].y, 50 - Graph.GROUP_HEADER)
+    compare(rects[0].w, (600 - 100) + 2 * Graph.GROUP_PAD)
+    compare(rects[0].h, (280 - 50) + Graph.GROUP_HEADER + Graph.GROUP_PAD)
+  }
+
+  function test_a_box_follows_the_story_that_was_dragged_out_of_it() {
+    var nodes = [{ id: "s1", milestoneId: "m1", x: 0, y: 0, w: 200, h: 80 },
+                 { id: "s2", milestoneId: "m2", x: 600, y: 0, w: 200, h: 80 }]
+    var groups = [{ id: "m1", title: "One" }, { id: "m2", title: "Two" }]
+    // s1 is dragged far away: its box grows to keep containing it, and the
+    // other milestone's box does not adopt it.
+    var rects = Graph.storyGroupRects(groups, nodes, { s1: { x: 900, y: 400 } })
+    verify(rects[0].x <= 900 && 900 + 200 <= rects[0].x + rects[0].w, "s1 is inside its own box")
+    verify(rects[0].y <= 400 && 400 + 80 <= rects[0].y + rects[0].h)
+    compare(rects[1].x, 600 - Graph.GROUP_PAD, "m2's box is untouched by another milestone's story")
+    compare(rects[1].w, 200 + 2 * Graph.GROUP_PAD)
+  }
+
+  function test_a_group_with_no_placed_story_draws_no_box() {
+    compare(Graph.storyGroupRects([{ id: "m1", title: "One" }], [], {}).length, 0)
+    compare(Graph.storyGroupRects([{ id: "m1", title: "One" }],
+                                  [{ id: "s1", milestoneId: "m1", x: NaN, y: 0, w: 10, h: 10 }], {}).length, 0)
+    compare(Graph.storyGroupRects(undefined, undefined, undefined).length, 0)
+  }
+
+  function test_the_model_boxes_are_the_bounding_boxes_of_the_placed_stories() {
+    var g = Graph.storyGraphModel(storyRoots())
+    var rects = Graph.storyGroupRects(g.groups, g.nodes, {})
+    compare(JSON.stringify(rects), JSON.stringify(g.groups),
+            "one derivation: the model's own boxes are what the live one computes")
+  }
+
+  // ---- Moving a whole box, and the positions that override the layout.
+
+  function test_moving_a_box_shifts_exactly_its_own_stories() {
+    var nodes = [{ id: "s1", milestoneId: "m1", x: 0, y: 0, w: 200, h: 80 },
+                 { id: "s2", milestoneId: "m1", x: 300, y: 100, w: 200, h: 80 },
+                 { id: "s3", milestoneId: "m2", x: 600, y: 0, w: 200, h: 80 }]
+    var at = Graph.moveGroupPositions(nodes, "m1", 40, -10, {})
+    compare(at.s1.x, 40)
+    compare(at.s1.y, -10)
+    compare(at.s2.x, 340)
+    compare(at.s2.y, 90)
+    verify(at.s3 === undefined, "another milestone's story stays where it is")
+    // Moving again starts from where the stories are NOW, not from the model.
+    var again = Graph.moveGroupPositions(nodes, "m1", 10, 10, at)
+    compare(again.s1.x, 50)
+    compare(again.s1.y, 0)
+    compare(Graph.moveGroupPositions(nodes, "m1", NaN, 0, at).s1.x, 40, "a junk delta moves nothing")
+    compare(Graph.moveGroupPositions(nodes, "nope", 10, 0, {}).s1, undefined)
+  }
+
+  function test_a_position_override_replaces_the_laid_out_one() {
+    var nodes = [{ id: "s1", milestoneId: "m1", x: 0, y: 0, w: 200, h: 80 },
+                 { id: "s2", milestoneId: "m1", x: 300, y: 100, w: 200, h: 80 }]
+    var placed = Graph.placedNodes(nodes, { s1: { x: 12, y: 34 } })
+    compare(placed[0].x, 12)
+    compare(placed[0].y, 34)
+    compare(placed[0].w, 200, "everything else about the node is kept")
+    compare(placed[1].x, 300)
+    compare(nodes[0].x, 0, "the caller's own nodes are never written")
+    compare(Graph.placedNodes(undefined, undefined).length, 0)
+    var kept = Graph.withPosition({ s1: { x: 1, y: 2 } }, "s2", 5, 6)
+    compare(kept.s1.x, 1)
+    compare(kept.s2.y, 6)
+    compare(Graph.withPosition({}, "s1", NaN, 0).s1, undefined, "a junk drop is no position")
+  }
+
   function test_the_story_graph_is_deterministic_and_empty_of_nothing() {
     var once = JSON.stringify(Graph.storyGraphModel(storyRoots()))
     var twice = JSON.stringify(Graph.storyGraphModel(storyRoots()))
@@ -244,6 +371,7 @@ TestCase {
     compare(empty.nodes.length, 0)
     compare(empty.edges.length, 0)
     compare(empty.groups.length, 0)
+    compare(empty.groupEdges.length, 0)
     compare(Graph.storyGraphModel(undefined).nodes.length, 0)
     compare(Graph.storyGraphModel([makeCard("m1", "todo", [])]).groups.length, 0)
   }
