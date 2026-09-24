@@ -142,7 +142,7 @@ def violations_store(path, text, root=ROOT):
 
 
 def violations_screen(path, text, root=ROOT):
-    """ui/screens/**: no import of core/stores (screens get `app` injected); unparseable imports fail."""
+    """ui/screens/** and ui/components/**: no import of core/stores (they get `app`/props injected); unparseable imports fail."""
     bad = []
     for kind, value in scan_imports(text):
         if kind == "unknown" or (kind == "path" and (resolve(path, value) == root / "core" / "stores"
@@ -191,6 +191,11 @@ def test_import_rule_regexes_flag_and_accept_what_they_should():
                  'import "../../core/stores" as C // x', 'import "../../core/stores" as C /* x */',
                  'import "../../core/stores/App.qml" as C', "import ../../core/stores as C"]:
         assert violations_screen(sc, evil) != [], evil
+    # components are prop-driven too (same rule, same scanner)
+    comp = ROOT / "ui/components/C.qml"
+    assert violations_screen(comp, 'import "../../core/stores" as X') != []
+    assert violations_screen(comp, "import '../../core/stores/App.qml' as X // c") != []
+    assert violations_screen(comp, 'import "../../core/domain/text.js" as T\nimport "../theme" as T2') == []
     # vendor
     assert violations_vendor(v, 'import "positions.js" as P\nimport qs.Commons\nimport QtQuick 2.15') == []
     for evil in ['import "../../core/domain/x.js" as X', 'import "../../ui/theme" as T', "import '../../core/x' as C",
@@ -217,7 +222,7 @@ def test_layers_import_only_what_their_allowlist_permits():
             assert violations_store(path, text) == [], r
         elif r.startswith("core/backend/"):
             assert path.suffix not in {".qml", ".js"}, r
-        elif r.startswith("ui/screens/"):
+        elif r.startswith(("ui/screens/", "ui/components/")):
             assert violations_screen(path, text) == [], r
         elif r.startswith("vendor/"):
             assert violations_vendor(path, text) == [], r

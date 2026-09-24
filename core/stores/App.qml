@@ -1,8 +1,8 @@
 import QtQml
 
 // The panel's non-visual state, in one place, plus the wiring between stores:
-// a store never reaches for another one, App hands it what it needs. Later
-// tasks add the remaining stores beside `nav`.
+// a store never reaches for another one, App composes them and hands each
+// what it needs through properties and signals.
 QtObject {
   id: app
 

@@ -10,6 +10,8 @@ Status: implemented. Behaviour-preserving restructure; no user-visible change.
 - `ui/Panel.qml` is about 479 lines (the "under about 400" target was not met; it holds no feature state).
 - `ui/components` ended as: ActionButton, Badge, Chip, ChipRow, DocumentsView, FilterableList, GraphView, ListRow, ListStatus, MemoriesView, MemoryNoteView, ModalCard, NewMemoryDialog, Sidebar, TagPicker, TextAreaBox, ThemedText, TypedConfirmDialog.
 - Documented remaining duplicates (allowlisted in the architecture test): the detail-panel tone pill in `CardDetailScreen`, `BoardCard`, and Sidebar's three `CursorSurface` uses; `TextAreaBox` sets `font.family` itself (a `Controls.TextArea`, not a `Text`). `Badge` and `Chip` draw through `ThemedText`.
+- `listProc` (brd projects), `treeProc` (brd tree), `saveStateProc`, `resolveDbPathProc` and `deleteProc` remain plain `Process` objects, not `HelperRunner` (they run the `brd` CLI or are fire-and-forget/single-owner with their own exit handling); the table above promised `HelperRunner` for delete/tree.
+- `HelperRunner.run()` SIGTERMs a previous run of the same helper rather than letting it finish and dropping its reply (reachable for list-docs/list-memories refetches and a set-doc-tag started in another project mid-flight); helpers write atomically, so at worst a stray `docs/.tmp-*`.
 - The layer test uses allowlists with regex self-tests; `docs/architecture.md` is the one-page summary.
 
 ## Problem

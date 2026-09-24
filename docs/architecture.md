@@ -12,7 +12,7 @@ Design background: `docs/superpowers/specs/2026-09-24-core-ui-architecture-desig
 | `core/backend/**` | Python stdlib, `core/backend/common` | any QML |
 | `core/*` | only `domain/`, `backend/`, `stores/` (no loose files); `backend/` has no `.js`/`.qml` | |
 | `core/stores/*.qml` | `QtQml`, `Quickshell`, `Quickshell.Io`, `../domain/*.js` | `QtQuick*`, `qs.*`, `ui/`, `vendor/`, sibling directories |
-| `ui/**` | everything in `core/`, `qs.Ui`, `qs.Commons`, `QtQuick*`, `vendor/canvas` | `ui/screens/**` must not import `core/stores` (they receive `app`) |
+| `ui/**` | everything in `core/`, `qs.Ui`, `qs.Commons`, `QtQuick*`, `vendor/canvas` | `ui/screens/**` and `ui/components/**` must not import `core/stores` (they receive `app`/props); only `Panel`, `Shortcuts`, `Navigator` may |
 | `vendor/**` | its own files, `qs.*`, `QtQuick*` | `core/`, `ui/` |
 
 Repo root holds no `.qml`/`.js`/`.py` except `install.sh`. `ui/Panel.qml` is the
@@ -33,6 +33,8 @@ manifest entry point.
 
 Other `ui/` pieces: `Navigator.qml` (screen switching), `Shortcuts.qml` (key
 events to store calls), `theme/Theme.qml` (colours and fonts from the shell).
+
+Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `treeProc` (`brd tree`), `saveStateProc`, `resolveDbPathProc` and `deleteProc` stay plain `Process` objects because they run the `brd` CLI or are fire-and-forget/single-owner with their own exit handling. `HelperRunner.run()` SIGTERMs a previous run of the same helper instead of letting it finish and dropping its reply (reachable for list-docs/list-memories refetches, and a set-doc-tag started in another project mid-flight); helpers write atomically, so at worst a stray `docs/.tmp-*` remains.
 
 ## Shared components (`ui/components`) - reuse before writing a second copy
 
