@@ -49,139 +49,123 @@ Item {
     dialog.createRequested(nameField.text.trim(), dialog.type, descriptionField.text.trim(), bodyArea.text)
   }
 
-  Rectangle {
-    objectName: "newMemoryBackdrop"
+  UI.ModalCard {
+    id: modal
     anchors.fill: parent
-    color: Qt.rgba(0, 0, 0, 0.55)
-    MouseArea { anchors.fill: parent; onClicked: if (!dialog.busy) dialog.cancelRequested() }
-  }
+    shown: true
+    dismissable: !dialog.busy
+    maxWidth: Style.space(520)
+    maxHeight: modal.height - Style.space(48)
+    backdropObjectName: "newMemoryBackdrop"
+    cardObjectName: "newMemoryCard"
+    onDismissed: dialog.cancelRequested()
 
-  Rectangle {
-    id: card
-    objectName: "newMemoryCard"
-    anchors.centerIn: parent
-    width: Math.min(Style.space(520), parent.width - Style.space(48))
-    height: Math.min(parent.height - Style.space(48), content.implicitHeight + Style.space(36))
-    radius: Style.space(10)
-    color: Color.popups.background
-    border.width: 1
-    border.color: Color.popups.border
+    Text {
+      text: "New memory"
+      color: dialog.foreground
+      font.family: dialog.fontFamily
+      font.pixelSize: Style.font.heading
+      font.bold: true
+    }
 
-    MouseArea { anchors.fill: parent }
+    TextField {
+      id: nameField
+      objectName: "newMemoryName"
+      width: parent.width
+      foreground: dialog.foreground
+      placeholderText: "Name"
+      enabled: !dialog.busy
+      KeyNavigation.tab: descriptionField
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Escape) { dialog.cancelRequested(); event.accepted = true }
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { dialog.submit(); event.accepted = true }
+      }
+    }
 
-    Column {
-      id: content
-      anchors.fill: parent
-      anchors.margins: Style.space(18)
-      spacing: Style.space(8)
+    UI.ChipRow {
+      width: parent.width
+      theme: dialog.theme
+      chipPrefix: "newMemoryType"
+      active: dialog.type
+      model: Memories.MEMORY_TYPES.filter(function(t) { return t.id !== "other" })
+        .map(function(t) {
+          return { id: t.id, label: t.label, tint: Memories.memoryTypeColor(t.id, dialog.dim) }
+        })
+      onChosen: function(id) { dialog.type = id }
+    }
 
-      Text {
-        text: "New memory"
+    TextField {
+      id: descriptionField
+      objectName: "newMemoryDescription"
+      width: parent.width
+      foreground: dialog.foreground
+      placeholderText: "One-line description (shown in the list and MEMORY.md)"
+      enabled: !dialog.busy
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Escape) { dialog.cancelRequested(); event.accepted = true }
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { dialog.submit(); event.accepted = true }
+      }
+    }
+
+    Rectangle {
+      width: parent.width
+      height: Style.space(160)
+      radius: Style.space(6)
+      color: Qt.alpha(dialog.foreground, 0.06)
+      border.width: 1
+      border.color: bodyArea.activeFocus ? dialog.foreground : Qt.alpha(dialog.foreground, 0.3)
+
+      Controls.TextArea {
+        id: bodyArea
+        objectName: "newMemoryBody"
+        anchors.fill: parent
+        anchors.margins: Style.space(8)
+        background: null
+        placeholderText: "What should be remembered?"
         color: dialog.foreground
         font.family: dialog.fontFamily
-        font.pixelSize: Style.font.heading
-        font.bold: true
-      }
-
-      TextField {
-        id: nameField
-        objectName: "newMemoryName"
-        width: parent.width
-        foreground: dialog.foreground
-        placeholderText: "Name"
-        enabled: !dialog.busy
-        KeyNavigation.tab: descriptionField
-        Keys.onPressed: function(event) {
-          if (event.key === Qt.Key_Escape) { dialog.cancelRequested(); event.accepted = true }
-          else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { dialog.submit(); event.accepted = true }
-        }
-      }
-
-      UI.ChipRow {
-        width: parent.width
-        theme: dialog.theme
-        chipPrefix: "newMemoryType"
-        active: dialog.type
-        model: Memories.MEMORY_TYPES.filter(function(t) { return t.id !== "other" })
-          .map(function(t) {
-            return { id: t.id, label: t.label, tint: Memories.memoryTypeColor(t.id, dialog.dim) }
-          })
-        onChosen: function(id) { dialog.type = id }
-      }
-
-      TextField {
-        id: descriptionField
-        objectName: "newMemoryDescription"
-        width: parent.width
-        foreground: dialog.foreground
-        placeholderText: "One-line description (shown in the list and MEMORY.md)"
+        font.pixelSize: Style.font.bodySmall
+        wrapMode: TextEdit.Wrap
+        selectByMouse: true
         enabled: !dialog.busy
         Keys.onPressed: function(event) {
           if (event.key === Qt.Key_Escape) { dialog.cancelRequested(); event.accepted = true }
-          else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { dialog.submit(); event.accepted = true }
-        }
-      }
-
-      Rectangle {
-        width: parent.width
-        height: Style.space(160)
-        radius: Style.space(6)
-        color: Qt.alpha(dialog.foreground, 0.06)
-        border.width: 1
-        border.color: bodyArea.activeFocus ? dialog.foreground : Qt.alpha(dialog.foreground, 0.3)
-
-        Controls.TextArea {
-          id: bodyArea
-          objectName: "newMemoryBody"
-          anchors.fill: parent
-          anchors.margins: Style.space(8)
-          background: null
-          placeholderText: "What should be remembered?"
-          color: dialog.foreground
-          font.family: dialog.fontFamily
-          font.pixelSize: Style.font.bodySmall
-          wrapMode: TextEdit.Wrap
-          selectByMouse: true
-          enabled: !dialog.busy
-          Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape) { dialog.cancelRequested(); event.accepted = true }
-            else if ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-              dialog.submit(); event.accepted = true
-            }
+          else if ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            dialog.submit(); event.accepted = true
           }
         }
       }
+    }
 
-      Text {
-        objectName: "newMemoryError"
-        visible: dialog.error !== ""
-        width: parent.width
-        text: dialog.error
-        color: dialog.urgent
-        font.family: dialog.fontFamily
-        font.pixelSize: Style.font.caption
-        wrapMode: Text.WordWrap
+    Text {
+      objectName: "newMemoryError"
+      visible: dialog.error !== ""
+      width: parent.width
+      text: dialog.error
+      color: dialog.urgent
+      font.family: dialog.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.WordWrap
+    }
+
+    Row {
+      spacing: Style.spacing.md
+
+      UI.ActionButton {
+        objectName: "newMemoryCancel"
+        text: "Cancel"
+        enabled: !dialog.busy
+        opacity: 1
+        theme: dialog.theme
+        onClicked: dialog.cancelRequested()
       }
 
-      Row {
-        spacing: Style.spacing.md
-
-        UI.ActionButton {
-          objectName: "newMemoryCancel"
-          text: "Cancel"
-          enabled: !dialog.busy
-          opacity: 1
-          theme: dialog.theme
-          onClicked: dialog.cancelRequested()
-        }
-
-        UI.ActionButton {
-          objectName: "newMemoryCreate"
-          text: dialog.busy ? "Creating…" : "Create"
-          enabled: !dialog.busy && dialog.valid
-          theme: dialog.theme
-          onClicked: dialog.submit()
-        }
+      UI.ActionButton {
+        objectName: "newMemoryCreate"
+        text: dialog.busy ? "Creating…" : "Create"
+        enabled: !dialog.busy && dialog.valid
+        theme: dialog.theme
+        onClicked: dialog.submit()
       }
     }
   }

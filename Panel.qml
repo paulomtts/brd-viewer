@@ -7,7 +7,6 @@ import qs.Commons
 import qs.Ui
 import "core/domain/board.js" as Board
 import "core/domain/documents.js" as Documents
-import "core/domain/projects.js" as Projects
 import "core/stores" as Core
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
@@ -81,7 +80,7 @@ Panel {
     return []
   }
 
-  readonly property Item focusItem: appStores.deleter.deleteTarget ? confirmField
+  readonly property Item focusItem: appStores.deleter.deleteTarget ? deleteModal.focusItem
     : appStores.memories.memoryDeleteOpen ? memoryConfirm.focusItem
     : appStores.memories.newMemoryOpen ? newMemoryDialog.focusItem
     : (appStores.nav.viewMode === "memory" && appStores.memories.memoryEditing) ? memoryNote.editorItem
@@ -841,119 +840,29 @@ Panel {
         }
       }
 
-      // Delete confirmation: a modal card over a dimmed backdrop, above everything.
-      Item {
+      // Delete confirmation: the shared typed-word modal, driven by the store.
+      TypedConfirmDialog {
         id: deleteModal
         objectName: "deleteModal"
         anchors.fill: parent
-        z: 100
-        visible: !!appStores.deleter.deleteTarget
-
-        Rectangle {
-          objectName: "deleteBackdrop"
-          anchors.fill: parent
-          color: Qt.rgba(0, 0, 0, 0.55)
-
-          MouseArea {
-            anchors.fill: parent
-            onClicked: appStores.deleter.cancelDelete()
-          }
-        }
-
-        Rectangle {
-          id: deleteCard
-          objectName: "deleteCard"
-          anchors.centerIn: parent
-          width: Math.min(Style.space(440), parent.width - Style.space(48))
-          height: deleteColumn.implicitHeight + Style.space(36)
-          radius: Style.space(10)
-          color: Color.popups.background
-          border.width: 1
-          border.color: Color.popups.border
-
-          MouseArea { anchors.fill: parent }
-
-          Column {
-            id: deleteColumn
-            anchors.fill: parent
-            anchors.margins: Style.space(18)
-            spacing: Style.space(8)
-            Text {
-              width: parent.width
-              text: "Type delete to permanently remove “" + (appStores.deleter.deleteTarget ? appStores.deleter.deleteTarget.name : "")
-                + "” from brd. This can't be undone, but a snapshot of its board is saved first."
-              color: root.urgent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              wrapMode: Text.WordWrap
-            }
-
-            Text {
-              width: parent.width
-              text: appStores.deleter.deleteTarget ? root.displayPath(appStores.deleter.deleteTarget.root_path) : ""
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              elide: Text.ElideMiddle
-            }
-
-            TextField {
-              id: confirmField
-              objectName: "confirmField"
-              width: parent.width
-              foreground: root.foreground
-              placeholderText: "delete"
-              enabled: !appStores.deleter.deleting
-              text: appStores.deleter.confirmText
-
-              onTextChanged: appStores.deleter.confirmText = text
-
-              Keys.onPressed: function(event) {
-                if (event.key === Qt.Key_Escape) { appStores.deleter.cancelDelete(); event.accepted = true; return }
-                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                  appStores.deleter.performDelete(); event.accepted = true; return
-                }
-              }
-            }
-
-            Text {
-              visible: appStores.deleter.deleteError !== ""
-              width: parent.width
-              text: appStores.deleter.deleteError
-              color: root.urgent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              wrapMode: Text.WordWrap
-            }
-
-            Row {
-              spacing: Style.spacing.md
-
-              Button {
-                text: "Cancel"
-                enabled: !appStores.deleter.deleting
-                bordered: true
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                fontSize: Style.font.bodySmall
-                verticalPadding: Style.spacing.controlPaddingY
-                onClicked: appStores.deleter.cancelDelete()
-              }
-
-              Button {
-                text: appStores.deleter.deleting ? "Deleting…" : "Confirm delete"
-                enabled: !appStores.deleter.deleting && Projects.isDeleteConfirmed(appStores.deleter.confirmText)
-                opacity: enabled ? 1 : 0.5
-                bordered: true
-                foreground: root.urgent
-                fontFamily: root.fontFamily
-                fontSize: Style.font.bodySmall
-                verticalPadding: Style.spacing.controlPaddingY
-                onClicked: appStores.deleter.performDelete()
-              }
-            }
-          }
-        }
+        backdropObjectName: "deleteBackdrop"
+        cardObjectName: "deleteCard"
+        fieldObjectName: "confirmField"
+        shown: !!appStores.deleter.deleteTarget
+        message: "Type delete to permanently remove “" + (appStores.deleter.deleteTarget ? appStores.deleter.deleteTarget.name : "")
+          + "” from brd. This can't be undone, but a snapshot of its board is saved first."
+        detail: appStores.deleter.deleteTarget ? root.displayPath(appStores.deleter.deleteTarget.root_path) : ""
+        confirmLabel: "Confirm delete"
+        busyLabel: "Deleting…"
+        busy: appStores.deleter.deleting
+        error: appStores.deleter.deleteError
+        typedText: appStores.deleter.confirmText
+        foreground: root.foreground
+        urgent: root.urgent
+        fontFamily: root.fontFamily
+        onTypedEdited: function(text) { appStores.deleter.confirmText = text }
+        onConfirmRequested: appStores.deleter.performDelete()
+        onCancelRequested: appStores.deleter.cancelDelete()
       }
 
       TypedConfirmDialog {
