@@ -6,21 +6,6 @@ import "../../../core/domain/milestones.js" as Milestones
 TestCase {
   name: "DomainMilestones"
 
-  function test_create_result() {
-    var r = Milestones.parseCreateResult('{"ok": true, "id": "c1", "extra": 1}\n', 0)
-    compare(r.ok, true); compare(r.id, "c1"); compare(r.error, "")
-    r = Milestones.parseCreateResult('{"ok": false, "error": "boom"}', 1)
-    compare(r.ok, false); compare(r.id, ""); compare(r.error, "boom")
-    r = Milestones.parseCreateResult('{"ok": true, "id": "c1"}', 1)
-    compare(r.ok, false)
-    r = Milestones.parseCreateResult("garbage", 0)
-    compare(r.ok, false); compare(r.id, ""); verify(r.error !== "")
-    r = Milestones.parseCreateResult(undefined, 0)
-    compare(r.ok, false); verify(r.error !== "")
-    r = Milestones.parseCreateResult('{"ok": true}', 0)
-    compare(r.ok, true); compare(r.id, "")
-  }
-
   function test_run_result() {
     var r = Milestones.parseRunResult('noise\n{"ok": true, "agent": "claude", "log": "/tmp/l", "exit_code": 0, "error": null}\n', 0)
     compare(r.ok, true); compare(r.agent, "claude"); compare(r.log, "/tmp/l"); compare(r.exitCode, 0); compare(r.error, "")

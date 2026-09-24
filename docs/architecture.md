@@ -31,9 +31,9 @@ manifest entry point.
 - `DocumentsStore.qml` listing, category filter, open document, tagging.
 - `MemoriesStore.qml` listing, type filter, open/edit/create/delete a note.
 - `MilestoneStore.qml` the New-milestone dialog and the one agent job
-  (`idle -> running -> done|failed`): three `HelperRunner`s
-  (`create-milestone.py`, `run-setup-milestone.py`, the same with
-  `--describe`). It never reaches for the board: `App` hands it `cardCount` and
+  (`idle -> running -> done|failed`): two `HelperRunner`s, both
+  `run-setup-milestone.py` -- the run itself, and `--describe`, which the
+  dialog asks for once per project as it opens. It never reaches for the board: `App` hands it `cardCount` and
   routes its `boardRefreshRequested()` to `board.fetchBoard()`. The spec
   runner's guard is the project the JOB is for, not the selected one, so a run
   that outlives a project switch is still recorded truthfully; `jobVisible`
@@ -54,7 +54,7 @@ presentational),
 `Chip` and `ChipRow` (filter chips), `ModalCard` (dimmed backdrop and card),
 `TypedConfirmDialog`, `ListRow` (hover / keyboard cursor / reveal),
 `ListStatus` (loading/error/empty), `FilterableList`, `TextAreaBox`,
-`TagPicker`, `NewMemoryDialog`, `NewMilestoneDialog` (manual / from-spec modal),
+`TagPicker`, `NewMemoryDialog`, `NewMilestoneDialog` (the from-spec modal),
 `MilestoneJobIndicator` (the toolbar strip while a milestone job runs, and its
 result), `Sidebar`, and the views
 `DocumentsView`, `MemoriesView`, `MemoryNoteView`, `GraphView`.
@@ -66,12 +66,11 @@ Fonts, because a glyph the font does not have renders as an empty box.
 toolbar - the category chips of the list, and the path and type picker of an
 open document - so only the document body scrolls.
 Domain helpers: `taxonomy.js` (typed labels), `results.js` (one JSON line +
-exit code), `text.js` (`matchesQuery`), `milestones.js` (the three helper
+exit code), `text.js` (`matchesQuery`), `milestones.js` (the two helper
 parsers, `agentMessage`, `formatElapsed`, the spec-list ordering and filter);
 Python: `core/backend/common`
 (`json_line`, `safe_paths`, `atomic_write`, `frontmatter`).
 `core/backend/milestones/` is the New-milestone backend:
-`create-milestone.py` (manual mode, one `brd add` with `cwd` = the project),
 `setup-milestone.md` (the prompt the agent is given),
 `agents.py` (one adapter per coding agent: the exact argv, whether the run can
 be restricted, and the `--help` lines that justify it) and

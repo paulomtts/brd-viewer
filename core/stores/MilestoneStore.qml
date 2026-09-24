@@ -3,9 +3,9 @@ import Quickshell
 import Quickshell.Io
 import "../domain/milestones.js" as Milestones
 
-// Creating a milestone: the New-milestone dialog (by hand, or by handing a spec
-// to the default coding agent) and the one agent job the shell may have running,
-// as a small state machine (idle -> running -> done|failed). The project, the
+// Creating a milestone: the New-milestone dialog (always a spec handed to the
+// default coding agent) and the one agent job the shell may have running, as a
+// small state machine (idle -> running -> done|failed). The project, the
 // backend directory and the number of cards the board knows about are handed to
 // it by App -- it never reaches for another store. The dialog's looks, the spec
 // picker and the running indicator stay in the UI.
@@ -18,9 +18,6 @@ Scope {
 
   // The dialog
   property bool dialogOpen: false
-  property string mode: "manual"      // "manual" | "spec"
-  property string title: ""
-  property string description: ""
   property string selectedSpec: ""    // path relative to the project root
   property var agentInfo: null        // the last `--describe` answer
   property string dialogError: ""
@@ -36,11 +33,6 @@ Scope {
   property int cardsFrozen: -1        // the count as it stood when the job ended
   property bool cardsCountKnown: true // false when the job ended away from its own board
   property bool jobDismissed: false
-  property string createProject: ""   // the project root the create in flight is for
-
-  // One create at a time, from its launch until the helper's own exit -- even
-  // when the user has left the project meanwhile.
-  readonly property bool dialogBusy: manualRunner.busy
 
   // The agent check is on its way: the dialog says so rather than showing a
   // verdict nobody has reached yet.
@@ -59,7 +51,6 @@ Scope {
     && store.jobProject === (store.project ? store.project.root_path : "")
     && !store.jobDismissed
 
-  readonly property alias manualRunner: manualRunner
   readonly property alias specRunner: specRunner
   readonly property alias describeRunner: describeRunner
 
@@ -71,75 +62,35 @@ Scope {
   // left and deliberately keeps running there (see `jobVisible`).
   function reset() {
     store.dialogOpen = false
-    store.mode = "manual"
-    store.title = ""
-    store.description = ""
     store.selectedSpec = ""
     store.dialogError = ""
     store.agentInfo = null
   }
 
-  // Manual mode needs no agent, so the dialog opens without asking about one.
+  // Every milestone comes from a spec, so the agent matters from the moment the
+  // dialog opens. Asked for once per project: the answer cannot change while
+  // the user stays in it, and `reset()` forgets it when they leave.
   function openDialog() {
     store.dialogOpen = true
-    store.mode = "manual"
-    store.title = ""
-    store.description = ""
     store.selectedSpec = ""
     store.dialogError = ""
+    if (store.agentInfo === null) store.checkAgent()
   }
-
-  // Asked for once per project, the first time the user wants From-spec mode:
-  // the answer cannot change while they stay in the project, and `reset()`
-  // forgets it when they leave.
-  onModeChanged: if (store.mode === "spec" && store.agentInfo === null) store.checkAgent()
 
   function checkAgent() {
     if (describeRunner.busy) return
     describeRunner.run(["--describe"])
   }
 
-  // Escape and the backdrop close the dialog -- but never while the create is
-  // in flight, which would leave the user with no sign of what happened.
+  // Escape and the backdrop close the dialog. Nothing is ever in flight behind
+  // it: starting a run closes it itself.
   function cancelDialog() {
-    if (store.dialogBusy) return
     store.dialogOpen = false
     store.dialogError = ""
   }
 
   function applyDescribeResult(text, exitCode) {
     store.agentInfo = Milestones.parseDescribeResult(text, exitCode)
-  }
-
-  function createManual() {
-    if (!store.project || store.dialogBusy) return
-    var name = String(store.title).trim()
-    if (name === "") {
-      store.dialogError = "A title is required."
-      return
-    }
-    store.dialogError = ""
-    store.createProject = store.project.root_path
-    var args = [store.project.root_path, "--title", name]
-    var desc = String(store.description).trim()
-    if (desc !== "") args.push("--description", desc)
-    manualRunner.run(args)
-  }
-
-  function applyCreateResult(text, exitCode, launchedGuard) {
-    // Only the project the create was launched for: a card made in a project
-    // the user has left must not close the dialog they are in now.
-    if (launchedGuard !== store.createProject) return
-    var result = Milestones.parseCreateResult(text, exitCode)
-    if (!result.ok) {
-      store.dialogError = result.error
-      return
-    }
-    store.dialogOpen = false
-    store.title = ""
-    store.description = ""
-    store.dialogError = ""
-    store.boardRefreshRequested()
   }
 
   // One job per shell: refused while one runs, without a spec, and without an
@@ -209,15 +160,6 @@ Scope {
   function dismissResult() {
     if (store.jobState === "running") return
     store.jobDismissed = true
-  }
-
-  // The guard is the selected project's root: a result for a project the user
-  // has since left can never be applied.
-  HelperRunner {
-    id: manualRunner
-    script: store.backendDir + "milestones/create-milestone.py"
-    guard: store.project ? store.project.root_path : ""
-    onFinished: function(stdout, exitCode, launchedGuard) { store.applyCreateResult(stdout, exitCode, launchedGuard) }
   }
 
   HelperRunner {

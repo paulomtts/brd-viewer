@@ -7,26 +7,19 @@ import "../components" as UI
 import "../theme" as T
 
 // A modal form for a new milestone, built on the same ModalCard conventions as
-// New memory: backdrop and Escape cancel unless the job is busy, Enter in the
-// title submits, everything freezes while busy.
+// New memory: the backdrop and Escape cancel.
 //
-// Two ways in, chosen by the ChipRow: Manual (a title and a description) and
-// From spec (pick one of the project's Markdown documents and let the default
-// agent build the milestone). The owner owns the mode, the title, the
-// description and the selection -- the dialog only reports the edits; the
-// spec list's search text is the one thing it keeps for itself.
+// There is one way in: pick one of the project's Markdown documents and let the
+// default agent build the milestone from it. The owner owns the selection --
+// the dialog only reports it; the spec list's search text is the one thing it
+// keeps for itself.
 Item {
   id: dialog
   objectName: "newMilestoneDialog"
   z: 100
 
   property bool shown: false
-  property bool busy: false
   property string error: ""
-  // "manual" | "spec"
-  property string mode: "manual"
-  property string title: ""
-  property string description: ""
   // Milestones.specChoices(docs): [{ title, path, category }], specs first.
   property var specs: []
   property string selectedSpec: ""
@@ -52,7 +45,7 @@ Item {
   // and a standalone instance renders with the shell defaults.
   property var theme: T.Theme {}
 
-  readonly property Item focusItem: dialog.mode === "spec" ? searchField : titleField
+  readonly property Item focusItem: searchField
   readonly property var visibleSpecs: Milestones.filterSpecChoices(dialog.specs, searchField.text)
   // The index the list paints its cursor on: the selected path's row, if it
   // survived the search.
@@ -61,13 +54,9 @@ Item {
     for (var i = 0; i < list.length; i++) if (list[i].path === dialog.selectedSpec) return i
     return -1
   }
-  readonly property bool valid: dialog.mode === "spec"
-    ? (dialog.selectedSpec !== "" && dialog.agentReady && !dialog.jobRunning)
-    : titleField.text.trim() !== ""
+  readonly property bool valid: dialog.selectedSpec !== ""
+    && dialog.agentReady && !dialog.jobRunning
 
-  signal modeChosen(string mode)
-  signal titleEdited(string text)
-  signal descriptionEdited(string text)
   signal specChosen(string path)
   signal submitRequested()
   signal cancelRequested()
@@ -75,25 +64,21 @@ Item {
   visible: shown
   onShownChanged: {
     if (!shown) return
-    titleField.text = dialog.title
-    descriptionArea.text = dialog.description
     searchField.text = ""
   }
 
   function cancel() {
-    if (dialog.busy) return
     dialog.cancelRequested()
   }
 
   function submit() {
-    if (!dialog.valid || dialog.busy) return
+    if (!dialog.valid) return
     dialog.submitRequested()
   }
 
   // The keyboard's way through the spec list: the neighbour of whatever is
   // selected, clamped at both ends, over the rows the search actually left.
   function moveSelection(step) {
-    if (dialog.busy) return
     var list = dialog.visibleSpecs
     if (list.length === 0) return
     var at = dialog.selectedIndex
@@ -106,7 +91,7 @@ Item {
     id: modal
     anchors.fill: parent
     shown: true
-    dismissable: !dialog.busy
+    dismissable: true
     maxWidth: Style.space(560)
     maxHeight: modal.height - Style.space(48)
     backdropObjectName: "newMilestoneBackdrop"
@@ -121,58 +106,8 @@ Item {
       font.bold: true
     }
 
-    UI.ChipRow {
-      width: parent.width
-      theme: dialog.theme
-      busy: dialog.busy
-      chipPrefix: "milestoneMode"
-      active: dialog.mode
-      model: [{ id: "manual", label: "Manual" }, { id: "spec", label: "From spec" }]
-      onChosen: function(id) { dialog.modeChosen(id) }
-    }
-
-    // ---- Manual -----------------------------------------------------------
-
-    Column {
-      objectName: "newMilestoneManual"
-      visible: dialog.mode !== "spec"
-      width: parent.width
-      spacing: Style.space(8)
-
-      TextField {
-        id: titleField
-        objectName: "newMilestoneTitle"
-        width: parent.width
-        foreground: dialog.theme.foreground
-        placeholderText: "Title"
-        enabled: !dialog.busy
-        onTextChanged: dialog.titleEdited(text)
-        Keys.onPressed: function(event) {
-          if (event.key === Qt.Key_Escape) { dialog.cancel(); event.accepted = true }
-          else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { dialog.submit(); event.accepted = true }
-        }
-      }
-
-      UI.TextAreaBox {
-        id: descriptionArea
-        width: parent.width
-        height: Style.space(140)
-        editorObjectName: "newMilestoneDescription"
-        submitChords: ["ctrl-enter"]
-        placeholder: "What the milestone is for (optional)"
-        theme: dialog.theme
-        enabled: !dialog.busy
-        onEdited: function(text) { dialog.descriptionEdited(text) }
-        onEscapePressed: dialog.cancel()
-        onSubmitRequested: dialog.submit()
-      }
-    }
-
-    // ---- From spec --------------------------------------------------------
-
     Column {
       objectName: "newMilestoneSpecs"
-      visible: dialog.mode === "spec"
       width: parent.width
       spacing: Style.space(8)
 
@@ -182,9 +117,8 @@ Item {
         width: parent.width
         foreground: dialog.theme.foreground
         placeholderText: "Search documents…"
-        enabled: !dialog.busy
-        // The search field is where the keyboard lives in spec mode, so it
-        // also walks the list and starts the run.
+        // The search field is where the keyboard lives, so it also walks the
+        // list and starts the run.
         Keys.onPressed: function(event) {
           if (event.key === Qt.Key_Escape) { dialog.cancel(); event.accepted = true }
           else if (event.key === Qt.Key_Down) { dialog.moveSelection(1); event.accepted = true }
@@ -291,7 +225,6 @@ Item {
       UI.ActionButton {
         objectName: "newMilestoneCancel"
         text: "Cancel"
-        enabled: !dialog.busy
         opacity: 1
         theme: dialog.theme
         onClicked: dialog.cancel()
@@ -299,8 +232,8 @@ Item {
 
       UI.ActionButton {
         objectName: "newMilestoneOk"
-        text: dialog.busy ? "Working…" : dialog.mode === "spec" ? "Start" : "Create"
-        enabled: !dialog.busy && dialog.valid
+        text: "Start"
+        enabled: dialog.valid
         theme: dialog.theme
         onClicked: dialog.submit()
       }
@@ -315,7 +248,6 @@ Item {
 
     width: specList.width
     theme: dialog.theme
-    enabled: !dialog.busy
     cursorIndex: dialog.selectedIndex
     onActivated: dialog.specChosen(row.modelData.path)
 

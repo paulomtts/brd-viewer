@@ -2,7 +2,7 @@
 // What the panel does around MilestoneStore: the ＋ New milestone button in the
 // Board toolbar, the running job's indicator taking its place (and its clock),
 // the dialog hosted over the panel -- focus, Escape, blocked shortcuts -- and
-// the documents listing the From-spec mode needs. The state machine itself is
+// the documents listing the spec picker needs. The state machine itself is
 // tested in tests/core/stores/tst_milestone_store.qml, the dialog's looks in
 // tests/ui/components/tst_new_milestone_dialog.qml.
 import QtQuick
@@ -46,11 +46,9 @@ TestCase {
     return out
   }
 
-  // The dialog in From-spec mode with the agent already answered for, ready to
-  // start a run.
+  // The dialog with the agent already answered for, ready to start a run.
   function specReady(p) {
     p.app.milestones.openDialog()
-    p.app.milestones.mode = "spec"
     var d = p.app.milestones.describeRunner.current
     verify(d, "the agent check ran")
     d.outText = agentOk
@@ -214,40 +212,19 @@ TestCase {
 
   // ---- the dialog over the panel
 
-  function test_the_manual_form_reaches_the_helper() {
+  // Every milestone comes from a spec, so opening the dialog is what needs the
+  // listing -- and the agent check with it.
+  function test_opening_the_dialog_fetches_the_documents_once() {
     var p = make(); if (!p) return
     p.app.milestones.openDialog()
     wait(50)
-    var title = H.find(p, "newMilestoneTitle")
-    verify(title, "the title field")
-    title.text = "Ship it"
-    compare(p.app.milestones.title, "Ship it")
-    var ok = H.find(p, "newMilestoneOk")
-    compare(ok.enabled, true)
-    mouseClick(ok, ok.width / 2, ok.height / 2)
-    var proc = p.app.milestones.manualRunner.current
-    verify(proc, "the create helper ran")
-    compare(proc.command.length, 5)
-    compare(proc.command[2], pA.root_path)
-    compare(proc.command[3], "--title")
-    compare(proc.command[4], "Ship it")
-    compare(p.app.milestones.dialogBusy, true)
-  }
-
-  function test_asking_for_from_spec_fetches_the_documents_once() {
-    var p = make(); if (!p) return
-    p.app.milestones.openDialog()
-    wait(50)
-    var chip = H.find(p, "milestoneModespec")
-    verify(chip, "the From spec chip")
-    mouseClick(chip, chip.width / 2, chip.height / 2)
-    compare(p.app.milestones.mode, "spec")
     compare(p.app.docs.docsLoading, true, "the documents listing is on its way")
+    verify(p.app.milestones.describeRunner.current, "and the agent check ran")
     var lister = p.app.docs.lister.current
     p.app.docs.applyDocsResult(docList, 0)
     wait(50)
-    p.app.milestones.mode = "manual"
-    p.app.milestones.mode = "spec"
+    p.app.milestones.cancelDialog()
+    p.app.milestones.openDialog()
     wait(50)
     compare(p.app.docs.lister.current, lister, "documents already in hand are not fetched again")
   }
@@ -264,7 +241,6 @@ TestCase {
   function test_ok_waits_for_the_agent_check_before_starting_a_run() {
     var p = make(); if (!p) return
     p.app.milestones.openDialog()
-    p.app.milestones.mode = "spec"
     p.app.docs.applyDocsResult(docList, 0)
     p.app.milestones.selectedSpec = "docs/specs/s.md"
     wait(50)
@@ -284,7 +260,6 @@ TestCase {
   function test_an_agent_that_cannot_run_unattended_blocks_ok_and_says_so() {
     var p = make(); if (!p) return
     p.app.milestones.openDialog()
-    p.app.milestones.mode = "spec"
     var describe = p.app.milestones.describeRunner.current
     describe.outText = agentNone
     describe.exited(0)
@@ -306,7 +281,6 @@ TestCase {
     wait(50)
     compare(H.find(p, "milestoneIndicator").visible, false, "not this project's job")
     p.app.milestones.openDialog()
-    p.app.milestones.mode = "spec"
     var describe = p.app.milestones.describeRunner.current
     describe.outText = agentOk
     describe.exited(0)
@@ -322,14 +296,11 @@ TestCase {
     var p = make(); if (!p) return
     p.app.milestones.openDialog()
     wait(50)
-    compare(p.focusItem.objectName, "newMilestoneTitle")
+    compare(p.focusItem.objectName, "newMilestoneSearch")
     compare(p.shortcuts.handleGlobalKey({ key: Qt.Key_4, modifiers: Qt.ControlModifier, accepted: false }), false)
     compare(p.app.nav.viewMode, "board", "the section shortcut did not fire")
     p.navigator.showSection("memories")
     compare(p.app.nav.viewMode, "board", "and neither does the navigator")
-    p.app.milestones.mode = "spec"
-    wait(50)
-    compare(p.focusItem.objectName, "newMilestoneSearch")
   }
 
   function test_escape_closes_the_dialog_rather_than_the_panel() {
@@ -339,17 +310,5 @@ TestCase {
     p.shortcuts.closeRequested()
     compare(p.app.milestones.dialogOpen, false)
     compare(p.opened, true, "the panel stays open")
-  }
-
-  function test_escape_cannot_abandon_a_create_that_is_in_flight() {
-    var p = make(); if (!p) return
-    p.app.milestones.openDialog()
-    p.app.milestones.title = "Ship it"
-    p.app.milestones.createManual()
-    wait(50)
-    compare(p.app.milestones.dialogBusy, true)
-    p.shortcuts.closeRequested()
-    compare(p.app.milestones.dialogOpen, true, "the dialog stays until the helper answers")
-    compare(p.opened, true, "and Escape does not fall through to the panel either")
   }
 }

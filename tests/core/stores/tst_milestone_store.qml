@@ -41,11 +41,10 @@ TestCase {
     return out
   }
 
-  // The dialog in From-spec mode, with the default agent already checked and
-  // usable. The check is skipped when this project's answer is already known.
+  // The dialog, with the default agent already checked and usable. The check is
+  // skipped when this project's answer is already known.
   function specFixture(app) {
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     var d = app.milestones.describeRunner.current
     if (d) { d.outText = agentOk; d.exited(0) }
     app.milestones.selectedSpec = "docs/specs/one.md"
@@ -61,29 +60,22 @@ TestCase {
 
   // ---- the dialog and the agent check
 
-  // Manual mode needs no agent, so opening the dialog must not go looking for
-  // one: nothing is said about the agent until the user asks for From-spec.
-  function test_opening_the_dialog_clears_it_and_checks_nothing_yet() {
+  function test_opening_the_dialog_clears_what_the_last_one_left() {
     var app = make(); if (!app) return
     compare(app.milestones.dialogOpen, false)
-    app.milestones.title = "left over"
+    app.milestones.selectedSpec = "left over"
     app.milestones.dialogError = "old"
     app.milestones.openDialog()
     compare(app.milestones.dialogOpen, true)
-    compare(app.milestones.mode, "manual")
-    compare(app.milestones.title, "")
-    compare(app.milestones.description, "")
     compare(app.milestones.selectedSpec, "")
     compare(app.milestones.dialogError, "")
-    verify(!app.milestones.describeRunner.current, "no agent check yet")
-    compare(app.milestones.agentChecking, false)
-    compare(app.milestones.agentMessage, "", "and nothing to say about an agent nobody asked about")
   }
 
-  function test_entering_spec_mode_checks_the_default_agent() {
+  // Every milestone comes from a spec, so the agent is looked up as soon as the
+  // dialog opens -- not on entering a mode that no longer exists.
+  function test_opening_the_dialog_checks_the_default_agent() {
     var app = make(); if (!app) return
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     var proc = app.milestones.describeRunner.current
     verify(proc, "the agent check runs")
     compare(proc.command[0], "python3")
@@ -99,19 +91,18 @@ TestCase {
     compare(app.milestones.agentMessage, "")
   }
 
-  // The answer does not change while the user stays in the project: going back
-  // and forth between the modes must not re-run the check every time.
+  // The answer does not change while the user stays in the project: reopening
+  // the dialog must not re-run the check every time.
   function test_the_agent_is_checked_once_per_project() {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     specFixture(app)
     compare(app.milestones.describeRunner.seq, 1)
-    app.milestones.mode = "manual"
-    app.milestones.mode = "spec"
+    app.milestones.cancelDialog()
+    app.milestones.openDialog()
     compare(app.milestones.describeRunner.seq, 1, "the known answer is reused")
     app.projects.chooseProject(pB)
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     compare(app.milestones.describeRunner.seq, 2, "the new project is checked again")
   }
 
@@ -130,7 +121,6 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     var proc = app.milestones.describeRunner.current
     proc.outText = "boom"
     proc.exited(1)
@@ -149,7 +139,6 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     var stale = app.milestones.describeRunner.current
     app.projects.chooseProject(pB)
     stale.outText = agentOk
@@ -167,7 +156,6 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     var proc = app.milestones.describeRunner.current
     app.projects.chooseProject(pB)
     app.projects.chooseProject(pA)
@@ -177,155 +165,16 @@ TestCase {
     compare(app.milestones.agentInfo.agent, "claude")
   }
 
-  // ---- manual mode
-
-  function test_creating_manually_runs_the_helper_with_the_title_and_description() {
+  // Nothing runs behind the dialog any more, so Escape and the backdrop always
+  // close it and drop whatever it was complaining about.
+  function test_cancelling_the_dialog_closes_it_and_clears_the_error() {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
-    app.milestones.title = "  Ship it  "
-    app.milestones.description = "the why"
-    app.milestones.createManual()
-    var proc = app.milestones.manualRunner.current
-    verify(proc, "a create process")
-    compare(proc.command[0], "python3")
-    compare(proc.command[1], "/plugin/core/backend/milestones/create-milestone.py")
-    compare(proc.command[2], "/home/u/my proj")
-    compare(proc.command[3], "--title")
-    compare(proc.command[4], "Ship it")
-    compare(proc.command[5], "--description")
-    compare(proc.command[6], "the why")
-    compare(proc.command.length, 7)
-    compare(proc.running, true)
-    compare(app.milestones.dialogBusy, true)
-  }
-
-  function test_an_empty_description_is_left_out_of_the_command() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    app.milestones.openDialog()
-    app.milestones.title = "Ship it"
-    app.milestones.description = "   "
-    app.milestones.createManual()
-    var proc = app.milestones.manualRunner.current
-    compare(proc.command.length, 5)
-    compare(proc.command[4], "Ship it")
-  }
-
-  function test_a_blank_title_is_refused_before_anything_runs() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    app.milestones.openDialog()
-    app.milestones.title = "   "
-    app.milestones.createManual()
-    verify(!app.milestones.manualRunner.current, "nothing was run")
-    compare(app.milestones.dialogBusy, false)
-    compare(app.milestones.dialogOpen, true)
-    verify(app.milestones.dialogError !== "", "the dialog says why")
-  }
-
-  function test_a_successful_create_closes_the_dialog_and_asks_for_a_board_refresh() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    var spy = spyOn(app.milestones, "boardRefreshRequested")
-    app.milestones.openDialog()
-    app.milestones.title = "Ship it"
-    app.milestones.createManual()
-    var proc = app.milestones.manualRunner.current
-    proc.outText = '{"ok": true, "id": "42"}'
-    proc.exited(0)
+    app.milestones.dialogError = "boom"
+    app.milestones.cancelDialog()
     compare(app.milestones.dialogOpen, false)
-    compare(app.milestones.dialogBusy, false)
     compare(app.milestones.dialogError, "")
-    compare(app.milestones.title, "")
-    compare(spy.count, 1)
-  }
-
-  function test_a_failed_create_keeps_the_dialog_open_with_the_error() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    var spy = spyOn(app.milestones, "boardRefreshRequested")
-    app.milestones.openDialog()
-    app.milestones.title = "Ship it"
-    app.milestones.createManual()
-    var proc = app.milestones.manualRunner.current
-    proc.outText = '{"ok": false, "error": "brd said no"}'
-    proc.exited(1)
-    compare(app.milestones.dialogOpen, true)
-    compare(app.milestones.dialogBusy, false)
-    compare(app.milestones.dialogError, "brd said no")
-    compare(app.milestones.title, "Ship it")
-    compare(spy.count, 0)
-  }
-
-  function test_the_dialog_cannot_be_closed_while_the_create_is_in_flight() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    app.milestones.openDialog()
-    app.milestones.title = "Ship it"
-    app.milestones.createManual()
-    app.milestones.cancelDialog()
-    compare(app.milestones.dialogOpen, true, "the dialog stays while busy")
-    var proc = app.milestones.manualRunner.current
-    proc.outText = '{"ok": false, "error": "no"}'
-    proc.exited(1)
-    compare(app.milestones.dialogBusy, false)
-    app.milestones.cancelDialog()
-    compare(app.milestones.dialogOpen, false)
-  }
-
-  function test_only_one_create_at_a_time() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    app.milestones.openDialog()
-    app.milestones.title = "one"
-    app.milestones.createManual()
-    var proc = app.milestones.manualRunner.current
-    app.milestones.title = "two"
-    app.milestones.createManual()
-    compare(app.milestones.manualRunner.current, proc, "the second attempt is refused")
-    compare(proc.command[4], "one")
-  }
-
-  // The lock is the runner's own: leaving the project while a create is in
-  // flight must not keep the dialog busy for the rest of the session.
-  function test_a_create_abandoned_by_a_project_switch_releases_the_lock() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    app.milestones.openDialog()
-    app.milestones.title = "one"
-    app.milestones.createManual()
-    var abandoned = app.milestones.manualRunner.current
-    app.projects.chooseProject(pB)
-    compare(app.milestones.dialogOpen, false, "the dialog is cleared by the switch")
-    abandoned.outText = '{"ok": true, "id": "42"}'
-    abandoned.exited(0)
-    compare(app.milestones.dialogBusy, false, "the abandoned create must not hold the lock")
-    compare(app.milestones.dialogOpen, false, "and its result must not reopen anything")
-    app.milestones.openDialog()
-    app.milestones.title = "two"
-    app.milestones.createManual()
-    var proc = app.milestones.manualRunner.current
-    compare(proc.command[2], "/home/u/b")
-    compare(proc.command[4], "two")
-  }
-
-  // A create answered for a project the user has left can never close the
-  // dialog of the one they are in now, nor refresh its board.
-  function test_a_create_result_for_another_project_is_ignored() {
-    var app = make(); if (!app) return
-    app.projects.chooseProject(pA)
-    var spy = spyOn(app.milestones, "boardRefreshRequested")
-    app.milestones.openDialog()
-    app.milestones.title = "Ship it"
-    app.milestones.createManual()
-    app.milestones.applyCreateResult('{"ok": true, "id": "42"}', 0, "/home/u/elsewhere")
-    compare(app.milestones.dialogOpen, true)
-    compare(app.milestones.title, "Ship it")
-    compare(spy.count, 0)
-    app.milestones.applyCreateResult('{"ok": true, "id": "42"}', 0, "/home/u/my proj")
-    compare(app.milestones.dialogOpen, false)
-    compare(spy.count, 1)
   }
 
   // ---- starting the agent job
@@ -357,7 +206,6 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     var d = app.milestones.describeRunner.current
     d.outText = agentMissing
     d.exited(0)
@@ -374,7 +222,6 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
-    app.milestones.mode = "spec"
     app.milestones.selectedSpec = "docs/specs/one.md"
     compare(app.milestones.agentChecking, true)
     compare(app.milestones.agentMessage, "")
@@ -643,16 +490,12 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     specFixture(app)
-    app.milestones.title = "t"
-    app.milestones.description = "d"
-    app.milestones.dialogError = "boom"
     app.milestones.startFromSpec()
     app.milestones.openDialog()
+    app.milestones.selectedSpec = "docs/specs/one.md"
+    app.milestones.dialogError = "boom"
     app.projects.chooseProject(pB)
     compare(app.milestones.dialogOpen, false)
-    compare(app.milestones.mode, "manual")
-    compare(app.milestones.title, "")
-    compare(app.milestones.description, "")
     compare(app.milestones.selectedSpec, "")
     compare(app.milestones.dialogError, "")
     compare(app.milestones.jobState, "running")
@@ -662,10 +505,11 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
-    app.milestones.title = "t"
+    app.milestones.selectedSpec = "docs/specs/one.md"
     app.projects.clearSelection()
     compare(app.milestones.dialogOpen, false)
-    compare(app.milestones.title, "")
+    compare(app.milestones.selectedSpec, "")
+    compare(app.milestones.agentInfo, null)
   }
 
   // ---- the counter
@@ -683,8 +527,7 @@ TestCase {
     compare(app.milestones.cardsCreated, 0, "a shrinking board never shows a negative count")
   }
 
-  // The board refresh App connects the store to: a manual create and the job's
-  // end both ask for it.
+  // The board refresh App connects the store to: the job's end asks for it.
   function test_app_refetches_the_board_when_the_store_asks() {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)

@@ -2,13 +2,7 @@
 .import "results.js" as Results
 .import "text.js" as Text
 
-// ---- New milestone: parsing the create / run / describe helper output
-
-function parseCreateResult(stdout, exitCode) {
-  var result = Results.parseJsonLine(stdout, exitCode, "Could not create the milestone card.")
-  if (result.ok) return { ok: true, id: String(result.data.id || ""), error: "" }
-  return { ok: false, id: "", error: result.error }
-}
+// ---- New milestone: parsing the run / describe helper output
 
 function parseRunResult(stdout, exitCode) {
   var result = Results.parseJsonLine(stdout, exitCode, "The agent run failed.")

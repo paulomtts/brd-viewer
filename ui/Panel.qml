@@ -14,8 +14,8 @@ import "theme" as T
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
 // project: pick a project, then view its cards as a Board.
-// Cards are read-only with one exception: New milestone, which adds cards --
-// by hand through `brd add`, or by handing a spec to the default coding agent
+// Cards are read-only with one exception: New milestone, which adds cards by
+// handing one of the project's specs to the default coding agent
 // (see MilestoneStore and core/backend/milestones/).
 Panel {
   id: root
@@ -79,14 +79,14 @@ Panel {
     function onListViewRequested() { navi.restoreListView() }
   }
 
-  // From-spec mode picks one of the project's Markdown documents, so the
-  // documents listing has to exist by the time the list is drawn. The store
-  // never reaches for another store: the panel does the fetching, once -- a
-  // listing already in hand is reused.
+  // The dialog picks one of the project's Markdown documents, so the documents
+  // listing has to exist by the time the list is drawn. The store never reaches
+  // for another store: the panel does the fetching when the dialog opens, once
+  // -- a listing already in hand is reused.
   Connections {
     target: appStores.milestones
-    function onModeChanged() {
-      if (appStores.milestones.mode !== "spec") return
+    function onDialogOpenChanged() {
+      if (!appStores.milestones.dialogOpen) return
       if (appStores.docs.docs.length > 0 || appStores.docs.docsLoading) return
       appStores.docs.fetchDocs()
     }
@@ -551,11 +551,7 @@ Panel {
         id: newMilestoneDialog
         anchors.fill: parent
         shown: appStores.milestones.dialogOpen
-        busy: appStores.milestones.dialogBusy
         error: appStores.milestones.dialogError
-        mode: appStores.milestones.mode
-        title: appStores.milestones.title
-        description: appStores.milestones.description
         specs: Milestones.specChoices(appStores.docs.docs)
         selectedSpec: appStores.milestones.selectedSpec
         agentName: appStores.milestones.agentInfo ? String(appStores.milestones.agentInfo.agent || "") : ""
@@ -570,12 +566,8 @@ Panel {
         docsLoading: appStores.docs.docsLoading
         docsError: appStores.docs.docsError
         theme: panelTheme
-        onModeChosen: function(mode) { appStores.milestones.mode = mode }
-        onTitleEdited: function(text) { appStores.milestones.title = text }
-        onDescriptionEdited: function(text) { appStores.milestones.description = text }
         onSpecChosen: function(path) { appStores.milestones.selectedSpec = path }
-        onSubmitRequested: appStores.milestones.mode === "spec"
-          ? appStores.milestones.startFromSpec() : appStores.milestones.createManual()
+        onSubmitRequested: appStores.milestones.startFromSpec()
         onCancelRequested: appStores.milestones.cancelDialog()
       }
     }

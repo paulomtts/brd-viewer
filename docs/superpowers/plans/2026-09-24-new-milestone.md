@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
+> **Superseded on the manual mode.** Milestones are never set up by hand any
+> more: the dialog is always from-spec. `create-milestone.py`, the mode switch
+> and the store's `mode`/`title`/`description`/`createManual` below are gone,
+> and the `--describe` check now runs when the dialog opens. Everything else in
+> this plan still describes the shipped flow.
+
 **Goal:** A "＋ New milestone" button on the Board that opens a modal with two modes — manual (title + description → `brd add`) and from-spec (pick a spec → the user's default coding agent runs unattended with the setup-milestone prompt) — with a running indicator and a result, ending by itself.
 
 **Architecture:** Python backend `core/backend/milestones/` (prompt, agent adapters, two runner scripts), a pure `core/domain/milestones.js`, a `MilestoneStore` (two `HelperRunner`s and a job state machine), two presentational components, and Panel wiring. Follows `docs/architecture.md` (layers, no `core/stores` import in ui components/screens, shared components, no second copies).

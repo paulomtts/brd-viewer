@@ -8,9 +8,9 @@ Status: proposed. Builds on `2026-09-24-core-ui-architecture-design.md`
 The Board can only be read. Creating a milestone with its stories and subtasks
 is done in a terminal by an agent following leave-me-alone's `setup-milestone`
 skill. This adds a **＋ New milestone** button to the Board that does it from
-the panel: either by hand (a title and description) or by handing a spec to the
-user's default coding agent, which builds the whole milestone unattended while
-the panel shows that work is happening.
+the panel, always from a spec: the user picks one of the project's Markdown
+documents and their default coding agent builds the whole milestone unattended
+while the panel shows that work is happening.
 
 ## Non-goals
 
@@ -27,15 +27,13 @@ the panel shows that work is happening.
 - Board toolbar: a bordered **＋ New milestone** button (icon + label style of
   the memories ＋ New), visible in the Board list view when a project is
   selected and no milestone job is running.
-- Click opens a modal card (same look and behaviour as New memory: backdrop,
-  Escape/backdrop cancels unless busy) with a **Manual / From spec** switch.
-  - **Manual**: Title (required) and Description; Create runs
-    `brd add --title … --description …` and closes; the board refreshes itself.
-  - **From spec**: a searchable list of the project's Markdown documents
-    (Specs first, then the rest; reuses the Documents listing), select one;
-    the dialog shows which agent will run (`omarchy-default-agent`), or a clear
-    message when there is none / it is not installed / it has no supported
-    unattended mode (OK disabled). OK starts the job and closes the dialog.
+- Click opens a modal card (same look and behaviour as New memory: backdrop and
+  Escape cancel). There is one way in, from a spec: a searchable list of the
+  project's Markdown documents (Specs first, then the rest; reuses the Documents
+  listing), select one; the dialog shows which agent will run
+  (`omarchy-default-agent`), or a clear message when there is none / it is not
+  installed / it has no supported unattended mode (Start disabled). Start runs
+  the job and closes the dialog. The focus lands in the search field.
 - While a job runs: the toolbar button is replaced by a **running indicator**
   (spinning icon, "Creating milestone…", elapsed time, and a **Cancel** button);
   cards appear on the Board live as the agent creates them (the board already
@@ -53,31 +51,30 @@ the panel shows that work is happening.
 core/backend/milestones/
   setup-milestone.md        the prompt (copied from leave-me-alone, edited, see below)
   agents.py                 adapter table: agent name -> unattended command builder + verified flag
-  create-milestone.py       manual mode: brd add, prints one JSON line
-  run-setup-milestone.py    from-spec mode: validate, spawn agent, wait, log, prints one JSON line
-core/domain/milestones.js   parse the two scripts' results; job-state text helpers
+  run-setup-milestone.py    validate, spawn agent, wait, log, prints one JSON line (and --describe)
+core/domain/milestones.js   parse the helper's results; job-state text helpers
 core/stores/MilestoneStore.qml   dialog state + job state machine (idle/running/done/failed)
-ui/components/NewMilestoneDialog.qml   modal (ModalCard, ChipRow for the mode, TextField, spec list)
+ui/components/NewMilestoneDialog.qml   modal (ModalCard, search field, spec list)
 ui/components/MilestoneJobIndicator.qml   spinner + label + elapsed + Cancel / result
 ui/Panel.qml              hosts the toolbar button/indicator and the dialog
 ```
 
-- **Store** (`MilestoneStore`, `Scope` root like the others): properties `mode`,
-  `dialogOpen`, `title`, `description`, `selectedSpec`, `agentInfo`
-  (name/supported/reason), `jobState`, `jobStartedAt`, `jobLog`, `jobError`,
-  `cardsCreated`; commands `open()`, `cancelDialog()`, `createManual()`,
+- **Store** (`MilestoneStore`, `Scope` root like the others): properties
+  `dialogOpen`, `selectedSpec`, `agentInfo` (name/supported/reason), `jobState`,
+  `jobStartedAt`, `jobLog`, `jobError`, `cardsCreated`; commands `openDialog()`
+  (which also asks `--describe` once per project), `cancelDialog()`,
   `startFromSpec()`, `cancelJob()`, `dismissResult()`. It uses two
-  `HelperRunner`s (manual, spec). `guard` is the project root so a switch never
-  applies a stale result; the running job keeps its own busy flag from the
-  runner (the Ruling-7 semantics: busy clears when the newest run exits).
+  `HelperRunner`s, both `run-setup-milestone.py`: the run and `--describe`.
+  `guard` is the project root so a switch never applies a stale result; the
+  running job keeps its own busy flag from the runner (the Ruling-7 semantics:
+  busy clears when the newest run exits).
 - **Wiring** in `App.qml`: `milestones.project`, `milestones.backendDir`,
   `milestones.cardCount: board.boardCards.length + …` (a plain count property
   handed in, so the store never imports the board store).
 - **UI rules** unchanged: components take props/signals, screens/components
   never import `core/stores`; only Panel talks to `app`.
-- The Documents listing feeds the spec picker: opening the dialog in From-spec
-  mode makes the docs store fetch if it has not (Panel wiring, not a store
-  import).
+- The Documents listing feeds the spec picker: opening the dialog makes the docs
+  store fetch if it has not (Panel wiring, not a store import).
 
 ## The agent run (`run-setup-milestone.py <project_root> <spec_path>`)
 
