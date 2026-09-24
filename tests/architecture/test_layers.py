@@ -251,6 +251,7 @@ GUARDS = {
         "ui/components/Badge.qml": "pill primitive",
         "ui/components/Chip.qml": "pill primitive",
         "ui/screens/CardDetailScreen.qml": "documented: detail-panel tone pill (own tone colour and padding; not a Badge)",
+        "ui/components/StatusPips.qml": "documented: the subtask pip is a circle, not a pill -- it carries no text, so no Badge/Chip fits",
     },
     r"bordered:\s*true": {
         "ui/components/ActionButton.qml": "the one bordered button",
