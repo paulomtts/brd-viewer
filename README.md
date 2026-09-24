@@ -46,6 +46,18 @@ until it is next saved, and existing snapshots and backups are left in their
   opens the milestone's card, and Back returns to the graph. The canvas also
   has mouse pan/zoom, `+`/`-` and on-screen zoom/organize/fit buttons. Nodes can
   be dragged for a look around, but the graph never creates or removes links.
+  A **Milestone | Story** switch in the toolbar picks the view (Milestone is
+  the default; the choice is remembered for the session and survives a project
+  switch). **Story** shows one node per story of *every* milestone at once,
+  each milestone's stories inside a box labelled with its title (a milestone
+  with no stories draws no box), and an arrow for each `blocked_by` link
+  between two stories — one that crosses two milestones simply draws across
+  their boxes. A story node keeps the title, status colour and open-issue flag,
+  and replaces the done/total text with **pips**: one small circle per subtask
+  in its status colour (todo / in progress / blocked / done, a subtask blocked
+  by an open issue counted as blocked), the in-progress ones gently pulsing.
+  More subtasks than fit collapse into a `+N`. Arrow keys, Enter, a click and
+  Back work exactly as they do in the milestone view, on the story's own card.
 - **Memories** (Ctrl+4) - the project's Claude Code memory notes, from
   `~/.claude/projects/<slug>/memory/` (the slug is the project path with every
   non-alphanumeric character turned into `-`; if that folder is missing, a

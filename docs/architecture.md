@@ -27,7 +27,16 @@ manifest entry point.
 - `ProjectStore.qml` registry, selection, remembered project, DB watch path.
 - `ProjectDeleteStore.qml` delete-project confirm/snapshot flow.
 - `BoardStore.qml` cards, index, selection, board order, the issue map (`brd issue list`; an old brd without issues is just an empty map); owns the DB `FileView` and the 250ms `watchTimer` that debounces it, so a burst of writes costs one tree+issue+export fetch (`fetchBoard()` itself -- Refresh, a project switch -- stays immediate).
-- `GraphStore.qml` graph model from the board (card roots and issue map, for each milestone's open-issue count), graph cursor and movement.
+- `GraphStore.qml` the two graph models from the board (card roots and issue
+  map, for each node's open-issue count): the milestone graph and the story
+  graph (`graph.js`'s `graphModel` / `storyGraphModel`). `graphView`
+  ("milestone", the default, or "story") picks which one `currentNodes` /
+  `currentEdges` / `currentGroups` -- and so the canvas, the arrow keys and
+  Enter -- work on; `setGraphView` refuses anything else, so one of the two
+  chips is always active, and keeps the selection on a node of the new view.
+  Nothing resets it, so the choice is remembered for the session and survives a
+  project switch (the cursor still clears with the project). Plus the graph
+  cursor and its movement.
 - `DocumentsStore.qml` listing, category filter, open document, tagging, plus
   brd's registered documents (`brd doc list`, fetched only when the section
   opens because it syncs -- writes -- every backup; re-entering the section you
@@ -76,7 +85,10 @@ of one entity, used by the card detail and the issue detail),
 `ListStatus` (loading/error/empty), `FilterableList`, `TextAreaBox`,
 `TagPicker`, `NewMemoryDialog`, `NewMilestoneDialog` (the from-spec modal),
 `MilestoneJobIndicator` (the toolbar strip while a milestone job runs, and its
-result), `Sidebar`, and the views
+result), `StatusPips` (one status circle per subtask on a story node, the
+overflow as a `+N`; its single pulse animation runs only while the row is
+visible AND holds an in-progress pip, so an idle graph animates nothing),
+`Sidebar`, and the views
 `DocumentsView`, `MemoriesView`, `MemoryNoteView`, `GraphView`.
 `Sidebar`'s five nav rows (Board, Graph, Documents, Memories, Issues) each lead with an
 icon glyph drawn in the theme's font; `tests/architecture/test_icon_glyphs.py`
@@ -143,5 +155,11 @@ would load its own type instead of ours.
 - `Panel.qml` shares a name with a shell type: it is loaded by manifest path.
 - `vendor/canvas/Canvas.qml`: always used qualified.
 - Panel-detail tone pill (`CardDetailScreen`) uses `radius: height / 2` itself, not `Badge`.
+- `StatusPips` uses `radius: height / 2` too: a subtask pip is a small circle
+  carrying no text, so neither `Badge` nor `Chip` fits.
+- `GraphView`'s story boxes are an Item INSIDE the vendored canvas with `z: -1`,
+  mirroring its camera (`panX`/`panY`/`zoom`): the canvas draws nodes and edges
+  only, and the boxes must paint behind them. `fitAll()` frames the nodes, so a
+  box's own padding can sit just outside the frame at high zoom.
 - `BoardCard` (BoardScreen) and Sidebar's project button, `NavRow`, `ProjectItem` use `CursorSurface` directly (and `bordered: true` for the two bordered ones).
 - `TextAreaBox` sets `font.family` itself: it is a `Controls.TextArea`, not a `Text`, so it cannot be a `ThemedText`.
