@@ -15,16 +15,9 @@ Item {
   property var nodes: []
   property var edges: []
   property string cursorId: ""
-  property color foreground: Color.foreground
-  property color dim: Qt.darker(foreground, 1.55)
-  property string fontFamily: Style.font.family
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: view.foreground
-    dim: view.dim
-    fontFamily: view.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
 
   signal nodeClicked(string id)
 
@@ -72,14 +65,14 @@ Item {
       // The canvas's Loader clears modelData while it tears a node down.
       readonly property var entry: modelData ? modelData : ({ id: "", title: "", status: "", done: 0, total: 0 })
       readonly property bool current: entry.id !== "" && view.cursorId === entry.id
-      readonly property color tint: Board.statusColor(entry.status, view.dim)
+      readonly property color tint: Board.statusColor(entry.status, view.theme.dim)
       objectName: "graphNode" + entry.id
       implicitWidth: Graph.GRAPH_NODE_W
       implicitHeight: Graph.GRAPH_NODE_H
       radius: 8
-      color: Qt.alpha(view.foreground, current ? 0.14 : 0.06)
+      color: Qt.alpha(view.theme.foreground, current ? 0.14 : 0.06)
       border.width: current ? 2 : 1
-      border.color: current ? view.foreground : Qt.alpha(view.foreground, 0.25)
+      border.color: current ? view.theme.foreground : Qt.alpha(view.theme.foreground, 0.25)
 
       Rectangle {
         width: 5

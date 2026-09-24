@@ -15,19 +15,10 @@ Item {
   property bool shown: false
   property bool busy: false
   property string error: ""
-  property color foreground: Color.foreground
-  property color urgent: Color.urgent
-  property color dim: Qt.darker(foreground, 1.55)
-  property string fontFamily: Style.font.family
   property string type: "feedback"
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: dialog.foreground
-    dim: dialog.dim
-    urgent: dialog.urgent
-    fontFamily: dialog.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
   readonly property Item focusItem: nameField
   readonly property bool valid: nameField.text.trim() !== ""
 
@@ -70,7 +61,7 @@ Item {
       id: nameField
       objectName: "newMemoryName"
       width: parent.width
-      foreground: dialog.foreground
+      foreground: dialog.theme.foreground
       placeholderText: "Name"
       enabled: !dialog.busy
       KeyNavigation.tab: descriptionField
@@ -87,7 +78,7 @@ Item {
       active: dialog.type
       model: Memories.MEMORY_TYPES.filter(function(t) { return t.id !== "other" })
         .map(function(t) {
-          return { id: t.id, label: t.label, tint: Memories.memoryTypeColor(t.id, dialog.dim) }
+          return { id: t.id, label: t.label, tint: Memories.memoryTypeColor(t.id, dialog.theme.dim) }
         })
       onChosen: function(id) { dialog.type = id }
     }
@@ -96,7 +87,7 @@ Item {
       id: descriptionField
       objectName: "newMemoryDescription"
       width: parent.width
-      foreground: dialog.foreground
+      foreground: dialog.theme.foreground
       placeholderText: "One-line description (shown in the list and MEMORY.md)"
       enabled: !dialog.busy
       Keys.onPressed: function(event) {
@@ -125,7 +116,7 @@ Item {
       visible: dialog.error !== ""
       width: parent.width
       text: dialog.error
-      color: dialog.urgent
+      color: dialog.theme.urgent
       wrapMode: Text.WordWrap
     }
 

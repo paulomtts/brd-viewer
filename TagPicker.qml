@@ -14,16 +14,9 @@ Column {
   property string current: ""
   property bool busy: false
   property string error: ""
-  property color foreground: Color.foreground
-  property color dim: Qt.darker(foreground, 1.55)
-  property string fontFamily: Style.font.family
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: picker.foreground
-    dim: picker.dim
-    fontFamily: picker.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
 
   signal tagChosen(string id)
 
@@ -55,7 +48,7 @@ Column {
         return {
           id: choice.id,
           label: choice.label,
-          tint: Documents.docCategoryColor(choice.id, picker.dim)
+          tint: Documents.docCategoryColor(choice.id, picker.theme.dim)
         }
       })
       onChosen: function(id) { picker.tagChosen(id) }

@@ -20,16 +20,9 @@ Column {
   property var categories: []
   property string activeCategory: ""
   property bool scrollOnCursor: false
-  property color foreground: Color.foreground
-  property color dim: Qt.darker(foreground, 1.55)
-  property string fontFamily: Style.font.family
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: view.foreground
-    dim: view.dim
-    fontFamily: view.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
 
   signal docChosen(string path)
   signal hovered(int index)
@@ -48,7 +41,7 @@ Column {
         id: category.id,
         label: category.label,
         count: category.count,
-        tint: Documents.docCategoryColor(category.id, view.dim)
+        tint: Documents.docCategoryColor(category.id, view.theme.dim)
       }
     })
     onChipToggled: function(id) { view.categoryToggled(id) }
@@ -107,7 +100,7 @@ Column {
         textObjectName: "docRowBadge" + row.index
         visible: text !== ""
         text: Documents.docCategoryLabel(row.modelData.category)
-        tint: Documents.docCategoryColor(row.modelData.category, view.dim)
+        tint: Documents.docCategoryColor(row.modelData.category, view.theme.dim)
       }
     }
 

@@ -20,18 +20,9 @@ Item {
   property int dropdownCursor: 0
   property bool canDelete: false
   property bool documentsEnabled: true
-  property color foreground: Color.foreground
-  property color dim: Qt.darker(foreground, 1.55)
-  property color urgent: Color.urgent
-  property string fontFamily: Style.font.family
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: sidebar.foreground
-    dim: sidebar.dim
-    urgent: sidebar.urgent
-    fontFamily: sidebar.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
 
   signal dropdownToggled()
   signal projectChosen(var project)
@@ -60,7 +51,7 @@ Item {
       implicitHeight: buttonRow.implicitHeight + Style.spacing.rowPaddingX * 2
       bordered: true
       hasCursor: buttonArea.containsMouse || sidebar.dropdownOpen
-      foreground: sidebar.foreground
+      foreground: sidebar.theme.foreground
 
       RowLayout {
         id: buttonRow
@@ -74,14 +65,14 @@ Item {
           theme: sidebar.theme
           Layout.fillWidth: true
           text: sidebar.selectedProject ? sidebar.selectedProject.name : "No project"
-          color: sidebar.selectedProject ? sidebar.foreground : sidebar.dim
+          color: sidebar.selectedProject ? sidebar.theme.foreground : sidebar.theme.dim
           font.bold: true
           elide: Text.ElideRight
         }
 
         Text {
           text: sidebar.dropdownOpen ? "▴" : "▾"
-          color: sidebar.dim
+          color: sidebar.theme.dim
           font.pixelSize: Style.font.body
         }
       }
@@ -142,7 +133,7 @@ Item {
         id: filterField
         objectName: "filterField"
         width: parent.width
-        foreground: sidebar.foreground
+        foreground: sidebar.theme.foreground
         placeholderText: "Search projects…"
         text: sidebar.dropdownQuery
         onTextChanged: if (text !== sidebar.dropdownQuery) sidebar.queryEdited(text)
@@ -162,7 +153,7 @@ Item {
         visible: sidebar.projects.length === 0
         width: parent.width
         text: sidebar.dropdownQuery === "" ? "No projects registered." : "No projects match “" + sidebar.dropdownQuery + "”."
-        color: sidebar.dim
+        color: sidebar.theme.dim
         wrapMode: Text.WordWrap
       }
 
@@ -205,7 +196,7 @@ Item {
     current: sidebar.section === section
     hasCursor: navArea.containsMouse && enabled
     opacity: enabled ? 1 : 0.4
-    foreground: sidebar.foreground
+    foreground: sidebar.theme.foreground
 
     UI.ThemedText {
       id: navLabel
@@ -237,7 +228,7 @@ Item {
     implicitHeight: itemLabel.implicitHeight + Style.spacing.rowPaddingX * 2
     hasCursor: sidebar.dropdownCursor === index
     current: !!sidebar.selectedProject && modelData.root_path === sidebar.selectedProject.root_path
-    foreground: sidebar.foreground
+    foreground: sidebar.theme.foreground
     onHasCursorChanged: if (hasCursor) listFlick.ensureVisible(item)
 
     UI.ThemedText {

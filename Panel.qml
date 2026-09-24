@@ -412,10 +412,7 @@ Panel {
         dropdownCursor: appStores.nav.dropdownCursor
         canDelete: !!appStores.projects.selectedProject && !appStores.deleter.deleting && !appStores.deleter.deleteTarget
         documentsEnabled: root.documentsEnabled
-        foreground: root.foreground
-        dim: root.dim
-        urgent: root.urgent
-        fontFamily: root.fontFamily
+        theme: panelTheme
         onDropdownToggled: root.toggleDropdown()
         onProjectChosen: function(project) { root.chooseProject(project) }
         onQueryEdited: function(text) { appStores.nav.dropdownQuery = text; appStores.nav.dropdownCursor = 0 }
@@ -626,9 +623,7 @@ Panel {
             nodes: appStores.graph.graph.nodes
             edges: appStores.graph.graph.edges
             cursorId: appStores.graph.graphCursor
-            foreground: root.foreground
-            dim: root.dim
-            fontFamily: root.fontFamily
+            theme: panelTheme
             onNodeClicked: function(id) { appStores.graph.graphCursor = id; root.openCard(id) }
           }
 
@@ -644,9 +639,7 @@ Panel {
             found: appStores.memories.memoriesFound
             error: appStores.memories.memoriesError
             scrollOnCursor: appStores.nav.scrollOnCursor
-            foreground: root.foreground
-            dim: root.dim
-            fontFamily: root.fontFamily
+            theme: panelTheme
             onNoteChosen: function(file) { root.openMemory(file) }
             onHovered: function(index) { root.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
@@ -664,10 +657,7 @@ Panel {
             draft: appStores.memories.memoryDraft
             busy: appStores.memories.memoryBusy
             error: appStores.memories.memoryOpError
-            foreground: root.foreground
-            urgent: root.urgent
-            dim: root.dim
-            fontFamily: root.fontFamily
+            theme: panelTheme
             onEditRequested: appStores.memories.startMemoryEdit()
             onDeleteRequested: appStores.memories.requestMemoryDelete()
             onSaveRequested: appStores.memories.saveMemory()
@@ -688,9 +678,7 @@ Panel {
             error: appStores.docs.docsError
             truncated: appStores.docs.docsTruncated
             scrollOnCursor: appStores.nav.scrollOnCursor
-            foreground: root.foreground
-            dim: root.dim
-            fontFamily: root.fontFamily
+            theme: panelTheme
             onCategoryToggled: function(id) { appStores.docs.toggleDocCategory(id) }
             onDocChosen: function(path) { root.openDoc(path) }
             onHovered: function(index) { root.hoverCursor(index) }
@@ -715,9 +703,7 @@ Panel {
               current: appStores.docs.selectedDocCategory
               busy: appStores.docs.docTagBusy
               error: appStores.docs.docTagError
-              foreground: root.foreground
-              dim: root.dim
-              fontFamily: root.fontFamily
+              theme: panelTheme
               onTagChosen: function(id) { appStores.docs.setDocTag(id) }
             }
 
@@ -851,9 +837,7 @@ Panel {
         busy: appStores.deleter.deleting
         error: appStores.deleter.deleteError
         typedText: appStores.deleter.confirmText
-        foreground: root.foreground
-        urgent: root.urgent
-        fontFamily: root.fontFamily
+        theme: panelTheme
         onTypedEdited: function(text) { appStores.deleter.confirmText = text }
         onConfirmRequested: appStores.deleter.performDelete()
         onCancelRequested: appStores.deleter.cancelDelete()
@@ -867,9 +851,7 @@ Panel {
         detail: appStores.memories.selectedMemory
         busy: appStores.memories.memoryBusy
         error: appStores.memories.memoryDeleteError
-        foreground: root.foreground
-        urgent: root.urgent
-        fontFamily: root.fontFamily
+        theme: panelTheme
         onConfirmRequested: appStores.memories.performMemoryDelete()
         onCancelRequested: appStores.memories.cancelMemoryDelete()
       }
@@ -880,9 +862,7 @@ Panel {
         shown: appStores.memories.newMemoryOpen
         busy: appStores.memories.memoryBusy
         error: appStores.memories.newMemoryError
-        foreground: root.foreground
-        urgent: root.urgent
-        fontFamily: root.fontFamily
+        theme: panelTheme
         onCreateRequested: function(name, type, description, body) { appStores.memories.createMemory(name, type, description, body) }
         onCancelRequested: appStores.memories.cancelNewMemory()
       }

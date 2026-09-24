@@ -21,18 +21,9 @@ Column {
   property string draft: ""
   property bool busy: false
   property string error: ""
-  property color foreground: Color.foreground
-  property color urgent: Color.urgent
-  property color dim: Qt.darker(foreground, 1.55)
-  property string fontFamily: Style.font.family
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: view.foreground
-    dim: view.dim
-    urgent: view.urgent
-    fontFamily: view.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
   readonly property bool dirty: view.draft !== view.text
   readonly property Item editorItem: editorBox.editorItem
 
@@ -63,7 +54,7 @@ Column {
       textObjectName: "memoryNoteBadge"
       paddingY: Style.space(4)
       text: Memories.memoryTypeLabel(view.entry.type)
-      tint: Memories.memoryTypeColor(view.entry.type, view.dim)
+      tint: Memories.memoryTypeColor(view.entry.type, view.theme.dim)
     }
   }
 
@@ -135,7 +126,7 @@ Column {
     visible: view.error !== ""
     width: parent.width
     text: view.error
-    color: view.urgent
+    color: view.theme.urgent
     wrapMode: Text.WordWrap
   }
 

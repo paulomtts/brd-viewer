@@ -22,22 +22,13 @@ Item {
   // The typed word, when the owner keeps it (the store owns it for the
   // project delete); typedEdited reports every change back.
   property string typedText: ""
-  property color foreground: Color.foreground
-  property color urgent: Color.urgent
-  property color dim: Qt.darker(foreground, 1.55)
-  property string fontFamily: Style.font.family
   // The callers' tests look these up by name.
   property string backdropObjectName: "confirmBackdrop"
   property string cardObjectName: "confirmCard"
   property string fieldObjectName: "confirmTyped"
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: dialog.foreground
-    dim: dialog.dim
-    urgent: dialog.urgent
-    fontFamily: dialog.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
   readonly property Item focusItem: field
   readonly property bool confirmed: Projects.isDeleteConfirmed(field.text)
 
@@ -66,7 +57,7 @@ Item {
       theme: dialog.theme
       width: parent.width
       text: dialog.message
-      color: dialog.urgent
+      color: dialog.theme.urgent
       wrapMode: Text.WordWrap
     }
 
@@ -83,7 +74,7 @@ Item {
       id: field
       objectName: dialog.fieldObjectName
       width: parent.width
-      foreground: dialog.foreground
+      foreground: dialog.theme.foreground
       placeholderText: "delete"
       enabled: !dialog.busy
       text: dialog.typedText
@@ -108,7 +99,7 @@ Item {
       visible: dialog.error !== ""
       width: parent.width
       text: dialog.error
-      color: dialog.urgent
+      color: dialog.theme.urgent
       wrapMode: Text.WordWrap
     }
 

@@ -21,16 +21,9 @@ Column {
   property bool found: true
   property string error: ""
   property bool scrollOnCursor: false
-  property color foreground: Color.foreground
-  property color dim: Qt.darker(foreground, 1.55)
-  property string fontFamily: Style.font.family
-  // What the shared components draw with; Panel still passes the colours one
-  // by one, so the theme follows them.
-  property var theme: T.Theme {
-    foreground: view.foreground
-    dim: view.dim
-    fontFamily: view.fontFamily
-  }
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
 
   signal noteChosen(string file)
   signal hovered(int index)
@@ -49,7 +42,7 @@ Column {
         id: type.id,
         label: type.label,
         count: type.count,
-        tint: Memories.memoryTypeColor(type.id, view.dim)
+        tint: Memories.memoryTypeColor(type.id, view.theme.dim)
       }
     })
     onChipToggled: function(id) { view.typeToggled(id) }
@@ -100,7 +93,7 @@ Column {
         theme: view.theme
         textObjectName: "memoryRowBadge" + row.index
         text: Memories.memoryTypeLabel(row.modelData.type)
-        tint: Memories.memoryTypeColor(row.modelData.type, view.dim)
+        tint: Memories.memoryTypeColor(row.modelData.type, view.theme.dim)
       }
     }
 
