@@ -313,4 +313,97 @@ TestCase {
     p.hoverCursor(0)
     compare(p.cursorIndex, 0)
   }
+
+  function tagFixture() {
+    var p = make(); if (!p) return null
+    p.showSection("documents")
+    p.applyDocsResult(catList, 0)
+    p.cursorIndex = 1
+    p.activateCursor()
+    return p
+  }
+
+  function test_choosing_a_type_runs_the_helper_for_the_open_document() {
+    var p = tagFixture(); if (!p) return
+    compare(p.viewMode, "document")
+    compare(p.selectedDocCategory, "specs")
+    p.setDocTag("audits")
+    var proc = named(p, "setDocTagProc")
+    verify(proc, "setDocTagProc")
+    compare(proc.command[0], "python3")
+    verify(String(proc.command[1]).endsWith("set-doc-tag.py"))
+    compare(proc.command[2], "/home/u/my proj")
+    compare(proc.command[3], "docs/specs/s.md")
+    compare(proc.command[4], "audits")
+    compare(proc.running, true)
+    compare(p.docTagBusy, true)
+  }
+
+  function test_a_successful_change_refreshes_the_list() {
+    var p = tagFixture(); if (!p) return
+    p.setDocTag("audits")
+    p.applyDocTagResult('{"ok": true, "changed": true}', 0)
+    compare(p.docTagBusy, false)
+    compare(p.docTagError, "")
+    compare(p.docsLoading, true)
+    verify(p.docsProc, "list re-fetched")
+    p.applyDocsResult(catList.replace('"path": "docs/specs/s.md", "title": "Spec One", "size": 1, "category": "specs"',
+      '"path": "docs/specs/s.md", "title": "Spec One", "size": 1, "category": "audits"'), 0)
+    compare(p.selectedDocCategory, "audits")
+  }
+
+  function test_a_failed_change_shows_the_error_and_keeps_the_document() {
+    var p = tagFixture(); if (!p) return
+    p.setDocTag("standards")
+    p.applyDocTagResult('{"ok": false, "error": "Could not write the document: Permission denied"}', 1)
+    compare(p.docTagBusy, false)
+    compare(p.docTagError, "Could not write the document: Permission denied")
+    compare(p.viewMode, "document")
+    p.setDocTag("standards")
+    compare(p.docTagError, "")
+  }
+
+  function test_only_valid_types_and_one_change_at_a_time() {
+    var p = tagFixture(); if (!p) return
+    p.setDocTag("banana")
+    compare(p.docTagBusy, false)
+    p.setDocTag("audits")
+    var proc = named(p, "setDocTagProc")
+    var cmd = proc.command
+    p.setDocTag("standards")
+    compare(proc.command[4], "audits")
+  }
+
+  function test_choosing_a_type_outside_a_document_does_nothing() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(catList, 0)
+    p.setDocTag("audits")
+    compare(p.docTagBusy, false)
+    verify(!named(p, "setDocTagProc") || !named(p, "setDocTagProc").running)
+  }
+
+  function test_the_picker_shows_the_current_type_and_reports_choices() {
+    var p = tagFixture(); if (!p) return
+    p.setDocTag("nope")
+    var picker = null
+    function walk(item) {
+      if (item.objectName === "tagPicker") { picker = item; return }
+      var kids = item.children || []
+      for (var i = 0; i < kids.length; i++) if (!picker) walk(kids[i])
+    }
+    walk(p)
+    verify(picker, "tagPicker")
+    compare(picker.current, "specs")
+    picker.tagChosen("standards")
+    compare(named(p, "setDocTagProc").command[4], "standards")
+  }
+
+  function test_leaving_the_document_clears_the_tag_error() {
+    var p = tagFixture(); if (!p) return
+    p.setDocTag("audits")
+    p.applyDocTagResult('{"ok": false, "error": "x"}', 1)
+    p.goBack()
+    compare(p.docTagError, "")
+  }
 }

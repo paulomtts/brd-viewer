@@ -348,8 +348,8 @@ TestCase {
   ]
 
   function test_doc_categories_are_fixed_and_ordered() {
-    compare(Logic.DOC_CATEGORIES.map(function(c) { return c.id }).join(","), "architecture,specs,audits")
-    compare(Logic.DOC_CATEGORIES.map(function(c) { return c.label }).join(","), "Architecture,Specs,Audits")
+    compare(Logic.DOC_CATEGORIES.map(function(c) { return c.id }).join(","), "architecture,specs,standards,audits,other")
+    compare(Logic.DOC_CATEGORIES.map(function(c) { return c.label }).join(","), "Architecture,Specs,Standards,Audits,Other")
     compare(Logic.docCategoryLabel("specs"), "Specs")
     compare(Logic.docCategoryLabel("nope"), "")
   }
@@ -474,5 +474,16 @@ TestCase {
     compare(Logic.stripFrontmatter("---\ntag: spec\nnever closed"), "---\ntag: spec\nnever closed")
     compare(Logic.stripFrontmatter(""), "")
     compare(Logic.stripFrontmatter(undefined), "")
+  }
+
+  function test_parse_tag_result() {
+    var ok = Logic.parseTagResult('{"ok": true, "changed": true}\n', 0)
+    compare(ok.ok, true)
+    var bad = Logic.parseTagResult('{"ok": false, "error": "nope"}', 1)
+    compare(bad.ok, false)
+    compare(bad.error, "nope")
+    compare(Logic.parseTagResult("", 1).error, "Could not change the document type.")
+    compare(Logic.parseTagResult("garbage", 0).ok, false)
+    compare(Logic.parseTagResult('{"ok": true}', 1).ok, false)
   }
 }

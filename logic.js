@@ -299,3 +299,17 @@ function stripFrontmatter(text) {
   var m = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(value)
   return m ? value.slice(m[0].length) : value
 }
+
+// set-doc-tag.py's answer (its last stdout line) plus its exit code, as
+// { ok, error }. Anything but a clear success is a failure.
+function parseTagResult(stdout, exitCode) {
+  var generic = "Could not change the document type."
+  var lines = String(stdout || "").split("\n").filter(function(l) { return l.trim() !== "" })
+  var payload = null
+  if (lines.length > 0) {
+    try { payload = JSON.parse(lines[lines.length - 1]) } catch (e) { payload = null }
+  }
+  if (exitCode === 0 && payload && payload.ok === true) return { ok: true, error: "" }
+  var message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : generic
+  return { ok: false, error: message }
+}

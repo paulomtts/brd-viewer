@@ -60,9 +60,11 @@ Item {
 
     Rectangle {
       id: node
-      readonly property bool current: view.cursorId === modelData.id
-      readonly property color tint: Logic.statusColor(modelData.status, view.dim)
-      objectName: "graphNode" + modelData.id
+      // The canvas's Loader clears modelData while it tears a node down.
+      readonly property var entry: modelData ? modelData : ({ id: "", title: "", status: "", done: 0, total: 0 })
+      readonly property bool current: entry.id !== "" && view.cursorId === entry.id
+      readonly property color tint: Logic.statusColor(entry.status, view.dim)
+      objectName: "graphNode" + entry.id
       implicitWidth: Logic.GRAPH_NODE_W
       implicitHeight: Logic.GRAPH_NODE_H
       radius: 8
@@ -91,7 +93,7 @@ Item {
         Text {
           objectName: "graphNodeTitle"
           width: parent.width
-          text: modelData.title
+          text: node.entry.title
           color: view.foreground
           font.family: view.fontFamily
           font.pixelSize: Style.font.body
@@ -102,7 +104,7 @@ Item {
         Text {
           objectName: "graphNodeProgress"
           width: parent.width
-          text: modelData.total > 0 ? modelData.done + "/" + modelData.total + " done" : "No stories"
+          text: node.entry.total > 0 ? node.entry.done + "/" + node.entry.total + " done" : "No stories"
           color: view.dim
           font.family: view.fontFamily
           font.pixelSize: Style.font.caption

@@ -71,6 +71,36 @@ Panel {
   property var docsProc: null
 
   property string docCategory: ""
+  property bool docTagBusy: false
+  property string docTagError: ""
+  readonly property string selectedDocCategory: {
+    for (var i = 0; i < root.docs.length; i++)
+      if (root.docs[i].path === root.selectedDocPath) return root.docs[i].category || ""
+    return ""
+  }
+
+  // Writes the `tag:` line of the open document (set-doc-tag.py, which checks
+  // the path and replaces the file atomically); the list is re-read afterwards
+  // so badges and filters follow.
+  function setDocTag(id) {
+    if (root.viewMode !== "document" || !root.selectedProject || root.docTagBusy) return
+    if (["architecture", "specs", "standards", "audits", "default"].indexOf(id) < 0) return
+    root.docTagError = ""
+    root.docTagBusy = true
+    setDocTagProc.forRoot = root.selectedProject.root_path
+    setDocTagProc.command = ["python3", root.pluginDir + "set-doc-tag.py",
+      root.selectedProject.root_path, root.selectedDocPath, id]
+    setDocTagProc.running = true
+  }
+
+  function applyDocTagResult(text, exitCode) {
+    var result = Logic.parseTagResult(text, exitCode)
+    root.docTagBusy = false
+    var sameProject = root.selectedProject && root.selectedProject.root_path === setDocTagProc.forRoot
+    if (!sameProject) return
+    if (result.ok) root.fetchDocs()
+    else root.docTagError = result.error
+  }
   readonly property var filteredDocs: Logic.filterDocs(Logic.filterDocsByCategory(root.docs, root.docCategory), root.searchQuery)
 
   function toggleDocCategory(id) {
@@ -256,14 +286,14 @@ Panel {
     root.watchedDbPath = ""
     root.applyTreeData([])
     root.viewMode = "board"
-    root.docs = []; root.docCategory = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
   }
 
   function selectProject(project) {
     selectedProject = project
     resetSearch()
     viewMode = "board"
-    root.docs = []; root.docCategory = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     root.watchedDbPath = ""
     resolveDbPathProc.command = ["python3", root.pluginDir + "resolve-db-path.py", project.root_path]
     resolveDbPathProc.running = false
@@ -475,6 +505,7 @@ Panel {
     root.returnCursor = root.cursorIndex
     root.returnScrollY = panelFlick ? panelFlick.contentY : 0
     root.selectedDocPath = path
+    root.docTagError = ""
     root.docText = ""
     root.docError = ""
     root.docTooLargeFlag = Logic.docTooLarge(entry.size)
@@ -486,6 +517,7 @@ Panel {
   }
 
   function restoreDocumentsList() {
+    root.docTagError = ""
     root.selectedDocPath = ""
     root.docText = ""
     root.docError = ""
@@ -685,6 +717,23 @@ Panel {
 
   // snapshot-and-forget.py prints one JSON line and exits 0/1; nothing here
   // assumes success until Logic.parseDeleteResult says so.
+  Process {
+    id: setDocTagProc
+    objectName: "setDocTagProc"
+    property string forRoot: ""
+    property string outText: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: setDocTagProc.outText = String(text || "")
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      var out = setDocTagProc.outText
+      setDocTagProc.outText = ""
+      root.applyDocTagResult(out, exitCode)
+    }
+  }
+
   Process {
     id: deleteProc
     objectName: "deleteProc"
@@ -1096,6 +1145,17 @@ Panel {
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
               elide: Text.ElideMiddle
+            }
+
+            TagPicker {
+              width: parent.width
+              current: root.selectedDocCategory
+              busy: root.docTagBusy
+              error: root.docTagError
+              foreground: root.foreground
+              dim: root.dim
+              fontFamily: root.fontFamily
+              onTagChosen: function(id) { root.setDocTag(id) }
             }
 
             Text {
