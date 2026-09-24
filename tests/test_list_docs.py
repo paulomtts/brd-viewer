@@ -25,79 +25,127 @@ def paths(result):
     return [d["path"] for d in result["docs"]]
 
 
+def cats(result):
+    return {d["path"]: d["category"] for d in result["docs"]}
+
+
+SPECS = "docs/specs"
+
+
 def test_missing_project_directory_is_an_empty_list(tmp_path):
     code, result = run(str(tmp_path / "nope"))
     assert code == 0 and result == {"ok": True, "docs": [], "truncated": False}
 
 
-def test_project_without_docs_is_an_empty_list(tmp_path):
-    (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "notes.md").write_text("# not under docs")
+def test_only_the_four_documentation_folders_are_listed(tmp_path):
+    write(tmp_path / "README.md", "# Readme")
+    write(tmp_path / "src" / "notes.md")
+    write(tmp_path / "docs" / "loose.md")
+    write(tmp_path / "docs" / "notes" / "n.md")
+    write(tmp_path / "docs" / "superpowers" / "plans" / "plan.md")
     assert run(str(tmp_path))[1]["docs"] == []
 
 
-def test_readme_comes_first_then_docs_in_case_insensitive_order(tmp_path):
-    write(tmp_path / "README.md", "# Readme title\n")
-    write(tmp_path / "docs" / "b.md")
-    write(tmp_path / "docs" / "A.md")
-    write(tmp_path / "docs" / "sub" / "c.md")
-    assert paths(run(str(tmp_path))[1]) == ["README.md", "docs/A.md", "docs/b.md", "docs/sub/c.md"]
+def test_each_folder_maps_to_its_category(tmp_path):
+    write(tmp_path / "docs" / "architecture" / "a.md")
+    write(tmp_path / "docs" / "specs" / "s.md")
+    write(tmp_path / "docs" / "superpowers" / "specs" / "ss.md")
+    write(tmp_path / "docs" / "audits" / "u.md")
+    assert cats(run(str(tmp_path))[1]) == {
+        "docs/architecture/a.md": "architecture",
+        "docs/specs/s.md": "specs",
+        "docs/superpowers/specs/ss.md": "specs",
+        "docs/audits/u.md": "audits",
+    }
+
+
+def test_both_spec_folders_share_the_specs_category_and_sort_by_path(tmp_path):
+    write(tmp_path / "docs" / "superpowers" / "specs" / "b.md")
+    write(tmp_path / "docs" / "specs" / "z.md")
+    write(tmp_path / "docs" / "specs" / "A.md")
+    result = run(str(tmp_path))[1]
+    assert paths(result) == ["docs/specs/A.md", "docs/specs/z.md", "docs/superpowers/specs/b.md"]
+    assert set(cats(result).values()) == {"specs"}
+
+
+def test_results_are_grouped_by_category_then_path(tmp_path):
+    write(tmp_path / "docs" / "audits" / "a.md")
+    write(tmp_path / "docs" / "specs" / "b.md")
+    write(tmp_path / "docs" / "architecture" / "c.md")
+    write(tmp_path / "docs" / "architecture" / "B.md")
+    assert paths(run(str(tmp_path))[1]) == [
+        "docs/architecture/B.md", "docs/architecture/c.md", "docs/specs/b.md", "docs/audits/a.md"]
+
+
+def test_nested_folders_are_searched(tmp_path):
+    write(tmp_path / "docs" / "architecture" / "deep" / "er" / "x.md")
+    assert paths(run(str(tmp_path))[1]) == ["docs/architecture/deep/er/x.md"]
 
 
 def test_titles_come_from_the_first_h1_else_the_file_name(tmp_path):
-    write(tmp_path / "docs" / "with-title.md", "intro\n\n# The Title\nbody\n")
-    write(tmp_path / "docs" / "plain.md", "no heading here\n")
-    write(tmp_path / "docs" / "empty-h1.md", "# \nbody\n")
+    write(tmp_path / SPECS / "with-title.md", "intro\n\n# The Title\nbody\n")
+    write(tmp_path / SPECS / "plain.md", "no heading here\n")
+    write(tmp_path / SPECS / "empty-h1.md", "# \nbody\n")
     by_path = {d["path"]: d["title"] for d in run(str(tmp_path))[1]["docs"]}
-    assert by_path["docs/with-title.md"] == "The Title"
-    assert by_path["docs/plain.md"] == "plain"
-    assert by_path["docs/empty-h1.md"] == "empty-h1"
+    assert by_path[SPECS + "/with-title.md"] == "The Title"
+    assert by_path[SPECS + "/plain.md"] == "plain"
+    assert by_path[SPECS + "/empty-h1.md"] == "empty-h1"
 
 
 def test_size_is_reported(tmp_path):
-    write(tmp_path / "docs" / "a.md", "# T\n12345")
+    write(tmp_path / SPECS / "a.md", "# T\n12345")
     assert run(str(tmp_path))[1]["docs"][0]["size"] == len("# T\n12345")
 
 
 def test_extension_is_case_insensitive_and_other_files_are_ignored(tmp_path):
-    write(tmp_path / "docs" / "UP.MD")
-    write(tmp_path / "docs" / "notes.txt")
-    write(tmp_path / "docs" / "img.png", "x")
-    assert paths(run(str(tmp_path))[1]) == ["docs/UP.MD"]
+    write(tmp_path / SPECS / "UP.MD")
+    write(tmp_path / SPECS / "notes.txt")
+    write(tmp_path / SPECS / "img.png", "x")
+    assert paths(run(str(tmp_path))[1]) == [SPECS + "/UP.MD"]
 
 
 def test_hidden_directories_are_skipped(tmp_path):
-    write(tmp_path / "docs" / ".secret" / "x.md")
-    write(tmp_path / "docs" / "ok.md")
-    assert paths(run(str(tmp_path))[1]) == ["docs/ok.md"]
+    write(tmp_path / SPECS / ".secret" / "x.md")
+    write(tmp_path / SPECS / "ok.md")
+    assert paths(run(str(tmp_path))[1]) == [SPECS + "/ok.md"]
 
 
 def test_paths_with_spaces_work(tmp_path):
-    write(tmp_path / "docs" / "my notes" / "big plan.md")
-    assert paths(run(str(tmp_path))[1]) == ["docs/my notes/big plan.md"]
+    write(tmp_path / "docs" / "audits" / "my notes" / "big plan.md")
+    assert paths(run(str(tmp_path))[1]) == ["docs/audits/my notes/big plan.md"]
 
 
 def test_a_symlinked_file_that_escapes_the_project_is_skipped(tmp_path):
     outside = tmp_path / "outside.md"
     outside.write_text("# secret")
     proj = tmp_path / "proj"
-    write(proj / "docs" / "ok.md")
-    os.symlink(outside, proj / "docs" / "leak.md")
-    assert paths(run(str(proj))[1]) == ["docs/ok.md"]
+    write(proj / SPECS / "ok.md")
+    os.symlink(outside, proj / SPECS / "leak.md")
+    assert paths(run(str(proj))[1]) == [SPECS + "/ok.md"]
 
 
 def test_a_symlinked_directory_is_not_followed(tmp_path):
     other = tmp_path / "other"
     write(other / "x.md")
     proj = tmp_path / "proj"
-    write(proj / "docs" / "ok.md")
-    os.symlink(other, proj / "docs" / "linked")
-    assert paths(run(str(proj))[1]) == ["docs/ok.md"]
+    write(proj / SPECS / "ok.md")
+    os.symlink(other, proj / SPECS / "linked")
+    assert paths(run(str(proj))[1]) == [SPECS + "/ok.md"]
 
 
-def test_a_docs_directory_symlinked_outside_is_ignored(tmp_path):
+def test_a_category_folder_symlinked_outside_is_ignored(tmp_path):
     other = tmp_path / "other"
     write(other / "x.md")
+    proj = tmp_path / "proj"
+    (proj / "docs").mkdir(parents=True)
+    os.symlink(other, proj / "docs" / "audits")
+    write(proj / SPECS / "ok.md")
+    assert paths(run(str(proj))[1]) == [SPECS + "/ok.md"]
+
+
+def test_the_docs_folder_itself_symlinked_outside_is_ignored(tmp_path):
+    other = tmp_path / "other"
+    write(other / "specs" / "x.md")
     proj = tmp_path / "proj"
     proj.mkdir()
     os.symlink(other, proj / "docs")
@@ -106,31 +154,31 @@ def test_a_docs_directory_symlinked_outside_is_ignored(tmp_path):
 
 def test_a_symlinked_file_staying_inside_the_project_is_listed(tmp_path):
     proj = tmp_path / "proj"
-    write(proj / "docs" / "real.md")
-    os.symlink(proj / "docs" / "real.md", proj / "docs" / "alias.md")
-    assert paths(run(str(proj))[1]) == ["docs/alias.md", "docs/real.md"]
+    write(proj / SPECS / "real.md")
+    os.symlink(proj / SPECS / "real.md", proj / SPECS / "alias.md")
+    assert paths(run(str(proj))[1]) == [SPECS + "/alias.md", SPECS + "/real.md"]
 
 
 def test_the_list_is_capped_and_flagged(tmp_path):
     for i in range(505):
-        write(tmp_path / "docs" / ("d%04d.md" % i), "x")
+        write(tmp_path / SPECS / ("d%04d.md" % i), "x")
     result = run(str(tmp_path))[1]
     assert len(result["docs"]) == 500 and result["truncated"] is True
 
 
 def test_exactly_the_cap_is_not_truncated(tmp_path):
     for i in range(500):
-        write(tmp_path / "docs" / ("d%04d.md" % i), "x")
+        write(tmp_path / SPECS / ("d%04d.md" % i), "x")
     result = run(str(tmp_path))[1]
     assert len(result["docs"]) == 500 and result["truncated"] is False
 
 
 def test_binary_and_empty_files_do_not_crash(tmp_path):
-    (tmp_path / "docs").mkdir()
-    (tmp_path / "docs" / "bin.md").write_bytes(b"\xff\xfe\x00# nope\x80")
-    (tmp_path / "docs" / "empty.md").write_bytes(b"")
+    (tmp_path / SPECS).mkdir(parents=True)
+    (tmp_path / SPECS / "bin.md").write_bytes(b"\xff\xfe\x00# nope\x80")
+    (tmp_path / SPECS / "empty.md").write_bytes(b"")
     result = run(str(tmp_path))[1]
-    assert sorted(paths(result)) == ["docs/bin.md", "docs/empty.md"]
+    assert sorted(paths(result)) == [SPECS + "/bin.md", SPECS + "/empty.md"]
 
 
 def test_requires_a_path(tmp_path):
