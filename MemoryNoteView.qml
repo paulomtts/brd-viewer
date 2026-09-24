@@ -171,6 +171,7 @@ Column {
     width: parent.width
     minHeight: Style.space(280)
     editorObjectName: "memoryEditor"
+    submitChords: ["ctrl-s"]
     theme: view.theme
     enabled: !view.busy
     text: view.draft

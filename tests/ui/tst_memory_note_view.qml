@@ -89,6 +89,17 @@ TestCase {
     compare(saveSpy.count, 1)
   }
 
+  function test_ctrl_enter_in_the_editor_does_not_save() {
+    var v = make()
+    v.editing = true
+    v.draft = raw
+    var editor = find(v, "memoryEditor")
+    editor.forceActiveFocus()
+    keyClick(Qt.Key_Return, Qt.ControlModifier)
+    keyClick(Qt.Key_Enter, Qt.ControlModifier)
+    compare(saveSpy.count, 0)
+  }
+
   function test_read_errors_hide_the_actions_and_op_errors_show() {
     var v = make()
     v.readError = "Could not read this memory."

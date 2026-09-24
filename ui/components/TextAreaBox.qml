@@ -5,7 +5,8 @@ import "../theme" as T
 
 // The bordered multi-line editor the panel uses for raw note text: a tinted
 // box whose border brightens while it is being edited, wrapped around a
-// plain TextArea. Ctrl+Enter and Ctrl+S ask the owner to submit.
+// plain TextArea. Which chord asks the owner to submit is the caller's
+// choice: nothing submits unless `submitChords` lists it.
 Rectangle {
   id: box
 
@@ -20,6 +21,9 @@ Rectangle {
   property real minHeight: Style.space(160)
   // The callers' tests look the editor up by name.
   property string editorObjectName: "textAreaEditor"
+  // The chords that emit submitRequested: "ctrl-s" and/or "ctrl-enter".
+  // Empty by default so the component never adds a shortcut on its own.
+  property var submitChords: []
 
   readonly property var palette: box.theme || boxTheme
   readonly property Item editorItem: editor
@@ -54,10 +58,12 @@ Rectangle {
 
     Keys.onPressed: function(event) {
       if (event.key === Qt.Key_Escape) { box.escapePressed(); event.accepted = true; return }
-      if (event.modifiers & Qt.ControlModifier) {
-        if (event.key === Qt.Key_S || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          box.submitRequested(); event.accepted = true
-        }
+      if (!(event.modifiers & Qt.ControlModifier)) return
+      var chords = box.submitChords || []
+      var chord = event.key === Qt.Key_S ? "ctrl-s"
+        : (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) ? "ctrl-enter" : ""
+      if (chord !== "" && chords.indexOf(chord) !== -1) {
+        box.submitRequested(); event.accepted = true
       }
     }
   }

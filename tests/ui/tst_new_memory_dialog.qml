@@ -71,6 +71,17 @@ TestCase {
     mouseClick(find(d, "newMemoryBackdrop"), 2, 2); compare(cancelSpy.count, 2)
   }
 
+  function test_ctrl_s_in_the_body_does_not_create() {
+    var d = make()
+    find(d, "newMemoryName").text = "Terse replies"
+    var body = find(d, "newMemoryBody")
+    body.forceActiveFocus()
+    keyClick(Qt.Key_S, Qt.ControlModifier)
+    compare(createSpy.count, 0)
+    keyClick(Qt.Key_Return, Qt.ControlModifier)
+    compare(createSpy.count, 1)
+  }
+
   function test_fields_reset_when_reopened_and_errors_show() {
     var d = make()
     find(d, "newMemoryName").text = "abc"

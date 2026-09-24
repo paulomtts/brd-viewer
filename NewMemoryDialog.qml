@@ -111,6 +111,7 @@ Item {
       width: parent.width
       height: Style.space(160)
       editorObjectName: "newMemoryBody"
+      submitChords: ["ctrl-enter"]
       placeholder: "What should be remembered?"
       theme: dialog.theme
       enabled: !dialog.busy

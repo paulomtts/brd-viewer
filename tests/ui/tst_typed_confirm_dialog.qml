@@ -11,6 +11,7 @@ TestCase {
   Component { id: dialogC; TypedConfirmDialog { width: 560; height: 360; message: "Remove it?"; detail: "/some/path" } }
   SignalSpy { id: confirmSpy; signalName: "confirmRequested" }
   SignalSpy { id: cancelSpy; signalName: "cancelRequested" }
+  SignalSpy { id: typedSpy; signalName: "typedEdited" }
 
   function find(item, name) {
     if (item.objectName === name) return item
@@ -19,8 +20,8 @@ TestCase {
   }
   function make() {
     var d = createTemporaryObject(dialogC, tc)
-    confirmSpy.target = d; cancelSpy.target = d
-    confirmSpy.clear(); cancelSpy.clear()
+    confirmSpy.target = d; cancelSpy.target = d; typedSpy.target = d
+    confirmSpy.clear(); cancelSpy.clear(); typedSpy.clear()
     return d
   }
 
@@ -52,6 +53,33 @@ TestCase {
     compare(cancelSpy.count, 2)
     mouseClick(find(d, "confirmCard"), 3, 3)
     compare(cancelSpy.count, 2)
+  }
+
+  function test_the_typed_field_follows_the_owners_text_and_reports_typing() {
+    var d = make()
+    d.shown = true
+    d.typedText = "del"
+    compare(find(d, "confirmTyped").text, "del")
+    compare(d.confirmed, false)
+    typedSpy.clear()
+    find(d, "confirmTyped").text = "delete"
+    compare(typedSpy.count, 1)
+    compare(typedSpy.signalArguments[0][0], "delete")
+    compare(d.confirmed, true)
+    compare(find(d, "confirmAccept").enabled, true)
+  }
+
+  function test_reopening_shows_the_owners_current_text_not_the_old_typing() {
+    var d = make()
+    d.shown = true
+    d.typedText = "del"
+    find(d, "confirmTyped").text = "delete"
+    d.shown = false
+    compare(find(d, "confirmTyped").text, "")
+    d.shown = true
+    compare(find(d, "confirmTyped").text, "del")
+    d.typedText = "de"
+    compare(find(d, "confirmTyped").text, "de")
   }
 
   function test_busy_blocks_everything_and_errors_show() {

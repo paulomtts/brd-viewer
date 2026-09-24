@@ -18,7 +18,12 @@ TestCase {
       minHeight: Style.space(280)
       placeholder: "What should be remembered?"
       editorObjectName: "theEditor"
+      submitChords: ["ctrl-s", "ctrl-enter"]
     }
+  }
+  Component {
+    id: chordBoxC
+    UI.TextAreaBox { width: 460; editorObjectName: "chordEditor" }
   }
   SignalSpy { id: edits; signalName: "edited" }
   SignalSpy { id: escapes; signalName: "escapePressed" }
@@ -70,6 +75,42 @@ TestCase {
     keyClick(Qt.Key_S, Qt.ControlModifier)
     compare(submits.count, 1)
     keyClick(Qt.Key_Return, Qt.ControlModifier)
+    compare(submits.count, 2)
+  }
+
+  function makeChordBox(chords) {
+    var box = createTemporaryObject(chordBoxC, tc)
+    box.submitChords = chords
+    submits.target = box
+    submits.clear()
+    H.find(box, "chordEditor").forceActiveFocus()
+    return box
+  }
+
+  function test_no_chord_submits_unless_the_caller_asked_for_it() {
+    var box = makeChordBox([])
+    keyClick(Qt.Key_S, Qt.ControlModifier)
+    keyClick(Qt.Key_Return, Qt.ControlModifier)
+    keyClick(Qt.Key_Enter, Qt.ControlModifier)
+    compare(submits.count, 0)
+  }
+
+  function test_ctrl_s_only_ignores_ctrl_enter() {
+    var box = makeChordBox(["ctrl-s"])
+    keyClick(Qt.Key_Return, Qt.ControlModifier)
+    keyClick(Qt.Key_Enter, Qt.ControlModifier)
+    compare(submits.count, 0)
+    keyClick(Qt.Key_S, Qt.ControlModifier)
+    compare(submits.count, 1)
+  }
+
+  function test_ctrl_enter_only_ignores_ctrl_s() {
+    var box = makeChordBox(["ctrl-enter"])
+    keyClick(Qt.Key_S, Qt.ControlModifier)
+    compare(submits.count, 0)
+    keyClick(Qt.Key_Return, Qt.ControlModifier)
+    compare(submits.count, 1)
+    keyClick(Qt.Key_Enter, Qt.ControlModifier)
     compare(submits.count, 2)
   }
 

@@ -60,6 +60,24 @@ TestCase {
     m.p.app.deleter.deleting = false
   }
 
+  function test_the_typed_field_stays_bound_to_the_store_across_reopens() {
+    var m = makePanel()
+    m.p.app.deleter.openDelete(m.p.app.projects.selectedProject)
+    var field = findIn(m.host, "confirmField")
+    var accept = findIn(m.host, "confirmAccept")
+    field.text = "del"
+    compare(m.p.app.deleter.confirmText, "del")
+    compare(accept.enabled, false)
+    m.p.app.deleter.cancelDelete()
+    m.p.app.deleter.openDelete(m.p.app.projects.selectedProject)
+    compare(m.p.app.deleter.confirmText, "")
+    compare(field.text, "")
+    m.p.app.deleter.confirmText = "delete"
+    compare(field.text, "delete")
+    compare(accept.enabled, true)
+    m.p.app.deleter.cancelDelete()
+  }
+
   function test_clicks_on_the_card_do_not_dismiss_it() {
     var m = makePanel()
     var modal = findIn(m.host, "deleteModal")

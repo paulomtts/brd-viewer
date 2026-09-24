@@ -46,7 +46,11 @@ Item {
   signal typedEdited(string text)
 
   visible: shown
-  onShownChanged: if (!shown) field.text = ""
+  // The field is cleared when the dialog closes and re-synced from the owner
+  // when it opens; no binding is relied on, so an owner that keeps the typed
+  // word (the project delete store) stays in step after any reopen.
+  onShownChanged: field.text = shown ? dialog.typedText : ""
+  onTypedTextChanged: if (field.text !== dialog.typedText) field.text = dialog.typedText
 
   UI.ModalCard {
     anchors.fill: parent
@@ -85,6 +89,8 @@ Item {
       enabled: !dialog.busy
       text: dialog.typedText
 
+      // Typing tells the owner; an owner-driven change arrives through
+      // onTypedTextChanged above and matches, so nothing echoes.
       onTextChanged: if (text !== dialog.typedText) dialog.typedEdited(text)
 
       Keys.onPressed: function(event) {
