@@ -65,16 +65,46 @@ TestCase {
     wait(120)
     verify(H.find(live, "statusPipt2").opacity < 1, "the in-progress pip fades")
 
-    live.visible = false
-    wait(30)
-    compare(live.pulsing, false, "a hidden row runs nothing")
-    live.visible = true
-    wait(30)
-    compare(live.pulsing, true)
-
     live.model = [{ id: "t1", status: "done" }]
     wait(30)
     compare(live.pulsing, false)
     compare(H.find(live, "statusPipt1").opacity, 1, "the fade is undone when it stops")
+  }
+
+  // The row is inside a node of a canvas that is itself inside a screen the
+  // panel hides: nothing of that reaches the row's own `visible` binding, so it
+  // is the ANCESTOR going away that has to stop the animation.
+  Component { id: hiddenHostC; Item { width: 200; height: 60 } }
+
+  function test_hiding_an_ancestor_stops_the_pulse_and_puts_the_opacity_back() {
+    var host = createTemporaryObject(hiddenHostC, tc)
+    var pips = pipsC.createObject(host, { active: true })
+    pips.model = [{ id: "t1", status: "in_progress" }]
+    wait(30)
+    compare(pips.pulsing, true)
+    wait(120)
+    verify(H.find(pips, "statusPipt1").opacity < 1)
+
+    host.visible = false
+    wait(60)
+    compare(pips.pulsing, false, "an invisible ancestor runs nothing")
+    compare(H.find(pips, "statusPipt1").opacity, 1, "and leaves no pip faded")
+
+    host.visible = true
+    wait(30)
+    compare(pips.pulsing, true, "showing it again starts the pulse")
+  }
+
+  function test_the_owner_can_switch_the_animation_off() {
+    var pips = make([{ id: "t1", status: "in_progress" }])
+    compare(pips.active, true, "on by default")
+    compare(pips.pulsing, true)
+    pips.active = false
+    wait(30)
+    compare(pips.pulsing, false)
+    compare(H.find(pips, "statusPipt1").opacity, 1)
+    pips.active = true
+    wait(30)
+    compare(pips.pulsing, true)
   }
 }

@@ -159,7 +159,10 @@ would load its own type instead of ours.
   carrying no text, so neither `Badge` nor `Chip` fits.
 - `GraphView`'s story boxes are an Item INSIDE the vendored canvas with `z: -1`,
   mirroring its camera (`panX`/`panY`/`zoom`): the canvas draws nodes and edges
-  only, and the boxes must paint behind them. `fitAll()` frames the nodes, so a
-  box's own padding can sit just outside the frame at high zoom.
+  only, and the boxes must paint behind them. The canvas's own `fitAll()` frames
+  the NODES, so `GraphView.fitAll()` unions the boxes in and hands the result to
+  the canvas's public `fitBounds(rect)`. The boxes are static: they do not follow
+  a node drag, so a dragged story can end up outside its own box until the view
+  is fitted again.
 - `BoardCard` (BoardScreen) and Sidebar's project button, `NavRow`, `ProjectItem` use `CursorSurface` directly (and `bordered: true` for the two bordered ones).
 - `TextAreaBox` sets `font.family` itself: it is a `Controls.TextArea`, not a `Text`, so it cannot be a `ThemedText`.

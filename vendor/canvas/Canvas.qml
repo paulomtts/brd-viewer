@@ -1149,6 +1149,24 @@ Item {
         root._fitRect(bounds);
     }
 
+    // Public: frame an explicit world rect {x, y, w, h}. fitAll() frames the
+    // NODES; a caller that draws something of its own in world coordinates --
+    // a grouping layer, an annotation -- knows bounds the canvas cannot, and
+    // hands them over here. Same padding and same clamp as fitAll; only the
+    // rect differs. An unusable rect, or a viewport that has not been laid out
+    // yet, is a no-op, exactly like fitAll's null bounds.
+    function fitBounds(rect) {
+        if (root.width <= 0 || root.height <= 0) {
+            return;
+        }
+        if (!rect || !_isFiniteNumber(rect.x) || !_isFiniteNumber(rect.y)
+                || !_isFiniteNumber(rect.w) || !_isFiniteNumber(rect.h)
+                || rect.w <= 0 || rect.h <= 0) {
+            return;
+        }
+        root._fitRect(rect);
+    }
+
     // Frame a world rect (viewport already known to be laid out).
     function _fitRect(bounds) {
         var camera = Camera.fitToRect(bounds,

@@ -29,7 +29,36 @@ Item {
   signal nodeClicked(string id)
 
   function centerOn(id) { canvas.centerOn(id) }
-  function fitAll() { canvas.fitAll() }
+
+  // Frame the whole graph. The canvas only knows its nodes, so in the story
+  // view the boxes -- which reach past their stories by their padding and their
+  // label strip -- are added here and the union is what gets framed.
+  function fitAll() {
+    var rect = view.contentBounds()
+    if (rect === null) { canvas.fitAll(); return }
+    canvas.fitBounds(rect)
+  }
+
+  // The union of every node and every box, in world coordinates, or null when
+  // there is nothing (or nothing measurable) to frame.
+  function contentBounds() {
+    var boxes = (view.mode === "story" ? view.groups : []) || []
+    if (boxes.length === 0) return null
+    var rect = null
+    function add(item) {
+      if (!item || !isFinite(item.x) || !isFinite(item.y) || !(item.w > 0) || !(item.h > 0)) return
+      if (rect === null) { rect = { x: item.x, y: item.y, w: item.w, h: item.h }; return }
+      var right = Math.max(rect.x + rect.w, item.x + item.w)
+      var bottom = Math.max(rect.y + rect.h, item.y + item.h)
+      rect.x = Math.min(rect.x, item.x)
+      rect.y = Math.min(rect.y, item.y)
+      rect.w = right - rect.x
+      rect.h = bottom - rect.y
+    }
+    boxes.forEach(add)
+    ;(view.nodes || []).forEach(add)
+    return rect
+  }
 
   Local.Canvas {
     id: canvas
@@ -42,8 +71,8 @@ Item {
     // dependency of its own.
     canConnect: function() { return false }
     onNodeClicked: function(id) { view.nodeClicked(id) }
-    onWidthChanged: Qt.callLater(canvas.fitAll)
-    Component.onCompleted: Qt.callLater(canvas.fitAll)
+    onWidthChanged: Qt.callLater(view.fitAll)
+    Component.onCompleted: Qt.callLater(view.fitAll)
 
     // The story view's milestone boxes. The canvas draws nodes and edges only,
     // so this layer sits inside it, applies the very same camera, and is pushed
@@ -97,8 +126,8 @@ Item {
   // different set of milestones (or showing the view again) reframes it, so a
   // pan/zoom survives an unrelated edit.
   readonly property string idKey: nodes.map(function(n) { return n.id }).join("|")
-  onIdKeyChanged: Qt.callLater(canvas.fitAll)
-  onVisibleChanged: if (visible) Qt.callLater(canvas.fitAll)
+  onIdKeyChanged: Qt.callLater(view.fitAll)
+  onVisibleChanged: if (visible) Qt.callLater(view.fitAll)
 
   Local.CanvasControls { canvas: canvas; showCulling: false }
 
@@ -245,6 +274,10 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             model: storyNode.entry.pips || []
             more: storyNode.entry.morePips || 0
+            // The section hides the whole view; a delegate inside the canvas is
+            // not always told, so the verdict is handed down explicitly and the
+            // pulse never runs for a graph nobody is looking at.
+            active: view.visible
           }
 
           UI.ThemedText {

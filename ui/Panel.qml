@@ -330,7 +330,11 @@ Panel {
             Layout.preferredWidth: implicitWidth
             model: [{ id: "milestone", label: "Milestone" }, { id: "story", label: "Story" }]
             active: appStores.graph.graphView
-            onChosen: function(id) { navi.showGraphView(id) }
+            // Straight to the store, like the other toolbar actions: the view
+            // it picks is a different set of nodes, and the canvas frames those
+            // itself (GraphView.onIdKeyChanged), so there is nothing left for
+            // the navigator to centre or scroll.
+            onChosen: function(id) { appStores.graph.setGraphView(id) }
           }
 
           // Icon-only refresh, square and as tall as the New button beside it.

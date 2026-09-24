@@ -156,6 +156,38 @@ TestCase {
     compare(layer.scale, 2)
   }
 
+  function test_hiding_the_graph_stops_the_pips_pulsing() {
+    var v = story()
+    var pips = find(find(v, "graphNodes1"), "graphNodePips")
+    compare(pips.pulsing, true, "a subtask is in progress")
+    v.visible = false
+    wait(60)
+    compare(pips.pulsing, false, "a graph nobody is looking at animates nothing")
+    v.visible = true
+    wait(60)
+    compare(pips.pulsing, true)
+  }
+
+  function test_the_fit_frames_the_boxes_and_not_only_the_nodes() {
+    // A wide, short viewport: the node alone would be framed at a zoom that
+    // pushes the box's label strip off the top edge.
+    var v = createTemporaryObject(viewC, tc, { width: 600, height: 200 })
+    v.mode = "story"
+    // One milestone, one story: the box is the node plus its padding and the
+    // strip that carries the label, and all of it has to be on screen.
+    v.nodes = [{ id: "s1", title: "Only", status: "todo", milestoneId: "m1", openIssues: 0,
+                 pips: [], morePips: 0, x: 16, y: 30, w: 230, h: 78 }]
+    v.groups = [{ id: "m1", title: "Milestone one", x: 0, y: 0, w: 262, h: 124 }]
+    wait(200)
+    var box = find(v, "graphGroupm1")
+    var topLeft = box.mapToItem(v, 0, 0)
+    var bottomRight = box.mapToItem(v, box.width, box.height)
+    verify(topLeft.x >= 0 && topLeft.y >= 0,
+           "the box's label strip and padding are framed (" + topLeft.x + "," + topLeft.y + ")")
+    verify(bottomRight.x <= v.width && bottomRight.y <= v.height,
+           "and so is its far corner (" + bottomRight.x + "," + bottomRight.y + ")")
+  }
+
   function test_an_empty_story_graph_says_so() {
     var v = createTemporaryObject(viewC, tc)
     v.mode = "story"

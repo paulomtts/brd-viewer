@@ -58,6 +58,9 @@ until it is next saved, and existing snapshots and backups are left in their
   by an open issue counted as blocked), the in-progress ones gently pulsing.
   More subtasks than fit collapse into a `+N`. Arrow keys, Enter, a click and
   Back work exactly as they do in the milestone view, on the story's own card.
+  The boxes are drawn where the layout put them and do not follow a drag, so
+  dragging a story node around can take it outside its own box; the fit button
+  puts the view back.
 - **Memories** (Ctrl+4) - the project's Claude Code memory notes, from
   `~/.claude/projects/<slug>/memory/` (the slug is the project path with every
   non-alphanumeric character turned into `-`; if that folder is missing, a

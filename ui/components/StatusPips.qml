@@ -18,6 +18,11 @@ Row {
   property int more: 0
   // The owner's Theme, or none: `palette` then falls back to this row's own.
   property var theme: null
+  // The owner's own "this is on screen" verdict, ANDed into the animation
+  // below on top of `visible`. A delegate inside a canvas is not always told
+  // that the section it is drawn in has gone away, and an idle graph must cost
+  // nothing.
+  property bool active: true
 
   readonly property var palette: pips.theme || pipsTheme
 
@@ -35,7 +40,7 @@ Row {
 
   SequentialAnimation {
     id: pulse
-    running: pips.visible && pips.hasInProgress
+    running: pips.active && pips.visible && pips.hasInProgress
     loops: Animation.Infinite
     NumberAnimation { target: pips; property: "pulseOpacity"; from: 1; to: 0.3; duration: 800; easing.type: Easing.InOutSine }
     NumberAnimation { target: pips; property: "pulseOpacity"; from: 0.3; to: 1; duration: 800; easing.type: Easing.InOutSine }
