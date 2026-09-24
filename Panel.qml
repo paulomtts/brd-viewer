@@ -38,12 +38,19 @@ Panel {
   Connections {
     target: appStores.projects
     function onSelected(project) {
-      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+      root.resetMemories()
       root.focusForView()
     }
     function onCleared() {
-      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+      root.resetMemories()
     }
+  }
+
+  // A different category means a different list: the cursor reset is App's, the
+  // scroll is the panel's.
+  Connections {
+    target: appStores.docs
+    function onCategoryToggled() { Qt.callLater(root.scrollToTop) }
   }
 
   // The open card left the board (a refetch dropped it): back to the list.
@@ -59,63 +66,12 @@ Panel {
     function onDeleted() { root.focusForView() }
   }
 
-  property var docs: []
-  property bool docsLoading: false
-  property string docsError: ""
-  property bool docsTruncated: false
-  property string selectedDocPath: ""
-  property string docText: ""
-  property string docError: ""
-  property bool docTooLargeFlag: false
-  property int docsSeq: 0
-  property var docsProc: null
-
-  property string docCategory: ""
-  property bool docTagBusy: false
-  property string docTagError: ""
-  readonly property string selectedDocCategory: {
-    for (var i = 0; i < root.docs.length; i++)
-      if (root.docs[i].path === root.selectedDocPath) return root.docs[i].category || ""
-    return ""
-  }
-
-  // Writes the `tag:` line of the open document (set-doc-tag.py, which checks
-  // the path and replaces the file atomically); the list is re-read afterwards
-  // so badges and filters follow.
-  function setDocTag(id) {
-    if (appStores.nav.viewMode !== "document" || !appStores.projects.selectedProject || root.docTagBusy) return
-    if (["architecture", "specs", "standards", "audits", "default"].indexOf(id) < 0) return
-    root.docTagError = ""
-    root.docTagBusy = true
-    setDocTagProc.forRoot = appStores.projects.selectedProject.root_path
-    setDocTagProc.command = ["python3", root.pluginDir + "core/backend/documents/set-doc-tag.py",
-      appStores.projects.selectedProject.root_path, root.selectedDocPath, id]
-    setDocTagProc.running = true
-  }
-
-  function applyDocTagResult(text, exitCode) {
-    var result = Documents.parseTagResult(text, exitCode)
-    root.docTagBusy = false
-    var sameProject = appStores.projects.selectedProject && appStores.projects.selectedProject.root_path === setDocTagProc.forRoot
-    if (!sameProject) return
-    if (result.ok) root.fetchDocs()
-    else root.docTagError = result.error
-  }
-  readonly property var filteredDocs: Documents.filterDocs(Documents.filterDocsByCategory(root.docs, root.docCategory), appStores.nav.searchQuery)
-
-  function toggleDocCategory(id) {
-    root.docCategory = root.docCategory === id ? "" : id
-    appStores.nav.cursorIndex = 0
-    appStores.nav.scrollOnCursor = false
-    Qt.callLater(root.scrollToTop)
-  }
-
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
   function currentList() {
     if (appStores.nav.viewMode === "board") return appStores.board.boardCards
     if (appStores.nav.viewMode === "entry") return appStores.board.detailLinkList
-    if (appStores.nav.viewMode === "documents") return root.filteredDocs
+    if (appStores.nav.viewMode === "documents") return appStores.docs.filteredDocs
     if (appStores.nav.viewMode === "memories") return root.filteredMemories
     return []
   }
@@ -275,7 +231,7 @@ Panel {
     appStores.nav.scrollOnCursor = false
     appStores.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : name === "memories" ? "memories" : "board"
     root.memoryEditing = false
-    if (name === "documents") root.fetchDocs()
+    if (name === "documents") appStores.docs.fetchDocs()
     if (name === "memories") root.fetchMemories()
     if (name === "graph" && appStores.graph.graphCursor === "" && appStores.graph.graph.nodes.length > 0) appStores.graph.graphCursor = appStores.graph.graph.nodes[0].id
     Qt.callLater(root.scrollToTop)
@@ -305,40 +261,9 @@ Panel {
     focusForView()
   }
 
-  function fetchDocs() {
-    if (!appStores.projects.selectedProject) return
-    var old = root.docsProc
-    if (old) old.running = false
-    root.docs = []
-    root.docsError = ""
-    root.docsTruncated = false
-    root.docsLoading = true
-    root.docsSeq += 1
-    var rootPath = appStores.projects.selectedProject.root_path
-    var proc = docsProcC.createObject(root, { forRoot: rootPath, seq: root.docsSeq })
-    proc.command = ["python3", root.pluginDir + "core/backend/documents/list-docs.py", rootPath]
-    root.docsProc = proc
-    proc.running = true
-  }
-
-  function applyDocsResult(text, exitCode) {
-    var result = Documents.parseDocsResult(text, exitCode)
-    root.docsLoading = false
-    root.docs = result.docs
-    root.docsTruncated = result.truncated
-    root.docsError = result.ok ? "" : result.error
-  }
-
   function openDoc(path) {
-    var entry = null
-    for (var i = 0; i < root.docs.length; i++) if (root.docs[i].path === path) entry = root.docs[i]
-    if (!entry || !appStores.projects.selectedProject) return
+    if (!appStores.docs.openDoc(path)) return
     appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
-    root.selectedDocPath = path
-    root.docTagError = ""
-    root.docText = ""
-    root.docError = ""
-    root.docTooLargeFlag = Documents.docTooLarge(entry.size)
     appStores.nav.viewMode = "document"
     appStores.nav.scrollOnCursor = false
     appStores.nav.cursorIndex = 0
@@ -347,11 +272,7 @@ Panel {
   }
 
   function restoreDocumentsList() {
-    root.docTagError = ""
-    root.selectedDocPath = ""
-    root.docText = ""
-    root.docError = ""
-    root.docTooLargeFlag = false
+    appStores.docs.restoreDocumentsList()
     var back = appStores.nav.popReturn()
     appStores.nav.viewMode = "documents"
     appStores.nav.scrollOnCursor = false
@@ -614,45 +535,6 @@ Panel {
     onPressed: function(buttonCode) { root.toggle() }
   }
 
-  // One process per listing: each carries the project and sequence number it
-  // was launched for, so a late exit can never be mistaken for the current run.
-  Component {
-    id: docsProcC
-    Process {
-      id: dp
-      objectName: "listDocsProc"
-      property string outText: ""
-      property string forRoot: ""
-      property int seq: 0
-      stdout: StdioCollector {
-        waitForEnd: true
-        onStreamFinished: dp.outText = String(text || "")
-      }
-      stderr: StdioCollector { waitForEnd: true }
-      onExited: function(exitCode) {
-        var current = appStores.projects.selectedProject ? appStores.projects.selectedProject.root_path : ""
-        if (dp.seq === root.docsSeq && dp.forRoot === current) root.applyDocsResult(dp.outText, exitCode)
-        dp.destroy()
-      }
-    }
-  }
-
-  FileView {
-    id: docFile
-    objectName: "docFile"
-    path: appStores.nav.viewMode === "document" && !root.docTooLargeFlag && appStores.projects.selectedProject && root.selectedDocPath !== ""
-      ? Documents.docAbsolutePath(appStores.projects.selectedProject.root_path, root.selectedDocPath) : ""
-    watchChanges: true
-    printErrors: false
-    onFileChanged: reload()
-    onLoaded: { root.docError = ""; root.docText = Documents.stripFrontmatter(docFile.text()) }
-    onLoadFailed: {
-      if (docFile.path === "" || !appStores.projects.selectedProject || root.selectedDocPath === "") return
-      if (docFile.path === Documents.docAbsolutePath(appStores.projects.selectedProject.root_path, root.selectedDocPath))
-        root.docError = "Could not read this document."
-    }
-  }
-
   Component {
     id: memoriesProcC
     Process {
@@ -703,23 +585,6 @@ Panel {
     onFileChanged: reload()
     onLoaded: root.setMemoryText(memoryFile.text())
     onLoadFailed: if (memoryFile.path !== "") root.memoryReadError = "Could not read this memory."
-  }
-
-  Process {
-    id: setDocTagProc
-    objectName: "setDocTagProc"
-    property string forRoot: ""
-    property string outText: ""
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: setDocTagProc.outText = String(text || "")
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      var out = setDocTagProc.outText
-      setDocTagProc.outText = ""
-      root.applyDocTagResult(out, exitCode)
-    }
   }
 
   KeyboardPanel {
@@ -1065,19 +930,19 @@ Panel {
           DocumentsView {
             visible: appStores.nav.viewMode === "documents" && !!appStores.projects.selectedProject
             width: parent.width
-            docs: root.filteredDocs
+            docs: appStores.docs.filteredDocs
             query: appStores.nav.searchQuery
-            categories: Documents.docCategoryCounts(root.docs)
-            activeCategory: root.docCategory
+            categories: Documents.docCategoryCounts(appStores.docs.docs)
+            activeCategory: appStores.docs.docCategory
             cursorIndex: appStores.nav.cursorIndex
-            loading: root.docsLoading
-            error: root.docsError
-            truncated: root.docsTruncated
+            loading: appStores.docs.docsLoading
+            error: appStores.docs.docsError
+            truncated: appStores.docs.docsTruncated
             scrollOnCursor: appStores.nav.scrollOnCursor
             foreground: root.foreground
             dim: root.dim
             fontFamily: root.fontFamily
-            onCategoryToggled: function(id) { root.toggleDocCategory(id) }
+            onCategoryToggled: function(id) { appStores.docs.toggleDocCategory(id) }
             onDocChosen: function(path) { root.openDoc(path) }
             onHovered: function(index) { root.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
@@ -1090,7 +955,7 @@ Panel {
 
             Text {
               width: parent.width
-              text: root.selectedDocPath
+              text: appStores.docs.selectedDocPath
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -1099,19 +964,19 @@ Panel {
 
             TagPicker {
               width: parent.width
-              current: root.selectedDocCategory
-              busy: root.docTagBusy
-              error: root.docTagError
+              current: appStores.docs.selectedDocCategory
+              busy: appStores.docs.docTagBusy
+              error: appStores.docs.docTagError
               foreground: root.foreground
               dim: root.dim
               fontFamily: root.fontFamily
-              onTagChosen: function(id) { root.setDocTag(id) }
+              onTagChosen: function(id) { appStores.docs.setDocTag(id) }
             }
 
             Text {
-              visible: root.docTooLargeFlag || root.docError !== ""
+              visible: appStores.docs.docTooLargeFlag || appStores.docs.docError !== ""
               width: parent.width
-              text: root.docTooLargeFlag ? "This document is too large to display." : root.docError
+              text: appStores.docs.docTooLargeFlag ? "This document is too large to display." : appStores.docs.docError
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
@@ -1119,9 +984,9 @@ Panel {
             }
 
             Text {
-              visible: !root.docTooLargeFlag && root.docError === ""
+              visible: !appStores.docs.docTooLargeFlag && appStores.docs.docError === ""
               width: parent.width
-              text: root.docText !== "" ? root.docText : "Loading…"
+              text: appStores.docs.docText !== "" ? appStores.docs.docText : "Loading…"
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
