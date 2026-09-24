@@ -313,3 +313,105 @@ function parseTagResult(stdout, exitCode) {
   var message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : generic
   return { ok: false, error: message }
 }
+
+// ---- Memories: a project's Claude Code memory notes (list-memories.py / memory-op.py)
+
+var MEMORY_TYPES = [
+  { id: "user", label: "User" },
+  { id: "feedback", label: "Feedback" },
+  { id: "project", label: "Project" },
+  { id: "reference", label: "Reference" },
+  { id: "other", label: "Other" }
+]
+
+function memoryTypeLabel(id) {
+  for (var i = 0; i < MEMORY_TYPES.length; i++)
+    if (MEMORY_TYPES[i].id === id) return MEMORY_TYPES[i].label
+  return ""
+}
+
+function memoryTypeColor(id, fallback) {
+  if (id === "user") return "#d98cb3"
+  if (id === "feedback") return "#6fb7c9"
+  if (id === "project") return "#9bbf6a"
+  if (id === "reference") return "#b39ddb"
+  return fallback
+}
+
+function filterMemoriesByType(notes, typeId) {
+  var list = notes || []
+  if (!typeId) return list
+  return list.filter(function(n) { return n.type === typeId })
+}
+
+function memoryTypeCounts(notes) {
+  var counts = []
+  MEMORY_TYPES.forEach(function(t) {
+    var n = (notes || []).filter(function(note) { return note.type === t.id }).length
+    if (n > 0) counts.push({ id: t.id, label: t.label, count: n })
+  })
+  return counts
+}
+
+function filterMemories(notes, query) {
+  return (notes || []).filter(function(n) {
+    return matchesQuery(n.name, query) || matchesQuery(n.description, query) || matchesQuery(n.file, query)
+  })
+}
+
+function parseMemoriesResult(stdout, exitCode) {
+  var generic = "Could not read this project's memories."
+  var empty = { ok: false, found: false, memoryDir: "", notes: [], error: generic }
+  var lines = String(stdout || "").split("\n").filter(function(l) { return l.trim() !== "" })
+  var payload = null
+  if (lines.length > 0) {
+    try { payload = JSON.parse(lines[lines.length - 1]) } catch (e) { payload = null }
+  }
+  if (exitCode !== 0 || !payload || payload.ok !== true || !Array.isArray(payload.notes)) {
+    if (payload && typeof payload.error === "string" && payload.error !== "") empty.error = payload.error
+    return empty
+  }
+  return { ok: true, found: payload.found === true, memoryDir: String(payload.memory_dir || ""),
+           notes: payload.notes, error: "" }
+}
+
+function parseMemoryOpResult(stdout, exitCode) {
+  var generic = "Could not update the memory."
+  var lines = String(stdout || "").split("\n").filter(function(l) { return l.trim() !== "" })
+  var payload = null
+  if (lines.length > 0) {
+    try { payload = JSON.parse(lines[lines.length - 1]) } catch (e) { payload = null }
+  }
+  if (exitCode === 0 && payload && payload.ok === true) return { ok: true, backup: String(payload.backup || ""), error: "" }
+  var message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : generic
+  return { ok: false, backup: "", error: message }
+}
+
+function memoryAbsolutePath(memoryDir, file) {
+  return String(memoryDir).replace(/\/+$/, "") + "/" + file
+}
+
+// "<type>_<slug>.md", made unique against the files already in the folder.
+function newMemoryFile(type, name, existingFiles) {
+  var kind = MEMORY_TYPES.some(function(t) { return t.id === type }) ? type : "other"
+  var slug = String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+  if (slug === "") slug = "memory"
+  var taken = {}
+  ;(existingFiles || []).forEach(function(f) { taken[f] = true })
+  var base = kind + "_" + slug
+  var candidate = base + ".md"
+  for (var n = 2; taken[candidate]; n++) candidate = base + "-" + n + ".md"
+  return candidate
+}
+
+function yamlValue(text) {
+  var value = String(text === undefined || text === null ? "" : text).replace(/\s*[\r\n]+\s*/g, " ").trim()
+  var risky = /: |#|^[\-?:,\[\]{}&*!|>'"%@`]|["\\]|\s$/.test(value)
+  return risky ? '"' + value.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"' : value
+}
+
+// A new note in Claude Code's memory format.
+function composeMemory(name, description, type, body) {
+  return "---\nname: " + yamlValue(name) + "\ndescription: " + yamlValue(description)
+    + "\nmetadata:\n  type: " + type + "\n---\n\n" + String(body || "")
+}
