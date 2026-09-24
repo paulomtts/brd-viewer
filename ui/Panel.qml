@@ -121,7 +121,7 @@ Panel {
   readonly property Item focusItem: appStores.deleter.deleteTarget ? deleteModal.focusItem
     : appStores.memories.memoryDeleteOpen ? memoryConfirm.focusItem
     : appStores.memories.newMemoryOpen ? newMemoryDialog.focusItem
-    : (appStores.nav.viewMode === "memory" && appStores.memories.memoryEditing) ? memoryNote.editorItem
+    : (appStores.nav.viewMode === "memory" && appStores.memories.memoryEditing) ? memoryNoteScreen.editorItem
     : appStores.nav.dropdownOpen ? sidebar.filterItem
     : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "graph" || !appStores.projects.selectedProject) ? keyCatcher
     : searchField
@@ -388,43 +388,20 @@ Panel {
             theme: panelTheme
           }
 
-          MemoriesView {
-            visible: appStores.nav.viewMode === "memories" && !!appStores.projects.selectedProject
+          MemoriesScreen {
             width: parent.width
-            notes: appStores.memories.filteredMemories
-            types: appStores.memories.memoryTypes
-            activeType: appStores.memories.memoryType
-            query: appStores.nav.searchQuery
-            cursorIndex: appStores.nav.cursorIndex
-            loading: appStores.memories.memoriesLoading
-            found: appStores.memories.memoriesFound
-            error: appStores.memories.memoriesError
-            scrollOnCursor: appStores.nav.scrollOnCursor
+            app: appStores
+            navigator: navi
             theme: panelTheme
-            onNoteChosen: function(file) { navi.openMemory(file) }
-            onHovered: function(index) { navi.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
-            onTypeToggled: function(id) { appStores.memories.toggleMemoryType(id) }
           }
 
-          MemoryNoteView {
-            id: memoryNote
-            visible: appStores.nav.viewMode === "memory" && !!appStores.projects.selectedProject
+          MemoryNoteScreen {
+            id: memoryNoteScreen
             width: parent.width
-            entry: appStores.memories.selectedMemoryEntry
-            text: appStores.memories.memoryText
-            readError: appStores.memories.memoryReadError
-            editing: appStores.memories.memoryEditing
-            draft: appStores.memories.memoryDraft
-            busy: appStores.memories.memoryBusy
-            error: appStores.memories.memoryOpError
+            app: appStores
+            navigator: navi
             theme: panelTheme
-            onEditRequested: appStores.memories.startMemoryEdit()
-            onDeleteRequested: appStores.memories.requestMemoryDelete()
-            onSaveRequested: appStores.memories.saveMemory()
-            onCancelEditRequested: appStores.memories.cancelMemoryEdit()
-            onDraftEdited: function(text) { appStores.memories.memoryDraft = text }
-            onEscapePressed: appStores.memories.memoryEscape()
           }
 
           DocumentsScreen {
