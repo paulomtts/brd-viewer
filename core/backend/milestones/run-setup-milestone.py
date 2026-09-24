@@ -28,6 +28,7 @@ Prints exactly one JSON line on stdout on EVERY path, including an unexpected fa
 2 usage error. `--describe` prints {"agent", "supported", "restricted", "note",
 "installed"} and exits 0; there `installed` means only "the binary is on PATH".
 """
+import math
 import os
 import re
 import shutil
@@ -45,7 +46,12 @@ from milestones import agents  # noqa: E402
 USAGE = "usage: run-setup-milestone.py <project_root> <spec_path>"
 PROMPT_FILE = os.path.join(HERE, "setup-milestone.md")
 DEFAULT_TIMEOUT = 1800.0
+MAX_TIMEOUT = 24 * 3600.0
 KILL_GRACE = 5.0
+MAX_KILL_GRACE = 60.0
+
+# What the run knows so far, so a failure can still name the agent and its log.
+CONTEXT = {"agent": "", "log": ""}
 
 
 def fail(error, agent="", code=1):
@@ -125,40 +131,41 @@ def kill_group(proc):
     The KILL always goes to the group, so an agent that ignores SIGTERM and anything
     it started die too (unless they left the group themselves; see the module docstring).
     """
-    grace = env_seconds("OPM_AGENT_KILL_GRACE_SECONDS", KILL_GRACE)
+    grace = kill_grace_seconds()
     try:
         pgid = os.getpgid(proc.pid)
     except OSError:
         return
-    try:
-        os.killpg(pgid, signal.SIGTERM)
-    except OSError:
-        pass
-    try:
-        proc.wait(timeout=grace)
-    except subprocess.TimeoutExpired:
-        pass
-    try:
-        os.killpg(pgid, signal.SIGKILL)
-    except OSError:
-        pass
-    try:
-        proc.wait(timeout=grace)
-    except subprocess.TimeoutExpired:
-        pass
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(pgid, sig)
+        except Exception:  # noqa: BLE001 - a failed signal must not skip the next one
+            pass
+        try:
+            proc.wait(timeout=grace)
+        except Exception:  # noqa: BLE001 - nor may a failed wait
+            pass
 
 
-def env_seconds(name, default):
-    """A positive number of seconds from the environment, else the default."""
+def env_seconds(name, default, cap):
+    """A sane, positive, finite number of seconds from the environment, else the
+    default. Junk, inf/nan and absurd values (over `cap`) all fall back, so a bad
+    setting can never make the runner wait forever on a live agent."""
     try:
         value = float(os.environ.get(name, ""))
     except ValueError:
         return default
-    return value if value > 0 else default
+    if not math.isfinite(value) or value <= 0 or value > cap:
+        return default
+    return value
 
 
 def timeout_seconds():
-    return env_seconds("OPM_AGENT_TIMEOUT_SECONDS", DEFAULT_TIMEOUT)
+    return env_seconds("OPM_AGENT_TIMEOUT_SECONDS", DEFAULT_TIMEOUT, MAX_TIMEOUT)
+
+
+def kill_grace_seconds():
+    return env_seconds("OPM_AGENT_KILL_GRACE_SECONDS", KILL_GRACE, MAX_KILL_GRACE)
 
 
 def run_agent(argv, root, log):
@@ -201,6 +208,11 @@ def run_agent(argv, root, log):
                 kill_group(proc)
                 return proc.returncode, ("The agent ran out of time after "
                                          + format_limit(limit) + "s.")
+    except BaseException:  # noqa: BLE001 - nothing may outlive the agent
+        # Anything unexpected in here (or a KeyboardInterrupt) would otherwise leave
+        # the agent running while the caller is told the run failed.
+        kill_group(proc)
+        raise
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)
@@ -242,10 +254,12 @@ def main(argv):
         return fail(name + " has no supported unattended mode.", name)
     if shutil.which(name) is None:
         return fail(name + " is not installed.", name)
+    CONTEXT["agent"] = name
 
     rel_spec = os.path.relpath(spec_real, root_real)
     command = agents.ADAPTERS[name].build(build_prompt(skill_text, rel_spec))
     log = log_path(root_real)
+    CONTEXT["log"] = log
     code, error = run_agent(command, root_real, log)
     ok = error == ""
     return emit({"ok": ok, "agent": name, "log": log, "exit_code": code,
@@ -254,14 +268,17 @@ def main(argv):
 
 def guarded(argv):
     """The panel parses stdout for exactly one JSON line, so no path — not even an
-    unexpected exception — may end without one."""
+    unexpected exception — may end without one. By the time it runs the agent's process
+    group has already been killed (see `run_agent`)."""
+    CONTEXT["agent"], CONTEXT["log"] = "", ""
     try:
         return main(argv)
     except SystemExit:
         raise
     except BaseException as e:  # noqa: BLE001 - deliberate catch-all
         reason = str(e) or e.__class__.__name__
-        return emit({"ok": False, "agent": "", "log": "", "exit_code": None,
+        return emit({"ok": False, "agent": CONTEXT["agent"], "log": CONTEXT["log"],
+                     "exit_code": None,
                      "error": "The milestone run failed: " + reason}, 1)
 
 

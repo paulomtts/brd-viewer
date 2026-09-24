@@ -3,7 +3,9 @@
 Hermetic: a fake `omarchy-default-agent`, a fake agent binary and a fake `brd` live on a
 temp PATH; HOME and XDG_STATE_HOME are temp. No real agent is ever started.
 """
+import importlib.util
 import json
+import math
 import os
 import signal
 import stat
@@ -493,3 +495,81 @@ def test_a_bad_kill_grace_value_falls_back_to_the_default(world):
     code, res = run(world, [str(world["proj"]), str(world["spec"])],
                     OPM_AGENT_KILL_GRACE_SECONDS="nonsense")
     assert code == 0 and res["ok"] is True
+
+
+# --- the module in-process: no exception may outlive the agent ---------------
+
+def load_module():
+    """Import the helper (its file name is not a Python identifier)."""
+    spec = importlib.util.spec_from_file_location("run_setup_milestone", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize("raw", ["", "nonsense", "0", "-1", "inf", "-inf", "nan",
+                                 "1e309", "999999999"])
+def test_env_seconds_rejects_junk_non_finite_and_absurd_values(raw, monkeypatch):
+    module = load_module()
+    monkeypatch.setenv("OPM_TEST_SECONDS", raw)
+    assert module.env_seconds("OPM_TEST_SECONDS", 7.0, 100.0) == 7.0
+
+
+def test_env_seconds_takes_a_sane_value(monkeypatch):
+    module = load_module()
+    monkeypatch.setenv("OPM_TEST_SECONDS", "2.5")
+    assert module.env_seconds("OPM_TEST_SECONDS", 7.0, 100.0) == 2.5
+
+
+def test_the_limits_are_capped(monkeypatch):
+    module = load_module()
+    monkeypatch.setenv("OPM_AGENT_TIMEOUT_SECONDS", "99999999")
+    monkeypatch.setenv("OPM_AGENT_KILL_GRACE_SECONDS", "3600")
+    assert module.timeout_seconds() == module.DEFAULT_TIMEOUT
+    assert module.kill_grace_seconds() == module.KILL_GRACE
+    assert not math.isinf(module.timeout_seconds())
+
+
+def test_an_exception_after_the_spawn_still_kills_the_whole_group(world, monkeypatch,
+                                                                  capsys):
+    """Anything unexpected in the wait loop must kill the group before it propagates,
+    and the waits inside kill_group must not be able to skip the KILL."""
+    module = load_module()
+    pids_file = world["tmp"] / "pids.json"
+
+    class BoomPopen(subprocess.Popen):
+        def wait(self, timeout=None):  # raises once the agent has recorded its pids
+            if pids_file.exists():
+                raise RuntimeError("boom in the wait loop")
+            return super().wait(timeout=timeout)
+
+    monkeypatch.setattr(module.subprocess, "Popen", BoomPopen)
+    for key, value in env_for(world, FAKE_AGENT_MODE="deaf").items():
+        monkeypatch.setenv(key, value)
+    code = module.guarded([str(world["proj"]), str(world["spec"])])
+    out = capsys.readouterr().out.strip().splitlines()
+    assert len(out) == 1, out
+    res = json.loads(out[0])
+    assert code == 1 and res["ok"] is False
+    assert res["agent"] == "claude" and res["log"]  # known by then, so reported
+    assert res["error"].startswith("The milestone run failed:")
+    pids = json.loads(pids_file.read_text())
+    # In-process the agent is our own child, so it has to be reaped to prove it died;
+    # it ignores SIGTERM, so only the KILL escalation can have ended it.
+    assert reaped_signal(pids["agent"]) == signal.SIGKILL, "the agent outlived the failure"
+    assert wait_gone(pids["child"]), "the grandchild outlived the failure"
+
+
+def reaped_signal(pid, limit=10.0):
+    """Wait for our child `pid` and return the signal that killed it (None if it
+    exited normally or was already reaped)."""
+    end = time.monotonic() + limit
+    while time.monotonic() < end:
+        try:
+            done, status = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            return None
+        if done == pid:
+            return os.WTERMSIG(status) if os.WIFSIGNALED(status) else None
+        time.sleep(0.05)
+    raise AssertionError("pid %d was never reaped" % pid)
