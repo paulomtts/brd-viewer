@@ -21,8 +21,8 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return null }
     var p = comp.createObject(host)
     p.opened = true
-    p.stateLoaded = true
-    p.applyProjectsList([pA, pB])
+    p.app.projects.stateLoaded = true
+    p.app.projects.applyProjectsList([pA, pB])
     return p
   }
   function named(p, name) {
@@ -275,7 +275,7 @@ TestCase {
     var p = loaded(); if (!p) return
     p.toggleMemoryType("user")
     p.openMemory("user_role.md")
-    p.selectProject(pB)
+    p.app.projects.selectProject(pB)
     compare(p.memories.length, 0)
     compare(p.memoryType, "")
     compare(p.selectedMemory, "")
@@ -348,11 +348,11 @@ TestCase {
     p.startMemoryEdit()
     p.memoryDraft = "unsaved"
     p.chooseProject(pB)
-    compare(p.selectedProject.root_path, pA.root_path)
+    compare(p.app.projects.selectedProject.root_path, pA.root_path)
     compare(p.memoryDraft, "unsaved")
     verify(p.memoryOpError !== "")
     p.cancelMemoryEdit()
     p.chooseProject(pB)
-    compare(p.selectedProject.root_path, pB.root_path)
+    compare(p.app.projects.selectedProject.root_path, pB.root_path)
   }
 }

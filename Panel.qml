@@ -31,24 +31,31 @@ Panel {
   Core.App { id: appStores; backendDir: root.pluginDir + "core/backend/" }
   readonly property var app: appStores
 
-  property string storedProject: ""
-  property bool stateLoaded: false
-  property bool stateReadOk: false
-
   readonly property bool documentsEnabled: true
-  property var projects: []            // [{ root_path, name }]
-  property var selectedProject: null   // { root_path, name } | null
-  property string loadError: ""
-
-  // Deleting a project (brd forget). Always gated behind typing "delete", and
-  // snapshot-and-forget.py saves a snapshot first and refuses to forget if it
-  // cannot.
-  property var deleteTarget: null      // { root_path, name } | null
-  property string confirmText: ""
-  property bool deleting: false
-  property string deleteError: ""
-  property string lastSnapshot: ""
   property string graphCursor: ""
+
+  // The stores announce what the panel still has to do itself: reload the
+  // sections a project change invalidates, and put the focus where the new
+  // state belongs.
+  Connections {
+    target: appStores.projects
+    function onSelected(project) {
+      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+      root.fetchBoard()
+      root.focusForView()
+    }
+    function onCleared() {
+      root.applyTreeData([])
+      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    }
+  }
+
+  Connections {
+    target: appStores.deleter
+    function onRequested() { root.focusForView() }
+    function onClosed() { root.focusForView() }
+    function onDeleted() { root.focusForView() }
+  }
 
   property var docs: []
   property bool docsLoading: false
@@ -74,20 +81,20 @@ Panel {
   // the path and replaces the file atomically); the list is re-read afterwards
   // so badges and filters follow.
   function setDocTag(id) {
-    if (appStores.nav.viewMode !== "document" || !root.selectedProject || root.docTagBusy) return
+    if (appStores.nav.viewMode !== "document" || !appStores.projects.selectedProject || root.docTagBusy) return
     if (["architecture", "specs", "standards", "audits", "default"].indexOf(id) < 0) return
     root.docTagError = ""
     root.docTagBusy = true
-    setDocTagProc.forRoot = root.selectedProject.root_path
+    setDocTagProc.forRoot = appStores.projects.selectedProject.root_path
     setDocTagProc.command = ["python3", root.pluginDir + "core/backend/documents/set-doc-tag.py",
-      root.selectedProject.root_path, root.selectedDocPath, id]
+      appStores.projects.selectedProject.root_path, root.selectedDocPath, id]
     setDocTagProc.running = true
   }
 
   function applyDocTagResult(text, exitCode) {
     var result = Documents.parseTagResult(text, exitCode)
     root.docTagBusy = false
-    var sameProject = root.selectedProject && root.selectedProject.root_path === setDocTagProc.forRoot
+    var sameProject = appStores.projects.selectedProject && appStores.projects.selectedProject.root_path === setDocTagProc.forRoot
     if (!sameProject) return
     if (result.ok) root.fetchDocs()
     else root.docTagError = result.error
@@ -103,8 +110,6 @@ Panel {
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
-  readonly property var filteredProjects: Projects.filterProjects(root.projects, appStores.nav.dropdownQuery)
-
   function currentList() {
     if (appStores.nav.viewMode === "board") return root.boardCards
     if (appStores.nav.viewMode === "entry") return root.detailLinkList
@@ -113,12 +118,12 @@ Panel {
     return []
   }
 
-  readonly property Item focusItem: root.deleteTarget ? confirmField
+  readonly property Item focusItem: appStores.deleter.deleteTarget ? confirmField
     : root.memoryDeleteOpen ? memoryConfirm.focusItem
     : root.newMemoryOpen ? newMemoryDialog.focusItem
     : (appStores.nav.viewMode === "memory" && root.memoryEditing) ? memoryNote.editorItem
     : appStores.nav.dropdownOpen ? sidebar.filterItem
-    : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "graph" || !root.selectedProject) ? keyCatcher
+    : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "graph" || !appStores.projects.selectedProject) ? keyCatcher
     : searchField
 
   function focusForView() {
@@ -200,96 +205,18 @@ Panel {
     if (root.graphCursor !== "") root.openCard(root.graphCursor)
   }
 
-  function openDelete(project) {
-    if (root.deleting || !project) return
-    appStores.nav.dropdownOpen = false
-    root.deleteTarget = project
-    root.confirmText = ""
-    root.deleteError = ""
-    root.lastSnapshot = ""
-    root.focusForView()
-  }
-
-  function cancelDelete() {
-    if (root.deleting) return
-    root.deleteTarget = null
-    root.confirmText = ""
-    root.deleteError = ""
-    root.focusForView()
-  }
-
-  function performDelete() {
-    if (root.deleting || !root.deleteTarget) return
-    if (!Projects.isDeleteConfirmed(root.confirmText)) return
-    root.deleteError = ""
-    root.deleting = true
-    deleteProc.command = ["python3", root.pluginDir + "core/backend/projects/snapshot-and-forget.py",
-      root.deleteTarget.root_path, root.deleteTarget.name]
-    deleteProc.running = true
-  }
-
   function displayPath(path) {
     return String(path || "").replace(/^\/home\/[^\/]+/, "~")
-  }
-
-  function refreshProjects() {
-    loadError = ""
-    listProc.running = false
-    listProc.running = true
   }
 
   property var cardRoots: []   // top-level cards from the last brd tree fetch
   property var cardMap: ({})   // id -> card, from Board.indexTree
   readonly property var statuses: ["todo", "in_progress", "done"]
 
-  // The panel was just opened: refresh the registry and drop any half-finished
-  // UI state. The project on screen stays selected while it is still registered.
-  function onPanelOpened() {
-    appStores.nav.dropdownOpen = false
-    appStores.nav.dropdownQuery = ""
-    if (!root.deleting) { root.deleteTarget = null; root.confirmText = ""; root.deleteError = "" }
-    root.refreshProjects()
-    root.focusForView()
-  }
-  onOpenedChanged: if (opened) onPanelOpened()
+  onOpenedChanged: if (opened) { appStores.projects.onPanelOpened(); root.focusForView() }
 
-  function applyProjectsList(list) {
-    root.projects = list
-    root.maybeSelectInitial()
-  }
-
-  function maybeSelectInitial() {
-    if (!root.stateLoaded) return
-    var current = root.selectedProject ? root.selectedProject.root_path : ""
-    var chosen = Projects.chooseProject(root.projects, current, root.storedProject)
-    if (!chosen) { root.clearSelection(); return }
-    if (root.stateReadOk && chosen.root_path !== root.storedProject) root.persistLastProject(chosen.root_path)
-    if (chosen.root_path !== current) root.selectProject(chosen)
-    else root.selectedProject = chosen
-  }
-
-  function clearSelection() {
-    root.selectedProject = null
-    root.watchedDbPath = ""
-    root.applyTreeData([])
-    appStores.nav.viewMode = "board"
-    root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
-  }
-
-  function selectProject(project) {
-    selectedProject = project
-    resetSearch()
-    appStores.nav.viewMode = "board"
-    root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
-    root.watchedDbPath = ""
-    resolveDbPathProc.command = ["python3", root.pluginDir + "core/backend/projects/resolve-db-path.py", project.root_path]
-    resolveDbPathProc.running = false
-    resolveDbPathProc.running = true
-    fetchBoard()
-    focusForView()
-  }
-
-  // The user picked a project in the dropdown.
+  // The user picked a project in the dropdown. A dirty memory draft blocks the
+  // switch (memory state still lives here).
   function chooseProject(project) {
     if (root.memoryEditing && root.memoryDraft !== root.memoryText) {
       root.closeDropdown()
@@ -298,36 +225,16 @@ Panel {
     }
     root.closeDropdown()
     if (!project) return
-    root.lastSnapshot = ""
-    var current = root.selectedProject ? root.selectedProject.root_path : ""
-    if (project.root_path !== current) {
-      root.selectProject(project)
-      root.persistLastProject(project.root_path)
-    }
+    appStores.projects.chooseProject(project)
     root.focusForView()
   }
 
-  function applyStoredState(text, exitCode) {
-    if (root.stateLoaded) return
-    root.storedProject = Projects.parseStateResult(text, exitCode) || ""
-    root.stateReadOk = (exitCode === 0 && String(text || "").trim() !== "")
-    root.stateLoaded = true
-    root.maybeSelectInitial()
-  }
-
-  function persistLastProject(path) {
-    root.storedProject = path
-    saveStateProc.command = ["python3", root.pluginDir + "core/backend/projects/viewer-state.py", "set-project", path]
-    saveStateProc.running = false
-    saveStateProc.running = true
-  }
-
   function toggleDropdown() {
-    if (root.deleteTarget) return
+    if (appStores.deleter.deleteTarget) return
     if (appStores.nav.dropdownOpen) { root.closeDropdown(); return }
     var index = 0
-    for (var i = 0; i < root.projects.length; i++)
-      if (root.selectedProject && root.projects[i].root_path === root.selectedProject.root_path) index = i
+    for (var i = 0; i < appStores.projects.projects.length; i++)
+      if (appStores.projects.selectedProject && appStores.projects.projects[i].root_path === appStores.projects.selectedProject.root_path) index = i
     appStores.nav.toggleDropdown(index)
     root.focusForView()
   }
@@ -339,11 +246,11 @@ Panel {
   }
 
   function moveDropdown(delta) {
-    appStores.nav.moveDropdown(delta, root.filteredProjects.length)
+    appStores.nav.moveDropdown(delta, appStores.projects.filteredProjects.length)
   }
 
   function acceptDropdown() {
-    var list = root.filteredProjects
+    var list = appStores.projects.filteredProjects
     if (appStores.nav.dropdownCursor < 0 || appStores.nav.dropdownCursor >= list.length) return
     root.chooseProject(list[appStores.nav.dropdownCursor])
   }
@@ -352,7 +259,7 @@ Panel {
   // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
   // move things underneath it.
   function handleGlobalKey(event) {
-    if (!(event.modifiers & Qt.ControlModifier) || root.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return false
+    if (!(event.modifiers & Qt.ControlModifier) || appStores.deleter.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return false
     if (event.key === Qt.Key_P) { root.toggleDropdown(); return true }
     if (event.key === Qt.Key_1) { root.showSection("board"); return true }
     if (event.key === Qt.Key_2) { root.showSection("documents"); return true }
@@ -364,7 +271,7 @@ Panel {
   }
 
   function showSection(name) {
-    if (!root.selectedProject || root.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return
+    if (!appStores.projects.selectedProject || appStores.deleter.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return
     if (root.memoryEditing && root.memoryDraft !== root.memoryText) return
     if (name === "documents" && !root.documentsEnabled) return
     if (appStores.nav.dropdownOpen) appStores.nav.dropdownOpen = false
@@ -380,9 +287,9 @@ Panel {
   }
 
   function fetchBoard() {
-    if (!root.selectedProject) return
-    loadError = ""
-    treeProc.workingDirectory = root.selectedProject.root_path
+    if (!appStores.projects.selectedProject) return
+    appStores.projects.loadError = ""
+    treeProc.workingDirectory = appStores.projects.selectedProject.root_path
     treeProc.running = false
     treeProc.running = true
   }
@@ -393,8 +300,6 @@ Panel {
     root.cardMap = indexed.cardMap
     if (appStores.nav.viewMode === "entry" && !root.cardMap[root.selectedCardId]) root.restoreListView()
   }
-
-  property string watchedDbPath: ""
 
   readonly property var visibleBoardRoots: root.cardRoots.filter(function(c) {
     return Board.subtreeMatches(c, appStores.nav.searchQuery)
@@ -466,7 +371,7 @@ Panel {
   }
 
   function fetchDocs() {
-    if (!root.selectedProject) return
+    if (!appStores.projects.selectedProject) return
     var old = root.docsProc
     if (old) old.running = false
     root.docs = []
@@ -474,7 +379,7 @@ Panel {
     root.docsTruncated = false
     root.docsLoading = true
     root.docsSeq += 1
-    var rootPath = root.selectedProject.root_path
+    var rootPath = appStores.projects.selectedProject.root_path
     var proc = docsProcC.createObject(root, { forRoot: rootPath, seq: root.docsSeq })
     proc.command = ["python3", root.pluginDir + "core/backend/documents/list-docs.py", rootPath]
     root.docsProc = proc
@@ -492,7 +397,7 @@ Panel {
   function openDoc(path) {
     var entry = null
     for (var i = 0; i < root.docs.length; i++) if (root.docs[i].path === path) entry = root.docs[i]
-    if (!entry || !root.selectedProject) return
+    if (!entry || !appStores.projects.selectedProject) return
     appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
     root.selectedDocPath = path
     root.docTagError = ""
@@ -563,13 +468,13 @@ Panel {
   }
 
   function fetchMemories() {
-    if (!root.selectedProject) return
+    if (!appStores.projects.selectedProject) return
     var old = root.memoriesProc
     if (old) old.running = false
     root.memoriesError = ""
     root.memoriesLoading = true
     root.memoriesSeq += 1
-    var rootPath = root.selectedProject.root_path
+    var rootPath = appStores.projects.selectedProject.root_path
     var proc = memoriesProcC.createObject(root, { forRoot: rootPath, seq: root.memoriesSeq })
     proc.command = ["python3", root.pluginDir + "core/backend/memories/list-memories.py", rootPath]
     root.memoriesProc = proc
@@ -600,7 +505,7 @@ Panel {
   function openMemory(file) {
     var known = false
     for (var i = 0; i < root.memories.length; i++) if (root.memories[i].file === file) known = true
-    if (!known || !root.selectedProject || root.memoryDir === "") return
+    if (!known || !appStores.projects.selectedProject || root.memoryDir === "") return
     if (appStores.nav.viewMode === "memories")
       appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
     root.selectedMemory = file
@@ -662,7 +567,7 @@ Panel {
 
   function runMemoryOp(op, file, content, expected) {
     memoryOpProc.op = op
-    memoryOpProc.forRoot = root.selectedProject ? root.selectedProject.root_path : ""
+    memoryOpProc.forRoot = appStores.projects.selectedProject ? appStores.projects.selectedProject.root_path : ""
     memoryOpProc.forFile = file
     var command = ["python3", root.pluginDir + "core/backend/memories/memory-op.py", op, root.memoryDir, file]
     if (content !== undefined) command.push(content)
@@ -720,7 +625,7 @@ Panel {
   function applyMemoryOpResult(text, exitCode) {
     var result = Memories.parseMemoryOpResult(text, exitCode)
     var op = memoryOpProc.op
-    var sameProject = root.selectedProject && root.selectedProject.root_path === memoryOpProc.forRoot
+    var sameProject = appStores.projects.selectedProject && appStores.projects.selectedProject.root_path === memoryOpProc.forRoot
     root.memoryBusy = false
     if (!sameProject) return
     if (op === "save") {
@@ -769,7 +674,7 @@ Panel {
     function show(): void { root.open() }
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
-    function refresh(): string { root.refreshProjects(); return "ok" }
+    function refresh(): string { appStores.projects.refreshProjects(); return "ok" }
   }
 
   BarIconButton {
@@ -778,86 +683,6 @@ Panel {
     bar: root.bar
     text: "🗂️"
     onPressed: function(buttonCode) { root.toggle() }
-  }
-
-  // `brd projects` reads the global registry directly -- no cwd
-  // dependency, unlike `brd tree` in Task 5.
-  Process {
-    id: listProc
-    objectName: "listProc"
-    command: ["brd", "projects"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        try {
-          var parsed = JSON.parse(text || "{}")
-          var list = (parsed.data || []).map(function(p) {
-            return { root_path: p.root_path, name: p.name }
-          }).sort(function(a, b) { return a.name.localeCompare(b.name) })
-          root.applyProjectsList(list)
-        } catch (e) {
-          root.loadError = "Could not parse brd's project list."
-        }
-      }
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      if (exitCode !== 0 && root.projects.length === 0)
-        root.loadError = "Could not list brd projects (is brd installed and on PATH?)."
-    }
-  }
-
-  Process {
-    id: stateGetProc
-    objectName: "stateGetProc"
-    property string outText: ""
-    command: ["python3", root.pluginDir + "core/backend/projects/viewer-state.py", "get"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: stateGetProc.outText = String(text || "")
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      var out = stateGetProc.outText
-      stateGetProc.outText = ""
-      root.applyStoredState(out, exitCode)
-    }
-  }
-
-  // A failed save is deliberately silent: it never blocks navigation.
-  Process {
-    id: saveStateProc
-    objectName: "saveStateProc"
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector { waitForEnd: true }
-  }
-
-  // If the state helper never answers (python3 missing, spawn failure) the
-  // project list must not stay blocked: treat it as a failed read.
-  Timer {
-    id: stateWatchdog
-    objectName: "stateWatchdog"
-    interval: 2000
-    running: true
-    onTriggered: if (!root.stateLoaded) root.applyStoredState("", 1)
-  }
-
-  Component.onCompleted: stateGetProc.running = true
-
-  Process {
-    id: resolveDbPathProc
-    objectName: "resolveDbPathProc"
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var path = String(text || "").trim()
-        root.watchedDbPath = path
-      }
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      if (exitCode !== 0) root.watchedDbPath = ""
-    }
   }
 
   // One process per listing: each carries the project and sequence number it
@@ -876,7 +701,7 @@ Panel {
       }
       stderr: StdioCollector { waitForEnd: true }
       onExited: function(exitCode) {
-        var current = root.selectedProject ? root.selectedProject.root_path : ""
+        var current = appStores.projects.selectedProject ? appStores.projects.selectedProject.root_path : ""
         if (dp.seq === root.docsSeq && dp.forRoot === current) root.applyDocsResult(dp.outText, exitCode)
         dp.destroy()
       }
@@ -886,22 +711,22 @@ Panel {
   FileView {
     id: docFile
     objectName: "docFile"
-    path: appStores.nav.viewMode === "document" && !root.docTooLargeFlag && root.selectedProject && root.selectedDocPath !== ""
-      ? Documents.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath) : ""
+    path: appStores.nav.viewMode === "document" && !root.docTooLargeFlag && appStores.projects.selectedProject && root.selectedDocPath !== ""
+      ? Documents.docAbsolutePath(appStores.projects.selectedProject.root_path, root.selectedDocPath) : ""
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
     onLoaded: { root.docError = ""; root.docText = Documents.stripFrontmatter(docFile.text()) }
     onLoadFailed: {
-      if (docFile.path === "" || !root.selectedProject || root.selectedDocPath === "") return
-      if (docFile.path === Documents.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath))
+      if (docFile.path === "" || !appStores.projects.selectedProject || root.selectedDocPath === "") return
+      if (docFile.path === Documents.docAbsolutePath(appStores.projects.selectedProject.root_path, root.selectedDocPath))
         root.docError = "Could not read this document."
     }
   }
 
   FileView {
     id: dbFile
-    path: root.watchedDbPath !== "" ? root.watchedDbPath : ""
+    path: appStores.projects.watchedDbPath !== "" ? appStores.projects.watchedDbPath : ""
     watchChanges: true
     printErrors: false
     onFileChanged: root.fetchBoard()
@@ -916,11 +741,11 @@ Panel {
       onStreamFinished: {
         try {
           var parsed = JSON.parse(text || "{}")
-          root.loadError = ""
+          appStores.projects.loadError = ""
           root.applyTreeData(parsed.data || [])
         } catch (e) {
           root.applyTreeData([])
-          root.loadError = "Could not load the board for this project."
+          appStores.projects.loadError = "Could not load the board for this project."
         }
       }
     }
@@ -928,13 +753,11 @@ Panel {
     onExited: function(exitCode) {
       if (exitCode !== 0) {
         root.applyTreeData([])
-        root.loadError = "Could not load the board for this project."
+        appStores.projects.loadError = "Could not load the board for this project."
       }
     }
   }
 
-  // snapshot-and-forget.py prints one JSON line and exits 0/1; nothing here
-  // assumes success until Projects.parseDeleteResult says so.
   Component {
     id: memoriesProcC
     Process {
@@ -949,7 +772,7 @@ Panel {
       }
       stderr: StdioCollector { waitForEnd: true }
       onExited: function(exitCode) {
-        var current = root.selectedProject ? root.selectedProject.root_path : ""
+        var current = appStores.projects.selectedProject ? appStores.projects.selectedProject.root_path : ""
         if (mp.seq === root.memoriesSeq && mp.forRoot === current) root.applyMemoriesResult(mp.outText, exitCode)
         mp.destroy()
       }
@@ -1004,32 +827,6 @@ Panel {
     }
   }
 
-  Process {
-    id: deleteProc
-    objectName: "deleteProc"
-    property string outText: ""
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: deleteProc.outText = String(text || "")
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      var result = Projects.parseDeleteResult(deleteProc.outText, exitCode)
-      deleteProc.outText = ""
-      root.deleting = false
-      if (result.ok) {
-        root.deleteTarget = null
-        root.confirmText = ""
-        root.lastSnapshot = result.snapshot
-        appStores.nav.cursorIndex = 0
-        root.refreshProjects()
-        root.focusForView()
-      } else {
-        root.deleteError = result.error
-      }
-    }
-  }
-
   KeyboardPanel {
     id: panel
     objectName: "mainPanel"
@@ -1058,7 +855,7 @@ Panel {
       objectName: "keyCatcher"
       Keys.forwardTo: [globalKeys]
       anchors.fill: parent
-      onCloseRequested: root.deleteTarget ? root.cancelDelete() : root.memoryDeleteOpen ? root.cancelMemoryDelete() : root.newMemoryOpen ? root.cancelNewMemory() : (appStores.nav.dropdownOpen ? root.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? root.goBack() : root.close()))
+      onCloseRequested: appStores.deleter.deleteTarget ? appStores.deleter.cancelDelete() : root.memoryDeleteOpen ? root.cancelMemoryDelete() : root.newMemoryOpen ? root.cancelNewMemory() : (appStores.nav.dropdownOpen ? root.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
         if (appStores.nav.viewMode === "graph") {
           if (dx !== 0) root.moveGraph(dx < 0 ? "left" : "right")
@@ -1086,13 +883,13 @@ Panel {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: Style.space(200)
-        projects: root.filteredProjects
-        selectedProject: root.selectedProject
+        projects: appStores.projects.filteredProjects
+        selectedProject: appStores.projects.selectedProject
         section: appStores.nav.section
         dropdownOpen: appStores.nav.dropdownOpen
         dropdownQuery: appStores.nav.dropdownQuery
         dropdownCursor: appStores.nav.dropdownCursor
-        canDelete: !!root.selectedProject && !root.deleting && !root.deleteTarget
+        canDelete: !!appStores.projects.selectedProject && !appStores.deleter.deleting && !appStores.deleter.deleteTarget
         documentsEnabled: root.documentsEnabled
         foreground: root.foreground
         dim: root.dim
@@ -1102,7 +899,7 @@ Panel {
         onProjectChosen: function(project) { root.chooseProject(project) }
         onQueryEdited: function(text) { appStores.nav.dropdownQuery = text; appStores.nav.dropdownCursor = 0 }
         onSectionChosen: function(name) { root.showSection(name) }
-        onDeleteRequested: root.openDelete(root.selectedProject)
+        onDeleteRequested: appStores.deleter.openDelete(appStores.projects.selectedProject)
         onCursorHovered: function(index) { appStores.nav.dropdownCursor = index }
         onDropdownMove: function(delta) { root.moveDropdown(delta) }
         onDropdownAccept: root.acceptDropdown()
@@ -1137,7 +934,7 @@ Panel {
           Text {
             objectName: "projectHeading"
             Layout.fillWidth: true
-            text: root.selectedProject ? appStores.nav.sectionTitle : "Project Manager"
+            text: appStores.projects.selectedProject ? appStores.nav.sectionTitle : "Project Manager"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
@@ -1168,7 +965,7 @@ Panel {
         TextField {
           id: searchField
           objectName: "searchField"
-          visible: !!root.selectedProject && (appStores.nav.viewMode === "board" || appStores.nav.viewMode === "documents" || appStores.nav.viewMode === "memories")
+          visible: !!appStores.projects.selectedProject && (appStores.nav.viewMode === "board" || appStores.nav.viewMode === "documents" || appStores.nav.viewMode === "memories")
           width: parent.width
           foreground: root.foreground
           placeholderText: appStores.nav.viewMode === "documents" ? "Search documents…" : appStores.nav.viewMode === "memories" ? "Search memories…" : "Search cards…"
@@ -1204,9 +1001,9 @@ Panel {
         }
 
         Text {
-          visible: root.loadError !== ""
+          visible: appStores.projects.loadError !== ""
           width: parent.width
-          text: root.loadError
+          text: appStores.projects.loadError
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -1237,9 +1034,9 @@ Panel {
           spacing: Style.space(12)
 
           Text {
-            visible: !root.deleteTarget && root.lastSnapshot !== ""
+            visible: !appStores.deleter.deleteTarget && appStores.deleter.lastSnapshot !== ""
             width: parent.width
-            text: "Removed. Snapshot saved to " + root.displayPath(root.lastSnapshot)
+            text: "Removed. Snapshot saved to " + root.displayPath(appStores.deleter.lastSnapshot)
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -1247,7 +1044,7 @@ Panel {
           }
 
           Text {
-            visible: !root.selectedProject && root.loadError === ""
+            visible: !appStores.projects.selectedProject && appStores.projects.loadError === ""
             width: parent.width
             text: "No projects registered with brd."
             color: root.dim
@@ -1257,12 +1054,12 @@ Panel {
           }
 
           Column {
-            visible: appStores.nav.viewMode === "board" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "board" && !!appStores.projects.selectedProject
             width: parent.width
             spacing: Style.space(10)
 
             Text {
-              visible: root.cardRoots.length === 0 && root.loadError === ""
+              visible: root.cardRoots.length === 0 && appStores.projects.loadError === ""
               width: parent.width
               text: "This project's board is empty."
               color: root.dim
@@ -1314,7 +1111,7 @@ Panel {
 
           GraphView {
             id: graphView
-            visible: appStores.nav.viewMode === "graph" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "graph" && !!appStores.projects.selectedProject
             width: parent.width
             height: Math.max(Style.space(240), panelFlick.height - y - Style.space(12))
             nodes: root.graph.nodes
@@ -1327,7 +1124,7 @@ Panel {
           }
 
           MemoriesView {
-            visible: appStores.nav.viewMode === "memories" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "memories" && !!appStores.projects.selectedProject
             width: parent.width
             notes: root.filteredMemories
             types: root.memoryTypes
@@ -1349,7 +1146,7 @@ Panel {
 
           MemoryNoteView {
             id: memoryNote
-            visible: appStores.nav.viewMode === "memory" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "memory" && !!appStores.projects.selectedProject
             width: parent.width
             entry: root.selectedMemoryEntry
             text: root.memoryText
@@ -1371,7 +1168,7 @@ Panel {
           }
 
           DocumentsView {
-            visible: appStores.nav.viewMode === "documents" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "documents" && !!appStores.projects.selectedProject
             width: parent.width
             docs: root.filteredDocs
             query: appStores.nav.searchQuery
@@ -1539,7 +1336,7 @@ Panel {
         objectName: "deleteModal"
         anchors.fill: parent
         z: 100
-        visible: !!root.deleteTarget
+        visible: !!appStores.deleter.deleteTarget
 
         Rectangle {
           objectName: "deleteBackdrop"
@@ -1548,7 +1345,7 @@ Panel {
 
           MouseArea {
             anchors.fill: parent
-            onClicked: root.cancelDelete()
+            onClicked: appStores.deleter.cancelDelete()
           }
         }
 
@@ -1572,7 +1369,7 @@ Panel {
             spacing: Style.space(8)
             Text {
               width: parent.width
-              text: "Type delete to permanently remove “" + (root.deleteTarget ? root.deleteTarget.name : "")
+              text: "Type delete to permanently remove “" + (appStores.deleter.deleteTarget ? appStores.deleter.deleteTarget.name : "")
                 + "” from brd. This can't be undone, but a snapshot of its board is saved first."
               color: root.urgent
               font.family: root.fontFamily
@@ -1582,7 +1379,7 @@ Panel {
 
             Text {
               width: parent.width
-              text: root.deleteTarget ? root.displayPath(root.deleteTarget.root_path) : ""
+              text: appStores.deleter.deleteTarget ? root.displayPath(appStores.deleter.deleteTarget.root_path) : ""
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -1595,23 +1392,23 @@ Panel {
               width: parent.width
               foreground: root.foreground
               placeholderText: "delete"
-              enabled: !root.deleting
-              text: root.confirmText
+              enabled: !appStores.deleter.deleting
+              text: appStores.deleter.confirmText
 
-              onTextChanged: root.confirmText = text
+              onTextChanged: appStores.deleter.confirmText = text
 
               Keys.onPressed: function(event) {
-                if (event.key === Qt.Key_Escape) { root.cancelDelete(); event.accepted = true; return }
+                if (event.key === Qt.Key_Escape) { appStores.deleter.cancelDelete(); event.accepted = true; return }
                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                  root.performDelete(); event.accepted = true; return
+                  appStores.deleter.performDelete(); event.accepted = true; return
                 }
               }
             }
 
             Text {
-              visible: root.deleteError !== ""
+              visible: appStores.deleter.deleteError !== ""
               width: parent.width
-              text: root.deleteError
+              text: appStores.deleter.deleteError
               color: root.urgent
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -1623,25 +1420,25 @@ Panel {
 
               Button {
                 text: "Cancel"
-                enabled: !root.deleting
+                enabled: !appStores.deleter.deleting
                 bordered: true
                 foreground: root.foreground
                 fontFamily: root.fontFamily
                 fontSize: Style.font.bodySmall
                 verticalPadding: Style.spacing.controlPaddingY
-                onClicked: root.cancelDelete()
+                onClicked: appStores.deleter.cancelDelete()
               }
 
               Button {
-                text: root.deleting ? "Deleting…" : "Confirm delete"
-                enabled: !root.deleting && Projects.isDeleteConfirmed(root.confirmText)
+                text: appStores.deleter.deleting ? "Deleting…" : "Confirm delete"
+                enabled: !appStores.deleter.deleting && Projects.isDeleteConfirmed(appStores.deleter.confirmText)
                 opacity: enabled ? 1 : 0.5
                 bordered: true
                 foreground: root.urgent
                 fontFamily: root.fontFamily
                 fontSize: Style.font.bodySmall
                 verticalPadding: Style.spacing.controlPaddingY
-                onClicked: root.performDelete()
+                onClicked: appStores.deleter.performDelete()
               }
             }
           }

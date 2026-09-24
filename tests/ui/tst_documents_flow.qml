@@ -20,8 +20,8 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return null }
     var p = comp.createObject(host)
     p.opened = true
-    p.stateLoaded = true
-    p.applyProjectsList([pA, pB])
+    p.app.projects.stateLoaded = true
+    p.app.projects.applyProjectsList([pA, pB])
     return p
   }
   function named(p, name) {
@@ -297,7 +297,7 @@ TestCase {
     p.showSection("documents")
     p.applyDocsResult(catList, 0)
     p.toggleDocCategory("audits")
-    p.selectProject(pB)
+    p.app.projects.selectProject(pB)
     compare(p.docCategory, "")
   }
 

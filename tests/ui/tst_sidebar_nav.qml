@@ -17,7 +17,7 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return null }
     var p = comp.createObject(host)
     p.opened = true
-    p.stateLoaded = true
+    p.app.projects.stateLoaded = true
     return p
   }
   function names(list) { return list.map(function(x) { return x.name }).join(",") }
@@ -25,41 +25,41 @@ TestCase {
   function test_first_project_is_selected_when_the_list_arrives() {
     var p = make(); if (!p) return
     compare(p.app.nav.viewMode, "board")
-    compare(p.selectedProject, null)
-    p.applyProjectsList([pA, pB, pC])
-    compare(p.selectedProject.root_path, "/home/u/a")
+    compare(p.app.projects.selectedProject, null)
+    p.app.projects.applyProjectsList([pA, pB, pC])
+    compare(p.app.projects.selectedProject.root_path, "/home/u/a")
     compare(p.app.nav.viewMode, "board")
   }
 
   function test_stored_project_wins_over_the_first() {
     var p = make(); if (!p) return
-    p.storedProject = "/home/u/c"
-    p.applyProjectsList([pA, pB, pC])
-    compare(p.selectedProject.root_path, "/home/u/c")
+    p.app.projects.storedProject = "/home/u/c"
+    p.app.projects.applyProjectsList([pA, pB, pC])
+    compare(p.app.projects.selectedProject.root_path, "/home/u/c")
   }
 
   function test_current_project_is_kept_when_the_list_refreshes() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB, pC])
+    p.app.projects.applyProjectsList([pA, pB, pC])
     p.chooseProject(pB)
-    p.applyProjectsList([pA, pB, pC])
-    compare(p.selectedProject.root_path, "/home/u/b")
+    p.app.projects.applyProjectsList([pA, pB, pC])
+    compare(p.app.projects.selectedProject.root_path, "/home/u/b")
   }
 
   function test_vanished_current_project_falls_back() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB, pC])
+    p.app.projects.applyProjectsList([pA, pB, pC])
     p.chooseProject(pB)
-    p.applyProjectsList([pA, pC])
-    compare(p.selectedProject.root_path, "/home/u/a")
+    p.app.projects.applyProjectsList([pA, pC])
+    compare(p.app.projects.selectedProject.root_path, "/home/u/a")
   }
 
   function test_empty_registry_clears_the_selection() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB])
+    p.app.projects.applyProjectsList([pA, pB])
     p.applyTreeData([{ id: "x", title: "X", status: "todo", blocked_by: [], children: [] }])
-    p.applyProjectsList([])
-    compare(p.selectedProject, null)
+    p.app.projects.applyProjectsList([])
+    compare(p.app.projects.selectedProject, null)
     compare(p.cardRoots.length, 0)
     compare(p.app.nav.viewMode, "board")
     p.showSection("board")
@@ -68,36 +68,36 @@ TestCase {
 
   function test_choose_project_switches_persists_and_closes_the_dropdown() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB, pC])
+    p.app.projects.applyProjectsList([pA, pB, pC])
     p.toggleDropdown()
     compare(p.app.nav.dropdownOpen, true)
     p.chooseProject(pC)
     compare(p.app.nav.dropdownOpen, false)
-    compare(p.selectedProject.root_path, "/home/u/c")
-    compare(p.storedProject, "/home/u/c")
+    compare(p.app.projects.selectedProject.root_path, "/home/u/c")
+    compare(p.app.projects.storedProject, "/home/u/c")
     compare(p.app.nav.viewMode, "board")
   }
 
   function test_dropdown_keyboard() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB, pC])
+    p.app.projects.applyProjectsList([pA, pB, pC])
     p.toggleDropdown()
     compare(p.app.nav.dropdownCursor, 0)              // starts on the current project
     p.moveDropdown(1); compare(p.app.nav.dropdownCursor, 1)
     p.moveDropdown(9); compare(p.app.nav.dropdownCursor, 2)
     p.moveDropdown(-9); compare(p.app.nav.dropdownCursor, 0)
     p.app.nav.dropdownQuery = "gam"
-    compare(names(p.filteredProjects), "gamma")
+    compare(names(p.app.projects.filteredProjects), "gamma")
     p.app.nav.dropdownCursor = 0
     p.acceptDropdown()
-    compare(p.selectedProject.root_path, "/home/u/c")
+    compare(p.app.projects.selectedProject.root_path, "/home/u/c")
     compare(p.app.nav.dropdownOpen, false)
     compare(p.app.nav.dropdownQuery, "")
   }
 
   function test_dropdown_opens_on_the_current_project_and_toggles_closed() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB, pC])
+    p.app.projects.applyProjectsList([pA, pB, pC])
     p.chooseProject(pB)
     p.toggleDropdown()
     compare(p.app.nav.dropdownCursor, 1)
@@ -107,15 +107,15 @@ TestCase {
 
   function test_dropdown_cannot_open_during_delete_confirmation() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB])
-    p.openDelete(p.selectedProject)
+    p.app.projects.applyProjectsList([pA, pB])
+    p.app.deleter.openDelete(p.app.projects.selectedProject)
     p.toggleDropdown()
     compare(p.app.nav.dropdownOpen, false)
   }
 
   function test_back_from_the_board_does_nothing_and_from_a_card_returns_to_the_board() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA])
+    p.app.projects.applyProjectsList([pA])
     p.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
     p.goBack()
     compare(p.app.nav.viewMode, "board")
@@ -127,7 +127,7 @@ TestCase {
 
   function test_opening_the_panel_resets_transient_state() {
     var p = make(); if (!p) return
-    p.applyProjectsList([pA, pB])
+    p.app.projects.applyProjectsList([pA, pB])
     p.toggleDropdown(); p.app.nav.dropdownQuery = "x"
     p.opened = false; p.opened = true
     compare(p.app.nav.dropdownOpen, false); compare(p.app.nav.dropdownQuery, "")
@@ -136,14 +136,14 @@ TestCase {
   function test_focus_item_follows_state() {
     var p = make(); if (!p) return
     compare(p.focusItem.objectName, "keyCatcher")
-    p.applyProjectsList([pA])
+    p.app.projects.applyProjectsList([pA])
     compare(p.focusItem.objectName, "searchField")
     p.toggleDropdown()
     compare(p.focusItem.objectName, "filterField")
     p.closeDropdown()
-    p.openDelete(p.selectedProject)
+    p.app.deleter.openDelete(p.app.projects.selectedProject)
     compare(p.focusItem.objectName, "confirmField")
-    p.cancelDelete()
+    p.app.deleter.cancelDelete()
     compare(p.focusItem.objectName, "searchField")
     p.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
     p.app.nav.cursorIndex = 0; p.activateCursor()
@@ -166,8 +166,8 @@ TestCase {
     var comp = Qt.createComponent("../../Panel.qml")
     var p = comp.createObject(host)
     p.opened = true
-    p.stateLoaded = true
-    p.applyProjectsList([{ root_path: "/home/u/a", name: "alpha" }])
+    p.app.projects.stateLoaded = true
+    p.app.projects.applyProjectsList([{ root_path: "/home/u/a", name: "alpha" }])
     var kc = host
     var toolbar = findIn(kc, "panelToolbar")
     var flick = findIn(kc, "panelFlick")

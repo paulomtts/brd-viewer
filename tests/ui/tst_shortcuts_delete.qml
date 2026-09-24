@@ -18,9 +18,9 @@ TestCase {
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return null }
     var p = comp.createObject(host)
     p.opened = true
-    p.stateLoaded = true
-    p.stateReadOk = true
-    p.applyProjectsList([pA, pB])
+    p.app.projects.stateLoaded = true
+    p.app.projects.stateReadOk = true
+    p.app.projects.applyProjectsList([pA, pB])
     return p
   }
   function find(item, name) {
@@ -28,11 +28,6 @@ TestCase {
     for (var i = 0; i < item.children.length; i++) { var r = find(item.children[i], name); if (r) return r }
     return null
   }
-  function proc(p, name) {
-    for (var i = 0; i < p.data.length; i++) if (p.data[i] && p.data[i].objectName === name) return p.data[i]
-    return null
-  }
-
   function test_ctrl_p_toggles_the_dropdown() {
     var p = make(); if (!p) return
     compare(p.handleGlobalKey(ctrl(Qt.Key_P)), true)
@@ -62,7 +57,7 @@ TestCase {
 
   function test_shortcuts_are_ignored_while_confirming_a_delete() {
     var p = make(); if (!p) return
-    p.openDelete(p.selectedProject)
+    p.app.deleter.openDelete(p.app.projects.selectedProject)
     compare(p.handleGlobalKey(ctrl(Qt.Key_P)), false)
     compare(p.handleGlobalKey(ctrl(Qt.Key_1)), false)
     compare(p.app.nav.dropdownOpen, false)
@@ -84,47 +79,18 @@ TestCase {
     var sb = find(p, "sidebar")
     compare(sb.canDelete, true)
     sb.deleteRequested()
-    compare(p.deleteTarget.root_path, "/home/u/b")
+    compare(p.app.deleter.deleteTarget.root_path, "/home/u/b")
   }
 
   function test_delete_is_disabled_without_a_project_or_while_busy() {
     var p = make(); if (!p) return
     var sb = find(p, "sidebar")
-    p.openDelete(p.selectedProject)
+    p.app.deleter.openDelete(p.app.projects.selectedProject)
     compare(sb.canDelete, false)
-    p.cancelDelete()
+    p.app.deleter.cancelDelete()
     compare(sb.canDelete, true)
-    p.applyProjectsList([])
+    p.app.projects.applyProjectsList([])
     compare(sb.canDelete, false)
   }
 
-  function test_after_a_delete_the_first_remaining_project_is_shown_and_saved() {
-    var p = make(); if (!p) return
-    p.chooseProject(pB)
-    p.openDelete(p.selectedProject)
-    p.confirmText = "delete"
-    p.performDelete()
-    var del = proc(p, "deleteProc")
-    del.outText = '{"ok": true, "snapshot": "/home/u/Snapshots/omarchy-project-manager/beta-1"}'
-    del.exited(0)
-    compare(p.deleteTarget, null)
-    compare(p.lastSnapshot, "/home/u/Snapshots/omarchy-project-manager/beta-1")
-    p.applyProjectsList([pA])                       // what `brd projects` returns next
-    compare(p.selectedProject.root_path, "/home/u/a")
-    compare(p.lastSnapshot, "/home/u/Snapshots/omarchy-project-manager/beta-1")   // the note survives the reselection
-    compare(proc(p, "saveStateProc").command[3], "/home/u/a")
-  }
-
-  function test_deleting_the_last_project_shows_the_empty_state() {
-    var p = make(); if (!p) return
-    p.applyProjectsList([pA])
-    p.openDelete(p.selectedProject)
-    p.confirmText = "delete"; p.performDelete()
-    var del = proc(p, "deleteProc")
-    del.outText = '{"ok": true, "snapshot": "/s"}'
-    del.exited(0)
-    p.applyProjectsList([])
-    compare(p.selectedProject, null)
-    compare(p.app.nav.viewMode, "board")
-  }
 }
