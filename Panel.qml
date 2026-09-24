@@ -242,7 +242,7 @@ Panel {
     if (!Logic.isDeleteConfirmed(root.confirmText)) return
     root.deleteError = ""
     root.deleting = true
-    deleteProc.command = ["python3", root.pluginDir + "snapshot-and-forget.py",
+    deleteProc.command = ["python3", root.pluginDir + "core/backend/projects/snapshot-and-forget.py",
       root.deleteTarget.root_path, root.deleteTarget.name]
     deleteProc.running = true
   }
@@ -301,7 +301,7 @@ Panel {
     viewMode = "board"
     root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     root.watchedDbPath = ""
-    resolveDbPathProc.command = ["python3", root.pluginDir + "resolve-db-path.py", project.root_path]
+    resolveDbPathProc.command = ["python3", root.pluginDir + "core/backend/projects/resolve-db-path.py", project.root_path]
     resolveDbPathProc.running = false
     resolveDbPathProc.running = true
     fetchBoard()
@@ -336,7 +336,7 @@ Panel {
 
   function persistLastProject(path) {
     root.storedProject = path
-    saveStateProc.command = ["python3", root.pluginDir + "viewer-state.py", "set-project", path]
+    saveStateProc.command = ["python3", root.pluginDir + "core/backend/projects/viewer-state.py", "set-project", path]
     saveStateProc.running = false
     saveStateProc.running = true
   }
@@ -838,7 +838,7 @@ Panel {
     id: stateGetProc
     objectName: "stateGetProc"
     property string outText: ""
-    command: ["python3", root.pluginDir + "viewer-state.py", "get"]
+    command: ["python3", root.pluginDir + "core/backend/projects/viewer-state.py", "get"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: stateGetProc.outText = String(text || "")

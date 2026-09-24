@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "viewer-state.py")
+SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "core", "backend", "projects", "viewer-state.py")
 
 
 @pytest.fixture
@@ -103,3 +103,8 @@ def test_the_new_state_file_wins_over_the_old_one(env):
     state_file(env).parent.mkdir(parents=True)
     state_file(env).write_text('{"last_project": "/home/u/new"}')
     assert run(env, "get") == (0, {"last_project": "/home/u/new"})
+
+
+def test_a_newly_created_state_file_is_private(env):
+    run(env, "set-project", "/home/u/proj")
+    assert (state_file(env).stat().st_mode & 0o777) == 0o600

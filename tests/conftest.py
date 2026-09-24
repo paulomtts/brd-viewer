@@ -18,7 +18,7 @@ def run_resolve():
         if env:
             full_env.update(env)
         proc = subprocess.run(
-            [sys.executable, os.path.join(PLUGIN_DIR, "resolve-db-path.py"), *args],
+            [sys.executable, os.path.join(PLUGIN_DIR, "core", "backend", "projects", "resolve-db-path.py"), *args],
             capture_output=True, text=True, env=full_env, cwd=cwd,
         )
         return proc.returncode, proc.stdout.strip(), proc.stderr

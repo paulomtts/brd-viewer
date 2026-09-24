@@ -98,9 +98,10 @@ until it is next saved, and existing snapshots and backups are left in their
 - No card or document is ever created or edited from the panel.
 
 The plugin runs `brd` (`brd projects`, `brd tree`), plus small helpers in its
-directory: `resolve-db-path.py`, `viewer-state.py` (remembers the last
-project), `list-docs.py` (lists a project's documents) and
-`snapshot-and-forget.py` (the delete flow).
+`core/backend/<domain>/` folders: `projects/resolve-db-path.py`,
+`projects/viewer-state.py` (remembers the last project),
+`documents/list-docs.py` (lists a project's documents) and
+`projects/snapshot-and-forget.py` (the delete flow).
 
 ## Install
 

@@ -27,11 +27,8 @@ from datetime import datetime, timezone
 
 TIMEOUT_SECONDS = 30
 HERE = os.path.dirname(os.path.abspath(__file__))
-
-
-def emit(payload, code):
-    print(json.dumps(payload))
-    return code
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from common.json_line import emit  # noqa: E402
 
 
 def fail(message, code=1):

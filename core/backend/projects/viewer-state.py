@@ -13,7 +13,11 @@ atomically and keeps any other keys already in the file.
 import json
 import os
 import sys
-import tempfile
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from common.atomic_write import write_atomic  # noqa: E402
+from common.json_line import emit  # noqa: E402
+
 
 
 def state_base():
@@ -41,11 +45,6 @@ def load():
     return {}
 
 
-def emit(payload, code):
-    print(json.dumps(payload))
-    return code
-
-
 def cmd_get():
     last = load().get("last_project")
     return emit({"last_project": last if isinstance(last, str) and last else None}, 0)
@@ -56,19 +55,10 @@ def cmd_set_project(root_path):
     data["last_project"] = root_path
     path = state_path()
     directory = os.path.dirname(path)
-    tmp = None
     try:
         os.makedirs(directory, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=directory, prefix=".state-", suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-        os.replace(tmp, path)
+        write_atomic(path, json.dumps(data).encode("utf-8"), mode=0o600)
     except OSError as e:
-        if tmp and os.path.exists(tmp):
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
         return emit({"ok": False, "error": str(e)}, 1)
     return emit({"ok": True}, 0)
 

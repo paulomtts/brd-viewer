@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "snapshot-and-forget.py")
+SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "core", "backend", "projects", "snapshot-and-forget.py")
 
 FAKE_BRD = """#!/bin/sh
 echo "brd $* (cwd=$(pwd))" >> "$CALLS"
