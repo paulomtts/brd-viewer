@@ -1,6 +1,5 @@
 import QtQuick
 import qs.Commons
-import "../../core/domain/documents.js" as Documents
 import "../components" as UI
 import "../theme" as T
 
@@ -22,7 +21,6 @@ Column {
     width: parent.width
     docs: documentsScreen.app.docs.filteredDocs
     query: documentsScreen.app.nav.searchQuery
-    categories: Documents.docCategoryCounts(documentsScreen.app.docs.docs)
     activeCategory: documentsScreen.app.docs.docCategory
     cursorIndex: documentsScreen.app.nav.cursorIndex
     loading: documentsScreen.app.docs.docsLoading
@@ -30,7 +28,6 @@ Column {
     truncated: documentsScreen.app.docs.docsTruncated
     scrollOnCursor: documentsScreen.app.nav.scrollOnCursor
     theme: documentsScreen.theme
-    onCategoryToggled: function(id) { documentsScreen.app.docs.toggleDocCategory(id) }
     onDocChosen: function(path) { documentsScreen.navigator.openDoc(path) }
     onHovered: function(index) { documentsScreen.navigator.hoverCursor(index) }
     onRevealRequested: function(item) { documentsScreen.revealRequested(item) }

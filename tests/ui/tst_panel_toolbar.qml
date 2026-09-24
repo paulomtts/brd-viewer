@@ -124,4 +124,60 @@ TestCase {
     compare(H.find(p, "refreshButton").visible, true)
   }
 
+  // ---- the Documents pieces the toolbar owns
+
+  function test_the_document_category_chips_live_in_the_toolbar() {
+    var p = inDocuments(); if (!p) return
+    var chips = H.find(p, "docChips")
+    verify(chips, "the category chips")
+    verify(isUnder(chips, "panelToolbar"), "the chips are inside the fixed toolbar")
+    verify(!isUnder(chips, "panelFlick"), "and not inside the scrolling content")
+    compare(chips.visible, true)
+  }
+
+  function test_a_toolbar_chip_still_toggles_the_store_category() {
+    var p = inDocuments(); if (!p) return
+    var chip = H.find(p, "docChipspecs")
+    verify(chip, "the specs chip")
+    compare(String(chip.text), "Specs 1")
+    mouseClick(chip, chip.width / 2, chip.height / 2)
+    compare(p.app.docs.docCategory, "specs")
+    wait(50)
+    mouseClick(H.find(p, "docChipspecs"), 5, 5)
+    compare(p.app.docs.docCategory, "")
+  }
+
+  function test_the_open_documents_path_and_tag_picker_live_in_the_toolbar() {
+    var p = inDocuments(); if (!p) return
+    p.app.nav.cursorIndex = 1
+    p.navigator.activateCursor()
+    wait(50)
+    compare(p.app.nav.viewMode, "document")
+    var path = H.find(p, "docPath")
+    verify(path, "the document path")
+    compare(String(path.text), "docs/specs/s.md")
+    compare(path.elide, Text.ElideMiddle)
+    verify(isUnder(path, "panelToolbar"), "the path is inside the fixed toolbar")
+    verify(!isUnder(path, "panelFlick"))
+    var picker = H.find(p, "tagPicker")
+    verify(picker, "the tag picker")
+    verify(isUnder(picker, "panelToolbar"), "the picker is inside the fixed toolbar")
+    verify(!isUnder(picker, "panelFlick"))
+    compare(picker.current, "specs")
+    var chip = H.find(p, "tagChipaudits")
+    verify(chip, "the audits chip")
+    mouseClick(chip, chip.width / 2, chip.height / 2)
+    verify(p.app.docs.tagger.current, "the toolbar asked the store to set the tag")
+    compare(p.app.docs.tagger.current.command[4], "audits")
+  }
+
+  function test_the_documents_toolbar_pieces_are_hidden_in_other_views() {
+    var p = inDocuments(); if (!p) return
+    compare(H.find(p, "tagPicker").visible, false)
+    compare(H.find(p, "docPath").visible, false)
+    p.navigator.showSection("board")
+    wait(50)
+    compare(H.find(p, "docChips").visible, false)
+    compare(H.find(p, "tagPicker").visible, false)
+  }
 }

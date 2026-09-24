@@ -45,6 +45,9 @@ Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `tre
 `ListStatus` (loading/error/empty), `FilterableList`, `TextAreaBox`,
 `TagPicker`, `NewMemoryDialog`, `Sidebar`, and the views
 `DocumentsView`, `MemoriesView`, `MemoryNoteView`, `GraphView`.
+`ui/screens/DocumentsToolbar.qml` is the Documents half of the panel's fixed
+toolbar - the category chips of the list, and the path and type picker of an
+open document - so only the document body scrolls.
 Domain helpers: `taxonomy.js` (typed labels), `results.js` (one JSON line +
 exit code), `text.js` (`matchesQuery`); Python: `core/backend/common`
 (`json_line`, `safe_paths`, `atomic_write`, `frontmatter`).

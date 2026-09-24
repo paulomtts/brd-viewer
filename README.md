@@ -64,8 +64,10 @@ until it is next saved, and existing snapshots and backups are left in their
   frontmatter (`tag: spec`, `standard`, `audit`, `architecture`; case and
   singular/plural do not matter); without one the folder decides
   (`docs/architecture`, `docs/specs` and `docs/superpowers/specs`,
-  `docs/standards`, `docs/audits`), and anything else is Other. Badges above the
-  list show counts; click one to filter, click it again to clear. The filter
+  `docs/standards`, `docs/audits`), and anything else is Other. Badges in the
+  fixed toolbar show counts; click one to filter, click it again to clear. An
+  open document keeps its path and its type picker in that toolbar too, so only
+  the document body scrolls. The filter
   combines with the search box, and each row carries its badge. The frontmatter
   block is not shown when a document is opened.
   Documents over 1 MB (1048576 bytes) are not displayed. A document is

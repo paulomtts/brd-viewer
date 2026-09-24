@@ -99,18 +99,6 @@ TestCase {
     compare(s.app.nav.cursorIndex, 1)
   }
 
-  function test_a_category_chip_toggles_the_store_category() {
-    var s = loaded(); if (!s) return
-    wait(50)
-    var chip = find(s, "docChipspecs")
-    verify(chip, "the specs category chip")
-    mouseClick(chip)
-    compare(s.app.docs.docCategory, "specs")
-    wait(50)
-    mouseClick(find(s, "docChipspecs"))
-    compare(s.app.docs.docCategory, "")
-  }
-
   function test_a_keyboard_cursor_move_asks_the_panel_to_reveal_the_row() {
     var s = loaded(); if (!s) return
     wait(50)

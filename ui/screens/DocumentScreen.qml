@@ -3,9 +3,10 @@ import qs.Commons
 import "../components" as UI
 import "../theme" as T
 
-// One open Markdown document: its path, its type picker, and either the
-// too-large/read-error message or the rendered body. It reads the documents
-// store and calls it; it owns no state of its own.
+// One open Markdown document: either the too-large/read-error message or the
+// rendered body. Its path and its type picker live in the panel's fixed toolbar
+// (DocumentsToolbar), so only the body scrolls. It reads the documents store
+// and calls it; it owns no state of its own.
 Column {
   id: docScreen
 
@@ -15,23 +16,6 @@ Column {
 
   visible: docScreen.app.nav.viewMode === "document"
   spacing: Style.space(10)
-
-  UI.ThemedText {
-    variant: "caption"
-    theme: docScreen.theme
-    width: parent.width
-    text: docScreen.app.docs.selectedDocPath
-    elide: Text.ElideMiddle
-  }
-
-  UI.TagPicker {
-    width: parent.width
-    current: docScreen.app.docs.selectedDocCategory
-    busy: docScreen.app.docs.docTagBusy
-    error: docScreen.app.docs.docTagError
-    theme: docScreen.theme
-    onTagChosen: function(id) { docScreen.app.docs.setDocTag(id) }
-  }
 
   UI.ThemedText {
     variant: "dim"

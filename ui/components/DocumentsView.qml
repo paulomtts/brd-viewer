@@ -5,7 +5,9 @@ import "../components" as UI
 import "../theme" as T
 
 // The Documents section's list: one row per Markdown file (title, dim path).
-// It renders and emits only; Panel.qml owns the list, the cursor and the query.
+// It renders and emits only; Panel.qml owns the list, the cursor and the query,
+// and the panel's fixed toolbar owns the category chips (DocumentsToolbar).
+// `activeCategory` is still needed here: it words the empty-list message.
 Column {
   id: view
   objectName: "documentsView"
@@ -17,7 +19,6 @@ Column {
   property bool loading: false
   property string error: ""
   property bool truncated: false
-  property var categories: []
   property string activeCategory: ""
   property bool scrollOnCursor: false
   // The one input for every colour and font: Panel passes its Theme down,
@@ -27,24 +28,10 @@ Column {
   signal docChosen(string path)
   signal hovered(int index)
   signal revealRequested(var item)
-  signal categoryToggled(string id)
 
   UI.FilterableList {
     width: parent.width
     theme: view.theme
-
-    chipsObjectName: "docChips"
-    chipPrefix: "docChip"
-    activeChip: view.activeCategory
-    chips: view.categories.map(function(category) {
-      return {
-        id: category.id,
-        label: category.label,
-        count: category.count,
-        tint: Documents.docCategoryColor(category.id, view.theme.dim)
-      }
-    })
-    onChipToggled: function(id) { view.categoryToggled(id) }
 
     statusObjectName: "docsMessage"
     loading: view.loading

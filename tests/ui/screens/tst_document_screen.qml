@@ -1,6 +1,7 @@
 // tests/ui/screens/tst_document_screen.qml
-// ui/screens/DocumentScreen.qml on its own: the open document's path, its type
-// picker, the too-large and read-error messages, and the rendered body.
+// ui/screens/DocumentScreen.qml on its own: the too-large and read-error
+// messages and the rendered body. The path and the type picker are the fixed
+// toolbar's (tests/ui/screens/tst_documents_toolbar.qml).
 // REAL core/stores App -- no bespoke mocks.
 import QtQuick
 import QtTest
@@ -70,13 +71,14 @@ TestCase {
     compare(s.visible, true)
   }
 
-  function test_the_open_documents_path_is_shown_while_it_loads() {
+  function test_the_body_says_it_is_loading_and_the_screen_no_longer_holds_the_path() {
     var s = make(); if (!s) return
     s.navigator.openDoc("docs/specs/Design Doc.md")
     wait(50)
     var t = texts(s)
-    verify(t.indexOf("docs/specs/Design Doc.md") >= 0, t.join(" | "))
     verify(t.indexOf("Loading…") >= 0, t.join(" | "))
+    verify(t.indexOf("docs/specs/Design Doc.md") < 0, "the path belongs to the toolbar now")
+    verify(!find(s, "tagPicker"), "so does the type picker")
   }
 
   function test_the_body_is_rendered_once_it_arrives() {
@@ -109,19 +111,4 @@ TestCase {
     verify(t.indexOf("Loading…") < 0)
   }
 
-  function test_the_tag_picker_shows_the_current_type_and_sets_a_new_one() {
-    var s = make(); if (!s) return
-    s.app.docs.applyDocsResult('{"ok": true, "docs": [' +
-      '{"path": "docs/specs/Design Doc.md", "title": "Design", "size": 200, "category": "specs"}], "truncated": false}', 0)
-    s.navigator.openDoc("docs/specs/Design Doc.md")
-    wait(50)
-    var picker = find(s, "tagPicker")
-    verify(picker, "the TagPicker is inside the screen")
-    compare(picker.current, s.app.docs.selectedDocCategory)
-    var chip = find(s, "tagChipaudits")
-    verify(chip, "the audits chip")
-    mouseClick(chip)
-    verify(s.app.docs.tagger.current, "the screen asked the store to set the tag")
-    compare(s.app.docs.docTagBusy, true)
-  }
 }

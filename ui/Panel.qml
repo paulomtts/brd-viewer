@@ -327,6 +327,15 @@ Panel {
           Keys.onPressed: function(event) { sc.handleSearchKey(event) }
         }
 
+        // The Documents filters and the open document's path/type picker are
+        // toolbar furniture, not content: they stay put while the body scrolls.
+        DocumentsToolbar {
+          width: parent.width
+          app: appStores
+          navigator: navi
+          theme: panelTheme
+        }
+
         UI.ThemedText {
           variant: "caption"
           theme: panelTheme
