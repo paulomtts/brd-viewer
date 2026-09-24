@@ -144,10 +144,30 @@ rm -rf ~/.config/omarchy/plugins/paulomtts.omarchy-project-manager
 
 ## Development
 
-```bash
-./run-tests.sh
+Layout (details and rules in `docs/architecture.md`):
+
+```
+manifest.json          entryPoints.barWidget -> ui/Panel.qml
+install.sh             installer (the only source file at the root)
+core/domain/           pure JavaScript rules and parsers
+core/backend/<domain>/ Python helpers (one JSON line each) + common/
+core/stores/           non-visual QML state and workflows (App composes them)
+ui/                    Panel, Shortcuts, Navigator, screens/, components/, theme/
+vendor/canvas/         vendored canvas plugin (see VENDORED.md)
+tests/                 core/, ui/, architecture/, helpers/, stubs/
 ```
 
-See `docs/superpowers/specs/2026-09-23-brd-board-viewer-design.md` and
-`docs/superpowers/specs/2026-09-23-sidebar-and-documents-design.md` (sidebar
-and documents) for the full design.
+Data flow: `Panel` creates one `App`; stores run `brd` and the helpers and
+expose properties; screens and components bind to them. `ui/` may use `core/`,
+never the reverse.
+
+## Tests
+
+```bash
+bash tests/run.sh [filter]   # pytest, then every QML test (optional path filter)
+./run-tests.sh               # thin delegate to tests/run.sh
+bash tests/live-check.sh     # restarts the real shell; needs the desktop session
+```
+
+See `docs/architecture.md` and the specs in `docs/superpowers/specs/`
+(board viewer, sidebar and documents, core/ui architecture) for the design.

@@ -1,6 +1,16 @@
 # Core / UI architecture — design
 
-Status: proposed. Behaviour-preserving restructure; no user-visible change.
+Status: implemented. Behaviour-preserving restructure; no user-visible change.
+
+### As built (deviations from this spec)
+
+- `HelperRunner` emits the raw stdout, exit code and launch guard; stores call the existing domain parsers (no double parsing).
+- `ui/Navigator.qml` was added (screen switching), beside `Shortcuts.qml`.
+- `matchesQuery` lives in `core/domain/text.js`, shared by board/documents/memories.
+- `ui/Panel.qml` is about 479 lines (the "under about 400" target was not met; it holds no feature state).
+- `ui/components` ended as: ActionButton, Badge, Chip, ChipRow, DocumentsView, FilterableList, GraphView, ListRow, ListStatus, MemoriesView, MemoryNoteView, ModalCard, NewMemoryDialog, Sidebar, TagPicker, TextAreaBox, ThemedText, TypedConfirmDialog.
+- Documented remaining duplicates (allowlisted in the architecture test): the detail-panel tone pill in `CardDetailScreen`, `BoardCard`, and Sidebar's three `CursorSurface` uses; `Badge`, `Chip` and `TextAreaBox` set `font.family` on their own primitive.
+- The layer test uses allowlists with regex self-tests; `docs/architecture.md` is the one-page summary.
 
 ## Problem
 
