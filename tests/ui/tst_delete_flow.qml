@@ -16,7 +16,7 @@ TestCase {
 
   function test_delete_flow() {
     var host = createTemporaryObject(hostC, testCase)
-    var comp = Qt.createComponent("Panel.qml")
+    var comp = Qt.createComponent("../../Panel.qml")
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return }
     var p = comp.createObject(host)
     p.opened = true
@@ -71,7 +71,7 @@ TestCase {
   }
   function makePanel() {
     var host = createTemporaryObject(hostC, testCase)
-    var p = Qt.createComponent("Panel.qml").createObject(host)
+    var p = Qt.createComponent("../../Panel.qml").createObject(host)
     p.opened = true
     p.stateLoaded = true
     p.applyProjectsList([{ root_path: "/home/u/a", name: "alpha" }, { root_path: "/home/u/b", name: "beta" }])

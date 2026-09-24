@@ -1,5 +1,6 @@
 import QtQuick
 import QtTest
+import "../.."
 TestCase {
   id: tc
   name: "DocumentsView"

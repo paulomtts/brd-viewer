@@ -1,7 +1,7 @@
 // tests/qml/tst_logic.qml
 import QtQuick
 import QtTest
-import "../../logic.js" as Logic
+import "../../../logic.js" as Logic
 
 TestCase {
   name: "ProjectManagerLogic"

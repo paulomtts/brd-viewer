@@ -14,7 +14,7 @@ TestCase {
 
   function test_board_and_detail_flow() {
     var host = createTemporaryObject(hostC, testCase)
-    var comp = Qt.createComponent("Panel.qml")
+    var comp = Qt.createComponent("../../Panel.qml")
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return }
     var p = comp.createObject(host)
     p.opened = true
