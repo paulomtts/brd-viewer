@@ -78,6 +78,32 @@ TestCase {
     compare(tc.events[0].stdout, "fresh")
   }
 
+  // An ignored stale exit must not clear `busy`: the newer run is still going.
+  function test_an_ignored_stale_exit_leaves_the_runner_busy() {
+    var r = make(); if (!r) return
+    r.run(["a"])
+    var a = r.current
+    r.run(["b"])
+    var b = r.current
+    a.exited(0)
+    compare(r.busy, true, "the newer run is still in flight")
+    b.exited(0)
+    compare(r.busy, false)
+  }
+
+  // Every run gets its own Process; without the destroy they would pile up for
+  // the life of the panel.
+  function test_the_per_run_process_is_destroyed_after_it_exits() {
+    var r = make(); if (!r) return
+    r.run(["a"])
+    var proc = r.current
+    verify(proc, "a process was created")
+    proc.exited(0)
+    wait(50)
+    verify(!r.current, "the process object is gone")
+    compare(proc.command, undefined, "and its properties are no longer readable")
+  }
+
   function test_a_result_is_dropped_when_the_guard_changed_since_the_launch() {
     var r = make(); if (!r) return
     r.guard = "/home/u/a"
