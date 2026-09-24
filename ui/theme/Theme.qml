@@ -1,0 +1,18 @@
+import QtQuick
+import qs.Commons
+
+// The colours and font sizes every view and component draws with. Not a
+// singleton: Panel.qml creates one bound to the bar's palette and passes it
+// down, and every component keeps a default one so it renders standalone.
+QtObject {
+  id: theme
+
+  property color foreground: Color.foreground
+  property color dim: Qt.darker(theme.foreground, 1.55)
+  property color urgent: Color.urgent
+  property string fontFamily: Style.font.family
+
+  property real bodySize: Style.font.body
+  property real captionSize: Style.font.caption
+  property real headingSize: Style.font.heading
+}

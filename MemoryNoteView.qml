@@ -4,6 +4,8 @@ import qs.Commons
 import qs.Ui
 import "core/domain/documents.js" as Documents
 import "core/domain/memories.js" as Memories
+import "ui/components" as UI
+import "ui/theme" as T
 
 // One memory note: rendered text with Edit / Delete, or a raw-text editor with
 // Save / Cancel. Renders and emits only; Panel.qml owns the text, the draft and
@@ -24,6 +26,14 @@ Column {
   property color urgent: Color.urgent
   property color dim: Qt.darker(foreground, 1.55)
   property string fontFamily: Style.font.family
+  // What the shared components draw with; Panel still passes the colours one
+  // by one, so the theme follows them.
+  property var theme: T.Theme {
+    foreground: view.foreground
+    dim: view.dim
+    urgent: view.urgent
+    fontFamily: view.fontFamily
+  }
   readonly property bool dirty: view.draft !== view.text
   readonly property Item editorItem: editor
 
@@ -49,23 +59,13 @@ Column {
       elide: Text.ElideRight
     }
 
-    Rectangle {
+    UI.Badge {
       id: noteBadge
-      width: noteBadgeText.implicitWidth + Style.space(12)
-      height: noteBadgeText.implicitHeight + Style.space(4)
-      radius: height / 2
-      anchors.verticalCenter: undefined
-      color: Qt.alpha(noteBadgeText.color, 0.18)
-
-      Text {
-        id: noteBadgeText
-        objectName: "memoryNoteBadge"
-        anchors.centerIn: parent
-        text: Memories.memoryTypeLabel(view.entry.type)
-        color: Memories.memoryTypeColor(view.entry.type, view.dim)
-        font.family: view.fontFamily
-        font.pixelSize: Style.font.caption
-      }
+      theme: view.theme
+      textObjectName: "memoryNoteBadge"
+      paddingY: Style.space(4)
+      text: Memories.memoryTypeLabel(view.entry.type)
+      tint: Memories.memoryTypeColor(view.entry.type, view.dim)
     }
   }
 

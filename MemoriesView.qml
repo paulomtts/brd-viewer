@@ -3,6 +3,8 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "core/domain/memories.js" as Memories
+import "ui/components" as UI
+import "ui/theme" as T
 
 // The Memories section's list: one row per memory note (name, description,
 // type badge) under type filter chips. Renders and emits only; Panel.qml owns
@@ -24,6 +26,13 @@ Column {
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.55)
   property string fontFamily: Style.font.family
+  // What the shared components draw with; Panel still passes the colours one
+  // by one, so the theme follows them.
+  property var theme: T.Theme {
+    foreground: view.foreground
+    dim: view.dim
+    fontFamily: view.fontFamily
+  }
 
   signal noteChosen(string file)
   signal hovered(int index)
@@ -99,22 +108,12 @@ Column {
           elide: Text.ElideRight
         }
 
-        Rectangle {
+        UI.Badge {
           id: badge
-          width: badgeText.implicitWidth + Style.space(12)
-          height: badgeText.implicitHeight + Style.space(2)
-          radius: height / 2
-          color: Qt.alpha(badgeText.color, 0.18)
-
-          Text {
-            id: badgeText
-            objectName: "memoryRowBadge" + row.index
-            anchors.centerIn: parent
-            text: Memories.memoryTypeLabel(row.modelData.type)
-            color: Memories.memoryTypeColor(row.modelData.type, view.dim)
-            font.family: view.fontFamily
-            font.pixelSize: Style.font.caption
-          }
+          theme: view.theme
+          textObjectName: "memoryRowBadge" + row.index
+          text: Memories.memoryTypeLabel(row.modelData.type)
+          tint: Memories.memoryTypeColor(row.modelData.type, view.dim)
         }
       }
 

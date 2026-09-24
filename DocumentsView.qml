@@ -3,6 +3,8 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "core/domain/documents.js" as Documents
+import "ui/components" as UI
+import "ui/theme" as T
 
 // The Documents section's list: one row per Markdown file (title, dim path).
 // It renders and emits only; Panel.qml owns the list, the cursor and the query.
@@ -23,6 +25,13 @@ Column {
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.55)
   property string fontFamily: Style.font.family
+  // What the shared components draw with; Panel still passes the colours one
+  // by one, so the theme follows them.
+  property var theme: T.Theme {
+    foreground: view.foreground
+    dim: view.dim
+    fontFamily: view.fontFamily
+  }
 
   signal docChosen(string path)
   signal hovered(int index)
@@ -106,23 +115,13 @@ Column {
           elide: Text.ElideRight
         }
 
-        Rectangle {
+        UI.Badge {
           id: rowBadge
-          visible: badgeText.text !== ""
-          width: badgeText.implicitWidth + Style.space(12)
-          height: badgeText.implicitHeight + Style.space(2)
-          radius: height / 2
-          color: Qt.alpha(badgeText.color, 0.18)
-
-          Text {
-            id: badgeText
-            objectName: "docRowBadge" + row.index
-            anchors.centerIn: parent
-            text: Documents.docCategoryLabel(row.modelData.category)
-            color: Documents.docCategoryColor(row.modelData.category, view.dim)
-            font.family: view.fontFamily
-            font.pixelSize: Style.font.caption
-          }
+          theme: view.theme
+          textObjectName: "docRowBadge" + row.index
+          visible: text !== ""
+          text: Documents.docCategoryLabel(row.modelData.category)
+          tint: Documents.docCategoryColor(row.modelData.category, view.dim)
         }
       }
 
