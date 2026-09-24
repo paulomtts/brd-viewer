@@ -19,7 +19,6 @@ Prints one JSON line: {"ok": true, "backup": "<dir or empty>"} or
 """
 import contextlib
 import fcntl
-import json
 import os
 import shutil
 import sys
@@ -27,13 +26,12 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import memory_lib as lib  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from common.atomic_write import write_atomic, write_new  # noqa: E402
+from common.json_line import emit  # noqa: E402
+from common.safe_paths import inside  # noqa: E402
 
 OPS = ("save", "create", "delete")
-
-
-def emit(payload, code=0):
-    print(json.dumps(payload))
-    return code
 
 
 def make_backup(memory_dir, files):
@@ -104,7 +102,7 @@ def main(argv):
                 if os.path.lexists(full):
                     raise lib.Refused("A note with that file name already exists.")
             else:
-                if not (os.path.isfile(note_real) and lib.inside(memory_real, note_real)):
+                if not (os.path.isfile(note_real) and inside(memory_real, note_real)):
                     raise lib.Refused("Note not found.")
                 if expected is not None:
                     try:
@@ -117,7 +115,7 @@ def main(argv):
             index_full = os.path.join(memory_dir, lib.MEMORY_INDEX)
             index_real = os.path.realpath(index_full)
             index_exists = os.path.lexists(index_full)
-            if index_exists and not (os.path.isfile(index_real) and lib.inside(memory_real, index_real)):
+            if index_exists and not (os.path.isfile(index_real) and inside(memory_real, index_real)):
                 raise lib.Refused("MEMORY.md is not a regular file inside the memory directory.")
             try:
                 index_text = open(index_real, "rb").read().decode("utf-8") if index_exists else ""
@@ -144,21 +142,24 @@ def main(argv):
 
             if op == "delete":
                 if new_index is not None:
-                    lib.write_atomic(index_real, new_index.encode("utf-8"))
+                    write_atomic(index_real, new_index.encode("utf-8"))
                 os.remove(full)
             else:
                 old = open(note_real, "rb").read() if op == "save" else None
                 if op == "create":
-                    lib.write_new(note_real, data)
+                    try:
+                        write_new(note_real, data)
+                    except FileExistsError:
+                        raise lib.Refused("A note with that file name already exists.")
                 else:
-                    lib.write_atomic(note_real, data)
+                    write_atomic(note_real, data)
                 try:
-                    lib.write_atomic(index_real, new_index.encode("utf-8"))
+                    write_atomic(index_real, new_index.encode("utf-8"))
                 except OSError:
                     if old is None:
                         os.remove(note_real)
                     else:
-                        lib.write_atomic(note_real, old)
+                        write_atomic(note_real, old)
                     raise
             return emit({"ok": True, "backup": backup})
     except lib.Refused as e:

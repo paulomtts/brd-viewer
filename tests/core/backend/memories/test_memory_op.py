@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "core", "backend", "memories")
 sys.path.insert(0, HERE)
 import memory_lib  # noqa: E402
 

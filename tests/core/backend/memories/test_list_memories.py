@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "core", "backend", "memories")
 SCRIPT = os.path.join(HERE, "list-memories.py")
 
 

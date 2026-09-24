@@ -8,7 +8,6 @@ all I/O reporting.
 import json
 import os
 import re
-import tempfile
 
 MEMORY_INDEX = "MEMORY.md"
 MAX_NOTE_BYTES = 65536
@@ -33,10 +32,6 @@ def projects_root():
 
 def cache_root():
     return os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-
-
-def inside(root_real, path_real):
-    return path_real == root_real or path_real.startswith(root_real + os.sep)
 
 
 def slug_of(path):
@@ -81,6 +76,8 @@ def frontmatter_of(text):
     """{name, description, type} from a leading ---...--- block, {} when there
     is none or it never closes. `type` may sit at top level or, as Claude
     Code writes it, indented under `metadata:`; top level wins."""
+    # Deliberately not common.frontmatter: it splits with splitlines() and strips
+    # trailing # comments, which would change what Claude Code notes parse to.
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         return {}
@@ -262,45 +259,3 @@ def check_content(content):
     if len(data) > MAX_NOTE_BYTES:
         raise Refused("The note is too large (over 64 KB).")
     return data
-
-
-# --- writing ------------------------------------------------------------
-
-def write_atomic(real_path, data, mode=None):
-    """Replace (or create) a file atomically. An existing file keeps its mode;
-    a new one gets `mode` (default 0o644)."""
-    directory = os.path.dirname(real_path)
-    existing = os.stat(real_path).st_mode & 0o777 if os.path.exists(real_path) else None
-    fd, tmp = tempfile.mkstemp(prefix=".mem-", dir=directory)
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        os.chmod(tmp, existing if existing is not None else (mode if mode is not None else 0o644))
-        os.replace(tmp, real_path)
-    except BaseException:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-
-
-def write_new(real_path, data, mode=0o644):
-    """Create a file that must not exist yet, atomically: the content is fully
-    written before the name appears, and a concurrent creator of the same name
-    loses (Refused) instead of being overwritten."""
-    directory = os.path.dirname(real_path)
-    fd, tmp = tempfile.mkstemp(prefix=".mem-", dir=directory)
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        os.chmod(tmp, mode)
-        try:
-            os.link(tmp, real_path)
-        except FileExistsError:
-            raise Refused("A note with that file name already exists.")
-    finally:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass

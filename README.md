@@ -48,7 +48,7 @@ until it is next saved, and existing snapshots and backups are left in their
   description and file name. Open a note to read it, then **Edit** (Ctrl+E) to
   change its raw text (Ctrl+S saves, Escape leaves a clean editor and never
   discards unsaved changes), **Delete** (type `delete`), or **＋ New** (Ctrl+N)
-  to create one. Every change goes through `memory-op.py`, which first copies the
+  to create one. Every change goes through `core/backend/memories/memory-op.py`, which first copies the
   note and `MEMORY.md` to `~/.cache/omarchy-project-manager/memory-backups/`, replaces files
   atomically, and keeps the note's `- [Title](file.md) - hook` line in
   `MEMORY.md` in sync (name and description come from the note's frontmatter).

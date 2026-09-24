@@ -13,20 +13,17 @@ are skipped. name/description come from the note's frontmatter, else from its
 MEMORY.md line, else the file name. Sorted by type (user, feedback, project,
 reference, other) then name; at most 500.
 """
-import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import memory_lib as lib  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from common.json_line import emit  # noqa: E402
+from common.safe_paths import inside  # noqa: E402
 
 MAX_NOTES = 500
 ORDER = lib.TYPES + ["other"]
-
-
-def emit(payload, code=0):
-    print(json.dumps(payload))
-    return code
 
 
 def main(argv):
@@ -38,12 +35,12 @@ def main(argv):
     memory_dir = os.path.join(project_dir, "memory")
     root_real = os.path.realpath(lib.projects_root())
     memory_real = os.path.realpath(memory_dir)
-    if not (os.path.isdir(memory_real) and lib.inside(root_real, memory_real)):
+    if not (os.path.isdir(memory_real) and inside(root_real, memory_real)):
         return emit({"ok": True, "found": False, "memory_dir": memory_dir, "notes": []})
 
     index = {}
     index_path = os.path.realpath(os.path.join(memory_dir, lib.MEMORY_INDEX))
-    if os.path.isfile(index_path) and lib.inside(memory_real, index_path):
+    if os.path.isfile(index_path) and inside(memory_real, index_path):
         index = lib.index_targets(lib.read_head(index_path, 1024 * 1024))
 
     notes = []
@@ -51,7 +48,7 @@ def main(argv):
         if not name.endswith(".md") or name == lib.MEMORY_INDEX:
             continue
         real = os.path.realpath(os.path.join(memory_dir, name))
-        if not (os.path.isfile(real) and lib.inside(memory_real, real)):
+        if not (os.path.isfile(real) and inside(memory_real, real)):
             continue
         front = lib.frontmatter_of(lib.read_head(real))
         title, hook = index.get(name, ("", ""))

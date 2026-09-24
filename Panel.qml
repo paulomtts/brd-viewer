@@ -597,7 +597,7 @@ Panel {
     root.memoriesSeq += 1
     var rootPath = root.selectedProject.root_path
     var proc = memoriesProcC.createObject(root, { forRoot: rootPath, seq: root.memoriesSeq })
-    proc.command = ["python3", root.pluginDir + "list-memories.py", rootPath]
+    proc.command = ["python3", root.pluginDir + "core/backend/memories/list-memories.py", rootPath]
     root.memoriesProc = proc
     proc.running = true
   }
@@ -691,7 +691,7 @@ Panel {
     memoryOpProc.op = op
     memoryOpProc.forRoot = root.selectedProject ? root.selectedProject.root_path : ""
     memoryOpProc.forFile = file
-    var command = ["python3", root.pluginDir + "memory-op.py", op, root.memoryDir, file]
+    var command = ["python3", root.pluginDir + "core/backend/memories/memory-op.py", op, root.memoryDir, file]
     if (content !== undefined) command.push(content)
     if (expected !== undefined) command.push(expected)
     memoryOpProc.command = command
