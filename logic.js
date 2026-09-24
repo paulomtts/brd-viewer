@@ -216,3 +216,12 @@ function docCategoryCounts(docs) {
     return { id: c.id, label: c.label, count: n }
   }).filter(function(c) { return c.count > 0 })
 }
+
+// Fixed hues (the shell theme has no palette for this), distinct from the
+// status colours so a category badge never reads as a card status.
+function docCategoryColor(id, fallback) {
+  if (id === "architecture") return "#b39ddb"
+  if (id === "specs") return "#5fa8d3"
+  if (id === "audits") return "#e2c15a"
+  return fallback
+}

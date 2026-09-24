@@ -383,4 +383,12 @@ TestCase {
     compare(counts.length, 1)
     compare(counts[0].id, "architecture")
   }
+
+  function test_doc_category_colors() {
+    compare(Logic.docCategoryColor("architecture", "#111111"), "#b39ddb")
+    compare(Logic.docCategoryColor("specs", "#111111"), "#5fa8d3")
+    compare(Logic.docCategoryColor("audits", "#111111"), "#e2c15a")
+    compare(Logic.docCategoryColor("weird", "#111111"), "#111111")
+    compare(Logic.docCategoryColor(undefined, "#111111"), "#111111")
+  }
 }

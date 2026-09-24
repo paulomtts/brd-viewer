@@ -66,7 +66,15 @@ Panel {
   property int docsSeq: 0
   property var docsProc: null
 
-  readonly property var filteredDocs: Logic.filterDocs(root.docs, root.searchQuery)
+  property string docCategory: ""
+  readonly property var filteredDocs: Logic.filterDocs(Logic.filterDocsByCategory(root.docs, root.docCategory), root.searchQuery)
+
+  function toggleDocCategory(id) {
+    root.docCategory = root.docCategory === id ? "" : id
+    root.cursorIndex = 0
+    root.scrollOnCursor = false
+    Qt.callLater(root.scrollToTop)
+  }
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
@@ -216,14 +224,14 @@ Panel {
     root.watchedDbPath = ""
     root.applyTreeData([])
     root.viewMode = "board"
-    root.docs = []; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.docs = []; root.docCategory = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
   }
 
   function selectProject(project) {
     selectedProject = project
     resetSearch()
     viewMode = "board"
-    root.docs = []; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.docs = []; root.docCategory = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     root.watchedDbPath = ""
     resolveDbPathProc.command = ["python3", root.pluginDir + "resolve-db-path.py", project.root_path]
     resolveDbPathProc.running = false
@@ -998,6 +1006,8 @@ Panel {
             width: parent.width
             docs: root.filteredDocs
             query: root.searchQuery
+            categories: Logic.docCategoryCounts(root.docs)
+            activeCategory: root.docCategory
             cursorIndex: root.cursorIndex
             loading: root.docsLoading
             error: root.docsError
@@ -1006,6 +1016,7 @@ Panel {
             foreground: root.foreground
             dim: root.dim
             fontFamily: root.fontFamily
+            onCategoryToggled: function(id) { root.toggleDocCategory(id) }
             onDocChosen: function(path) { root.openDoc(path) }
             onHovered: function(index) { root.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }

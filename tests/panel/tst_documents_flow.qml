@@ -249,4 +249,55 @@ TestCase {
     named(p, "docFile").loadFailed(1)
     compare(p.docError, "Could not read this document.")
   }
+
+  property string catList: '{"ok": true, "docs": [' +
+    '{"path": "docs/architecture/a.md", "title": "Arch", "size": 1, "category": "architecture"},' +
+    '{"path": "docs/specs/s.md", "title": "Spec One", "size": 1, "category": "specs"},' +
+    '{"path": "docs/superpowers/specs/t.md", "title": "Spec Two", "size": 1, "category": "specs"},' +
+    '{"path": "docs/audits/u.md", "title": "Audit", "size": 1, "category": "audits"}], "truncated": false}'
+
+  function test_toggling_a_category_filters_and_toggling_again_clears() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(catList, 0)
+    compare(p.filteredDocs.length, 4)
+    p.toggleDocCategory("specs")
+    compare(p.docCategory, "specs")
+    compare(paths(p.filteredDocs), "docs/specs/s.md,docs/superpowers/specs/t.md")
+    compare(paths(p.currentList()), "docs/specs/s.md,docs/superpowers/specs/t.md")
+    p.toggleDocCategory("audits")
+    compare(paths(p.filteredDocs), "docs/audits/u.md")
+    p.toggleDocCategory("audits")
+    compare(p.docCategory, "")
+    compare(p.filteredDocs.length, 4)
+  }
+
+  function test_the_category_combines_with_the_search_query() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(catList, 0)
+    p.toggleDocCategory("specs")
+    p.searchQuery = "two"
+    compare(paths(p.filteredDocs), "docs/superpowers/specs/t.md")
+    p.searchQuery = "audit"
+    compare(p.filteredDocs.length, 0)
+  }
+
+  function test_toggling_a_category_resets_the_cursor_to_the_first_row() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(catList, 0)
+    p.cursorIndex = 3
+    p.toggleDocCategory("specs")
+    compare(p.cursorIndex, 0)
+  }
+
+  function test_switching_project_clears_the_category() {
+    var p = make(); if (!p) return
+    p.showSection("documents")
+    p.applyDocsResult(catList, 0)
+    p.toggleDocCategory("audits")
+    p.selectProject(pB)
+    compare(p.docCategory, "")
+  }
 }
