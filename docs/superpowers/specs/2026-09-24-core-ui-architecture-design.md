@@ -127,7 +127,7 @@ what replaces it:
 | Loading / error / empty message with the same precedence | DocumentsView, MemoriesView | `ui/components/ListStatus.qml` |
 | Chips + status + rows list with type filter | DocumentsView, MemoriesView | `ui/components/FilterableList.qml` (row delegate supplied by the screen) |
 | Bordered multi-line text box | MemoryNoteView editor, NewMemoryDialog body | `ui/components/TextAreaBox.qml` |
-| Text with the theme colour, font and size variants | everywhere | `ui/components/Label.qml` (variant: body, caption, heading, dim) |
+| Text with the theme colour, font and size variants | everywhere | `ui/components/ThemedText.qml` (variant: body, caption, heading, dim) |
 | "Run a helper, ignore stale results, parse one JSON line" (per-run processes with a sequence number and project guard, single-run ops with a busy flag) | docs list, memories list, memory ops, tag op, delete, board tree, state | `core/stores/HelperRunner.qml` used by every store |
 | "One active filter, toggle it, reset the cursor" | `toggleDocCategory`, `toggleMemoryType` | `core/stores/FilterState.qml` |
 | Return-to-list bookkeeping (return cursor, scroll, mode) | `openCard`, `openDoc`, `openMemory` and their restores | one `push/pop` on `NavigationStore` |
@@ -166,7 +166,7 @@ Behaviour stays green at every step; each step is its own commit.
    move the matching `Panel`-level flow tests to `tests/core/stores`.
 5. **UI:** first the shared components (`Badge`, `Chip`, `ChipRow`, `ModalCard`,
    `ActionButton`, `ListRow`, `ListStatus`, `FilterableList`, `TextAreaBox`,
-   `Label`), each replacing its duplicates; then slim `Panel.qml` to the
+   `ThemedText`), each replacing its duplicates; then slim `Panel.qml` to the
    shell, extract `Shortcuts.qml` and the screens; flip the manifest entry point to `ui/Panel.qml` (the plugin symlink
    links the whole folder, so it needs no change).
 6. **Enforce and document:** turn the architecture test to strict, rewrite the
