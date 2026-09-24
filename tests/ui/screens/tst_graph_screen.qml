@@ -143,6 +143,24 @@ TestCase {
     verify(find(s, "graphNodem1"), "and back again")
   }
 
+  function test_the_story_view_draws_the_box_to_box_dependency_from_the_board() {
+    var s = make(); if (!s) return
+    s.navigator.showSection("graph")
+    var m2 = card("m2", "Second", "todo", [card("s2", "Story two", "todo")])
+    m2.blocked_by = ["m1"]
+    s.app.board.applyTreeData([card("m1", "First", "todo", [card("s1", "Story one", "todo")]), m2])
+    s.app.graph.setGraphView("story")
+    wait(100)
+    var gv = find(s, "graphView")
+    compare(gv.groupEdges.map(function(e) { return e.id }).join(","), "m1>m2")
+    var drawn = find(s, "graphGroupEdges")
+    compare(drawn.segments.length, 1, "and it is drawn between the two boxes")
+    compare(drawn.segments[0].fromX, find(s, "graphGroupm1").x + find(s, "graphGroupm1").width)
+    s.app.graph.setGraphView("milestone")
+    wait(100)
+    compare(find(s, "graphView").groupEdges.length, 0, "the milestone view draws its own edges only")
+  }
+
   function test_clicking_a_story_node_opens_that_story_card() {
     var s = make(); if (!s) return
     s.navigator.showSection("graph")

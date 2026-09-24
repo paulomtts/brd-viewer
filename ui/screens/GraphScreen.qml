@@ -29,6 +29,7 @@ Item {
     nodes: graphScreen.app.graph.currentNodes
     edges: graphScreen.app.graph.currentEdges
     groups: graphScreen.app.graph.currentGroups
+    groupEdges: graphScreen.app.graph.currentGroupEdges
     mode: graphScreen.app.graph.graphView
     cursorId: graphScreen.app.graph.graphCursor
     theme: graphScreen.theme

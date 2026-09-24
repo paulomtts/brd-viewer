@@ -52,15 +52,25 @@ until it is next saved, and existing snapshots and backups are left in their
   each milestone's stories inside a box labelled with its title (a milestone
   with no stories draws no box), and an arrow for each `blocked_by` link
   between two stories — one that crosses two milestones simply draws across
-  their boxes. A story node keeps the title, status colour and open-issue flag,
+  their boxes. Behind them, a thicker, fainter curve joins the **boxes**
+  themselves, so milestone-level dependency reads here as it does in the
+  Milestone view: one box edge per pair, drawn when brd says one milestone is
+  blocked by the other *or* when any story in one is blocked by a story in the
+  other. A story node keeps the title, status colour and open-issue flag,
   and replaces the done/total text with **pips**: one small circle per subtask
   in its status colour (todo / in progress / blocked / done, a subtask blocked
   by an open issue counted as blocked), the in-progress ones gently pulsing.
   More subtasks than fit collapse into a `+N`. Arrow keys, Enter, a click and
   Back work exactly as they do in the milestone view, on the story's own card.
-  The boxes are drawn where the layout put them and do not follow a drag, so
-  dragging a story node around can take it outside its own box; the fit button
-  puts the view back.
+  A box is always exactly its own stories' bounding box: drag a story and its
+  box grows, shrinks or moves to keep containing it, and no other milestone's
+  box ever adopts it. Drag a box by its **label strip** to move the whole group
+  — every story inside goes with it, the box edges follow, and the selection and
+  arrow keys are unaffected. **Organize** lays each milestone's stories out
+  inside its own box and then arranges the boxes by their dependency, so every
+  story is back in its box and no two boxes overlap; **Fit** frames the boxes,
+  not just the nodes. An arrangement lasts until the board changes, exactly as a
+  dragged node's position does in the Milestone view.
 - **Memories** (Ctrl+4) - the project's Claude Code memory notes, from
   `~/.claude/projects/<slug>/memory/` (the slug is the project path with every
   non-alphanumeric character turned into `-`; if that folder is missing, a

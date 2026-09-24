@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import "../../vendor/canvas" as Local
+import "../../vendor/canvas/positions.js" as Positions
 import "../../core/domain/board.js" as Board
 import "../../core/domain/graph.js" as Graph
 import "../components" as UI
@@ -18,9 +19,13 @@ Item {
   // "milestone" or "story": which delegate the nodes take, and whether the
   // boxes below are drawn at all.
   property string mode: "milestone"
-  // [{ id, title, x, y, w, h }] -- the story view's milestone boxes, in world
-  // coordinates, empty in the milestone view.
+  // [{ id, title }] -- the story view's milestone boxes, empty in the milestone
+  // view. Where a box IS is not taken from the model: it is derived below from
+  // the stories it holds, wherever they currently are.
   property var groups: []
+  // [{ id, from, to }] between two of those boxes: the milestone-level reading
+  // of the story view, empty in the milestone view.
+  property var groupEdges: []
   property string cursorId: ""
   // The one input for every colour and font: Panel passes its Theme down,
   // and a standalone instance renders with the shell defaults.
@@ -29,6 +34,67 @@ Item {
   signal nodeClicked(string id)
 
   function centerOn(id) { canvas.centerOn(id) }
+
+  // ---- Where things are -----------------------------------------------------
+  //
+  // The user's own arrangement: the position a story was dropped at, or moved
+  // to with its whole box, by card id. It overrides what the layout decided.
+  // A board change hands this view a new `nodes` array and clears it, so a
+  // refresh resets an arranged story graph exactly as it resets a dragged node
+  // in the milestone view -- one behaviour, both views.
+  property var arranged: ({})
+  onNodesChanged: view.arranged = ({})
+
+  // What the canvas is actually given: the nodes at their arranged positions.
+  // The canvas treats a node's coordinates as pinned, so this is what makes an
+  // arrangement outlive a model rebuild the canvas does for its own reasons.
+  readonly property var placedNodes: Graph.placedNodes(view.nodes, view.arranged)
+
+  // Where every node IS right now, by card id -- a node halfway through a drag
+  // included, because the canvas's working positions are what it draws from.
+  // Read-only, and the one place this view reads the canvas's own bookkeeping
+  // (documented exception, docs/architecture.md).
+  readonly property var livePositions: {
+    var out = ({})
+    var live = canvas._positions || ({})
+    ;(view.nodes || []).forEach(function(node) {
+      var at = live[Positions.key(node.id)]
+      if (at) out[node.id] = { x: at.x, y: at.y }
+    })
+    return out
+  }
+
+  // The boxes as they are now: each milestone's own stories' bounding box, so a
+  // story can never be outside its box, however it was dragged. Membership is
+  // the story's milestone and nothing else -- a story dropped over another
+  // milestone's box is not adopted by it.
+  readonly property var liveGroups: Graph.storyGroupRects(view.groups, view.nodes, view.livePositions)
+
+  // The same boxes as the canvas edge layer wants them: by its own key, each
+  // rect carrying both the anchor ({x, y}) and the size ({w, h}).
+  readonly property var boxByKey: {
+    var out = ({})
+    ;(view.liveGroups || []).forEach(function(box) { out[Positions.key(box.id)] = box })
+    return out
+  }
+  readonly property var boxKeys: (view.liveGroups || []).map(function(box) { return Positions.key(box.id) })
+
+  // Moving a whole box by a world delta: every story it holds moves with it,
+  // and nothing else does.
+  function moveGroup(id, dx, dy) {
+    view.arranged = Graph.moveGroupPositions(view.nodes, id, dx, dy, view.livePositions)
+  }
+
+  // The organize button. In the story view the model's own layout already puts
+  // every story inside its own box and keeps the boxes apart, so organizing is
+  // dropping the arrangement and going back to it -- a fresh (empty) map is
+  // assigned even when there was none, so the canvas re-reads the model and a
+  // dragged story returns too.
+  function organize() {
+    if (view.mode !== "story") { canvas.organize(); return }
+    view.arranged = ({})
+    Qt.callLater(view.fitAll)
+  }
 
   // Frame the whole graph. The canvas only knows its nodes, so in the story
   // view the boxes -- which reach past their stories by their padding and their
@@ -42,7 +108,7 @@ Item {
   // The union of every node and every box, in world coordinates, or null when
   // there is nothing (or nothing measurable) to frame.
   function contentBounds() {
-    var boxes = (view.mode === "story" ? view.groups : []) || []
+    var boxes = (view.mode === "story" ? view.liveGroups : []) || []
     if (boxes.length === 0) return null
     var rect = null
     function add(item) {
@@ -56,7 +122,9 @@ Item {
       rect.h = bottom - rect.y
     }
     boxes.forEach(add)
-    ;(view.nodes || []).forEach(add)
+    // At their live positions: a dragged story is inside its box anyway, and a
+    // stale model coordinate would frame emptiness.
+    Graph.placedNodes(view.nodes, view.livePositions).forEach(add)
     return rect
   }
 
@@ -64,9 +132,14 @@ Item {
     id: canvas
     objectName: "graphCanvas"
     anchors.fill: parent
-    nodes: view.nodes
+    nodes: view.mode === "story" ? view.placedNodes : view.nodes
     edges: view.edges
     nodeDelegate: view.mode === "story" ? storyDelegate : milestoneDelegate
+    // A dropped story keeps its place: the arrangement is this view's, so the
+    // canvas is handed the new coordinates rather than owning them alone.
+    onNodeMoved: function(id, x, y) {
+      if (view.mode === "story") view.arranged = Graph.withPosition(view.arranged, id, x, y)
+    }
     // Read-only board: the canvas may drag nodes around, but never draws a
     // dependency of its own.
     canConnect: function() { return false }
@@ -78,6 +151,7 @@ Item {
     // so this layer sits inside it, applies the very same camera, and is pushed
     // behind the canvas's own world item -- the boxes must never cover a node.
     Item {
+      id: groupLayer
       objectName: "graphGroupLayer"
       z: -1
       visible: view.mode === "story"
@@ -86,8 +160,26 @@ Item {
       scale: canvas.zoom
       transformOrigin: Item.TopLeft
 
+      // The dependency BETWEEN the boxes, the canvas's own edge layer drawing
+      // it: one curve from a box's right border to the next box's left border,
+      // exactly as the milestone view draws a milestone's. Declared first, so
+      // it paints behind the boxes and their stories, and thicker and fainter
+      // than a story edge so the two are never confused. No hit width: a box
+      // edge is not clickable, and must not swallow a pan.
+      Local.CanvasEdges {
+        objectName: "graphGroupEdges"
+        edges: view.mode === "story" ? view.groupEdges : []
+        // The box rects serve as both: {x, y} to anchor on, {w, h} to size.
+        positions: view.boxByKey
+        nodeByKey: view.boxByKey
+        visibleKeys: view.boxKeys
+        strokeColor: Qt.alpha(view.theme.foreground, 0.22)
+        strokeWidth: 5
+        hitWidth: 0
+      }
+
       Repeater {
-        model: view.groups
+        model: view.liveGroups
 
         delegate: Rectangle {
           id: box
@@ -102,6 +194,41 @@ Item {
           color: Qt.alpha(view.theme.foreground, 0.04)
           border.width: 1
           border.color: Qt.alpha(view.theme.foreground, 0.18)
+
+          // The label strip drags the whole box. Only the strip: the rest of a
+          // box is either a story (which drags itself) or empty space, where a
+          // drag has to stay the canvas's pan.
+          Item {
+            id: handle
+            objectName: "graphGroupHandle" + (box.modelData ? box.modelData.id : "")
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Graph.GROUP_HEADER
+
+            DragHandler {
+              id: boxDrag
+              target: null
+
+              // The pointer in WORLD coordinates. Mapped into the layer, which
+              // carries the camera but not this box: a point read in the box's
+              // own frame would move as the box follows the drag, and every
+              // frame after the first would measure nothing.
+              function world() {
+                return handle.mapToItem(groupLayer, centroid.position.x, centroid.position.y)
+              }
+
+              property var last: null
+              onActiveChanged: boxDrag.last = boxDrag.active ? boxDrag.world() : null
+              onCentroidChanged: {
+                if (!boxDrag.active || !boxDrag.last) return
+                var now = boxDrag.world()
+                view.moveGroup(box.modelData ? box.modelData.id : "",
+                               now.x - boxDrag.last.x, now.y - boxDrag.last.y)
+                boxDrag.last = now
+              }
+            }
+          }
 
           UI.ThemedText {
             objectName: "graphGroupLabel" + (box.modelData ? box.modelData.id : "")
@@ -129,7 +256,19 @@ Item {
   onIdKeyChanged: Qt.callLater(view.fitAll)
   onVisibleChanged: if (visible) Qt.callLater(view.fitAll)
 
-  Local.CanvasControls { canvas: canvas; showCulling: false }
+  // The vendored controls drive a canvas; here they drive the VIEW where the
+  // view knows more than the canvas does -- organizing a story graph is per
+  // box, and framing it has to take the boxes in. Zoom and culling are the
+  // canvas's own.
+  QtObject {
+    id: controlsTarget
+    readonly property bool culling: canvas.culling
+    function zoomBy(factor) { canvas.zoomBy(factor) }
+    function fitAll() { view.fitAll() }
+    function organize() { view.organize() }
+  }
+
+  Local.CanvasControls { canvas: controlsTarget; showCulling: false }
 
   UI.ThemedText {
     objectName: "graphEmpty"

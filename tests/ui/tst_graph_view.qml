@@ -83,10 +83,16 @@ TestCase {
     { id: "s2", title: "Second story", status: "blocked", milestoneId: "m2", openIssues: 1,
       pips: [], morePips: 0, x: 420, y: 40, w: 230, h: 78 }
   ]
+  // Only id and title: where a box IS follows its own stories, live.
   property var storyGroups: [
-    { id: "m1", title: "Milestone one", x: 0, y: 0, w: 270, h: 140 },
-    { id: "m2", title: "Milestone two", x: 400, y: 0, w: 270, h: 140 }
+    { id: "m1", title: "Milestone one" },
+    { id: "m2", title: "Milestone two" }
   ]
+  // What the two boxes above come out as: s1/s2 padded, with the label strip.
+  property var boxOne: ({ x: 20 - 16, y: 40 - 30, w: 230 + 32, h: 78 + 46 })
+  property var boxTwo: ({ x: 420 - 16, y: 40 - 30, w: 230 + 32, h: 78 + 46 })
+
+  property var storyGroupEdges: [{ id: "m1>m2", from: "m1", to: "m2" }]
 
   function story() {
     var v = createTemporaryObject(viewC, tc)
@@ -94,8 +100,155 @@ TestCase {
     v.nodes = storyNodes
     v.edges = [{ id: "s1>s2", from: "s1", to: "s2" }]
     v.groups = storyGroups
+    v.groupEdges = storyGroupEdges
     wait(100)
     return v
+  }
+
+  function box(v, id) { return find(v, "graphGroup" + id) }
+
+  function test_a_box_edge_is_drawn_between_the_two_box_borders() {
+    var v = story()
+    var layer = find(v, "graphGroupEdges")
+    verify(layer, "the box edge layer")
+    compare(layer.segments.length, 1, "one edge per box dependency")
+    var one = box(v, "m1")
+    var two = box(v, "m2")
+    var segment = layer.segments[0]
+    compare(segment.id, "m1>m2")
+    compare(segment.fromX, one.x + one.width, "it leaves m1's right border")
+    compare(segment.fromY, one.y + one.height / 2)
+    compare(segment.toX, two.x, "and arrives at m2's left border")
+    compare(segment.toY, two.y + two.height / 2)
+  }
+
+  function test_the_box_edges_are_told_apart_from_the_story_edges() {
+    var v = story()
+    var boxes = find(v, "graphGroupEdges")
+    var stories = find(find(v, "graphCanvas"), "canvasEdges")
+    verify(boxes.strokeWidth > stories.strokeWidth, "a thicker line")
+    verify(boxes.strokeColor.a < 1, "at a lower opacity")
+    verify(find(v, "graphGroupLayer").z < 0, "behind the story nodes")
+  }
+
+  function test_the_milestone_view_draws_no_box_edges() {
+    var v = createTemporaryObject(viewC, tc)
+    v.nodes = nodes
+    v.edges = edges
+    v.groups = storyGroups
+    v.groupEdges = storyGroupEdges
+    wait(100)
+    compare(find(v, "graphGroupLayer").visible, false, "the whole box layer, edges included, is hidden")
+    verify(!find(v, "graphGroupLayer").visible)
+  }
+
+  // ---- The boxes contain their stories, wherever the stories are.
+
+  // Where the canvas is actually drawing a node: the same working positions the
+  // boxes follow. Moving one is what a drag does, frame by frame.
+  function dragNode(v, id, x, y) {
+    find(v, "graphCanvas")._moveNode(id, { x: x, y: y })
+    wait(50)
+  }
+
+  function contains(b, node, at) {
+    var x = at ? at.x : node.x
+    var y = at ? at.y : node.y
+    return b.x <= x && x + node.w <= b.x + b.width && b.y <= y && y + node.h <= b.y + b.height
+  }
+
+  function test_a_box_follows_the_story_that_is_dragged_out_of_it() {
+    var v = story()
+    dragNode(v, "s1", 900, 420)
+    var one = box(v, "m1")
+    verify(contains(one, storyNodes[0], { x: 900, y: 420 }), "s1 is still inside its own box")
+    compare(one.x, 900 - 16, "m1 holds only s1, so its box went with it")
+    compare(one.width, boxOne.w)
+    compare(box(v, "m2").x, boxTwo.x, "another milestone's box does not adopt it")
+    compare(box(v, "m2").width, boxTwo.w)
+  }
+
+  function test_the_box_edges_follow_the_boxes() {
+    var v = story()
+    dragNode(v, "s1", -400, 40)
+    var one = box(v, "m1")
+    var segment = find(v, "graphGroupEdges").segments[0]
+    compare(segment.fromX, one.x + one.width, "still anchored on the live border")
+  }
+
+  // ---- Moving a whole box.
+
+  function test_moving_a_box_moves_every_story_it_contains() {
+    var v = story()
+    var one = box(v, "m1")
+    var x = one.x
+    var y = one.y
+    v.moveGroup("m1", 60, -25)
+    wait(50)
+    compare(v.livePositions.s1.x, storyNodes[0].x + 60)
+    compare(v.livePositions.s1.y, storyNodes[0].y - 25)
+    compare(v.livePositions.s2.x, storyNodes[1].x, "a story of another milestone stays put")
+    compare(box(v, "m1").x, x + 60)
+    compare(box(v, "m1").y, y - 25)
+    compare(box(v, "m2").x, boxTwo.x)
+  }
+
+  function test_a_box_has_a_drag_handle_on_its_label_strip() {
+    var v = story()
+    var handle = find(v, "graphGroupHandlem1")
+    verify(handle, "the header strip drags the box")
+    verify(handle.height > 0 && handle.height <= 40, "and only the header strip")
+  }
+
+  function test_dragging_the_label_strip_moves_the_whole_box() {
+    var v = story()
+    var handle = find(v, "graphGroupHandlem1")
+    var at = handle.mapToItem(v, 10, handle.height / 2)
+    var before = v.livePositions.s1.x
+    mousePress(v, at.x, at.y)
+    mouseMove(v, at.x + 40, at.y)
+    mouseMove(v, at.x + 90, at.y)
+    mouseRelease(v, at.x + 90, at.y)
+    wait(50)
+    verify(v.livePositions.s1.x > before, "the story went with the box it is in")
+    compare(v.livePositions.s2.x, storyNodes[1].x, "another milestone's story stays put")
+  }
+
+  function test_a_moved_box_survives_a_live_refresh_no_worse_than_a_dragged_node() {
+    var v = story()
+    v.moveGroup("m1", 60, 0)
+    wait(50)
+    compare(v.livePositions.s1.x, storyNodes[0].x + 60)
+    // A board change rebuilds the model: the layout the user arranged goes,
+    // exactly as a dragged node's position does in the milestone view.
+    v.nodes = storyNodes.map(function(n) { return Object.assign({}, n) })
+    wait(50)
+    compare(v.livePositions.s1.x, storyNodes[0].x)
+  }
+
+  // ---- Organize.
+
+  function test_organize_lays_the_stories_out_inside_their_own_boxes() {
+    var v = story()
+    dragNode(v, "s1", 900, 420)
+    find(v, "organizeButton").clicked()
+    wait(100)
+    verify(contains(box(v, "m1"), storyNodes[0], v.livePositions.s1), "s1 is back inside its box")
+    verify(contains(box(v, "m2"), storyNodes[1], v.livePositions.s2))
+    var one = box(v, "m1")
+    var two = box(v, "m2")
+    verify(one.x + one.width <= two.x || two.x + two.width <= one.x
+           || one.y + one.height <= two.y || two.y + two.height <= one.y, "the boxes do not overlap")
+  }
+
+  function test_organize_still_lays_out_the_milestone_view() {
+    var v = createTemporaryObject(viewC, tc)
+    v.nodes = nodes.map(function(n) { return Object.assign({}, n, { x: 0, y: 0 }) })
+    v.edges = edges
+    wait(100)
+    find(v, "organizeButton").clicked()
+    wait(100)
+    verify(v.livePositions.m2.x > v.livePositions.m1.x, "the blocked milestone moved to the right")
   }
 
   function test_a_story_node_shows_its_title_and_a_pip_per_subtask() {
@@ -124,10 +277,10 @@ TestCase {
     var v = story()
     var box = find(v, "graphGroupm1")
     verify(box, "a box per milestone")
-    compare(box.x, 0)
-    compare(box.y, 0)
-    compare(box.width, 270)
-    compare(box.height, 140)
+    compare(box.x, boxOne.x)
+    compare(box.y, boxOne.y)
+    compare(box.width, boxOne.w)
+    compare(box.height, boxOne.h)
     compare(find(v, "graphGroupLabelm1").text, "Milestone one")
     compare(find(v, "graphGroupLabelm2").text, "Milestone two")
     verify(find(v, "graphGroupLayer").z < 0, "the boxes sit behind the nodes")

@@ -31,7 +31,8 @@ manifest entry point.
   map, for each node's open-issue count): the milestone graph and the story
   graph (`graph.js`'s `graphModel` / `storyGraphModel`). `graphView`
   ("milestone", the default, or "story") picks which one `currentNodes` /
-  `currentEdges` / `currentGroups` -- and so the canvas, the arrow keys and
+  `currentEdges` / `currentGroups` / `currentGroupEdges` (the story view's
+  box-to-box dependency) -- and so the canvas, the arrow keys and
   Enter -- work on; `setGraphView` refuses anything else, so one of the two
   chips is always active, and keeps the selection on a node of the new view.
   Nothing resets it, so the choice is remembered for the session and survives a
@@ -161,8 +162,30 @@ would load its own type instead of ours.
   mirroring its camera (`panX`/`panY`/`zoom`): the canvas draws nodes and edges
   only, and the boxes must paint behind them. The canvas's own `fitAll()` frames
   the NODES, so `GraphView.fitAll()` unions the boxes in and hands the result to
-  the canvas's public `fitBounds(rect)`. The boxes are static: they do not follow
-  a node drag, so a dragged story can end up outside its own box until the view
-  is fitted again.
+  the canvas's public `fitBounds(rect)`.
+- A box is never a rect from the model: `graph.js`'s `storyGroupRects` derives it
+  from its own stories' CURRENT positions, so a story is always inside its box
+  and a story dragged over another milestone's box is never adopted by it
+  (membership is `milestoneId`, never geometry). Boxes may therefore overlap
+  after a drag; **Organize** puts them back. To follow a drag frame by frame,
+  `GraphView` READS the canvas's working positions (`canvas._positions`, via
+  `Positions.key`) -- the one place this plugin reaches into the vendored
+  canvas's bookkeeping, read-only. What the user arranged (a dropped story, a
+  moved box) lives in `GraphView.arranged` and is handed back to the canvas as
+  the nodes' own coordinates (`Graph.placedNodes`), which the canvas treats as
+  pinned; a new `nodes` array (a board change) clears it, so a refresh resets an
+  arranged story graph exactly as it resets a dragged node in the milestone view.
+- The box-to-box edges reuse the vendored `CanvasEdges` unchanged, declared
+  inside that box layer before the boxes: same curve, same anchors (a box's right
+  border to the next box's left), thicker and at a lower opacity than a story
+  edge, and with `hitWidth: 0` so a box edge never swallows a click or a pan.
+  The one derivation behind them, `storyGraphModel`'s `groupEdges`, is also what
+  ranks the boxes in the layout.
+- The vendored `CanvasControls` are pointed at a small `QtObject` in `GraphView`
+  rather than at the canvas: **Organize** and **Fit** are the view's (a story
+  graph organizes per box, and framing has to take the boxes in), zoom and
+  culling stay the canvas's own.
+- A box is dragged by its label strip only. The rest of a box is either a story,
+  which drags itself, or empty space, where a drag has to stay the canvas's pan.
 - `BoardCard` (BoardScreen) and Sidebar's project button, `NavRow`, `ProjectItem` use `CursorSurface` directly (and `bordered: true` for the two bordered ones).
 - `TextAreaBox` sets `font.family` itself: it is a `Controls.TextArea`, not a `Text`, so it cannot be a `ThemedText`.
