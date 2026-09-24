@@ -130,4 +130,11 @@ TestCase {
     p.moveGraph("right")
     compare(p.graphCursor, "m1")
   }
+
+  function test_the_popup_is_at_least_eighty_percent_of_the_screen_tall() {
+    var p = make(); if (!p) return
+    var panel = named(p, "mainPanel")
+    verify(panel, "mainPanel")
+    verify(panel.contentHeight >= 0.8 * panel.screenH, "height " + panel.contentHeight)
+  }
 }

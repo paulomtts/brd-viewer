@@ -713,6 +713,7 @@ Panel {
 
   KeyboardPanel {
     id: panel
+    objectName: "mainPanel"
     anchorItem: button
     owner: root
     bar: root.bar
@@ -722,7 +723,11 @@ Panel {
     // the sidebar.
     centerOnBar: true
     contentWidth: panel.fittedContentWidth(Style.space(840))
-    contentHeight: panel.fittedContentHeight(Math.max(column.implicitHeight, sidebar.implicitHeight), Style.space(620))
+    // At least 80% of the screen tall, whatever the section holds, so the
+    // popup does not jump in size between sections; long content still scrolls.
+    readonly property real minContentHeight: 0.8 * panel.screenH - panel.verticalContentInset
+    contentHeight: panel.fittedContentHeight(Math.max(column.implicitHeight, sidebar.implicitHeight, minContentHeight),
+      Math.max(Style.space(620), 0.8 * panel.screenH))
 
     Item {
       id: globalKeys
