@@ -135,4 +135,28 @@ TestCase {
     compare(sectionSpy.count, 1)
     compare(sectionSpy.signalArguments[0][0], "graph")
   }
+
+  function test_every_navigation_row_carries_its_own_icon_glyph() {
+    var sb = make()
+    var names = ["navIconBoard", "navIconGraph", "navIconDocuments", "navIconMemories"]
+    var glyphs = []
+    var size = -1
+    for (var i = 0; i < names.length; i++) {
+      var icon = find(sb, names[i])
+      verify(icon, names[i])
+      verify(String(icon.text) !== "", names[i] + " draws a glyph")
+      verify(glyphs.indexOf(String(icon.text)) < 0, names[i] + " is not a repeat")
+      glyphs.push(String(icon.text))
+      if (size < 0) size = icon.font.pixelSize
+      compare(icon.font.pixelSize, size, names[i] + " is drawn at the shared icon size")
+    }
+  }
+
+  function test_a_row_icon_is_painted_like_its_label() {
+    var sb = make()
+    var icon = find(sb, "navIconBoard")
+    var row = find(sb, "navBoard")
+    compare(icon.color, row.foreground)
+    verify(icon.mapToItem(row, 0, 0).x < find(sb, "navBoard").width / 2, "the icon leads the row")
+  }
 }

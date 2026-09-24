@@ -86,10 +86,16 @@ Item {
       }
     }
 
-    NavRow { objectName: "navBoard"; label: "Board"; section: "board"; enabled: sidebar.hasProject }
-    NavRow { objectName: "navGraph"; label: "Graph"; section: "graph"; enabled: sidebar.hasProject }
-    NavRow { objectName: "navDocuments"; label: "Documents"; section: "documents"; enabled: sidebar.hasProject && sidebar.documentsEnabled }
-    NavRow { objectName: "navMemories"; label: "Memories"; section: "memories"; enabled: sidebar.hasProject }
+    // The glyphs are drawn in the theme's font like every other icon in the
+    // shell (see qs.Ui Button's `iconText`), so they must exist in the Nerd
+    // Font that font resolves to -- tests/architecture/test_icon_glyphs.py
+    // checks every glyph literal in ui/ and vendor/ against the installed
+    // fonts. Memories is the Material Design brain (U+F09D1), written as its
+    // surrogate pair because it lives outside the BMP.
+    NavRow { objectName: "navBoard"; label: "Board"; iconText: "\uf0db"; section: "board"; enabled: sidebar.hasProject }
+    NavRow { objectName: "navGraph"; label: "Graph"; iconText: "\uf0e8"; section: "graph"; enabled: sidebar.hasProject }
+    NavRow { objectName: "navDocuments"; label: "Documents"; iconText: "\uf15c"; section: "documents"; enabled: sidebar.hasProject && sidebar.documentsEnabled }
+    NavRow { objectName: "navMemories"; label: "Memories"; iconText: "\udb82\uddd1"; section: "memories"; enabled: sidebar.hasProject }
 
     Item { Layout.fillHeight: true }
 
@@ -190,22 +196,39 @@ Item {
     id: navRow
     property string label: ""
     property string section: ""
+    property string iconText: ""
 
     Layout.fillWidth: true
-    implicitHeight: navLabel.implicitHeight + Style.spacing.rowPaddingX * 2
+    implicitHeight: navRowContent.implicitHeight + Style.spacing.rowPaddingX * 2
     current: sidebar.section === section
     hasCursor: navArea.containsMouse && enabled
     opacity: enabled ? 1 : 0.4
     foreground: sidebar.theme.foreground
 
-    UI.ThemedText {
-      id: navLabel
-      theme: sidebar.theme
+    Row {
+      id: navRowContent
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       anchors.leftMargin: Style.space(10)
-      text: navRow.label
-      font.bold: navRow.current
+      spacing: Style.space(8)
+
+      UI.ThemedText {
+        // navIconBoard, navIconGraph, ... -- one glyph per section.
+        objectName: "navIcon" + navRow.section.charAt(0).toUpperCase() + navRow.section.slice(1)
+        theme: sidebar.theme
+        anchors.verticalCenter: navLabel.verticalCenter
+        width: Style.font.iconSmall
+        horizontalAlignment: Text.AlignHCenter
+        text: navRow.iconText
+        font.pixelSize: Style.font.iconSmall
+      }
+
+      UI.ThemedText {
+        id: navLabel
+        theme: sidebar.theme
+        text: navRow.label
+        font.bold: navRow.current
+      }
     }
 
     MouseArea {

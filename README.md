@@ -28,8 +28,8 @@ until it is next saved, and existing snapshots and backups are left in their
   `~/.local/state/omarchy-project-manager/state.json` (`$XDG_STATE_HOME` is respected). If
   that project is no longer registered, the first one is shown.
 - **Sections** - **Board** (**Ctrl+1**), **Graph** (**Ctrl+2**), **Documents** (**Ctrl+3**) and **Memories** (**Ctrl+4**), also
-  reachable from the sidebar with the mouse. The digits follow the order the
-  sidebar lists the sections in.
+  reachable from the sidebar with the mouse, where each one carries its own
+  icon. The digits follow the order the sidebar lists the sections in.
 - **Board** - top-level cards in three status sections (Todo / In Progress /
   Done), each showing a done/total progress badge for its subtasks. A card
   reporting as blocked (derived status) appears in Todo, flagged in orange.

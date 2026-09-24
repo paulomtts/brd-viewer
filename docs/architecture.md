@@ -45,6 +45,10 @@ Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `tre
 `ListStatus` (loading/error/empty), `FilterableList`, `TextAreaBox`,
 `TagPicker`, `NewMemoryDialog`, `Sidebar`, and the views
 `DocumentsView`, `MemoriesView`, `MemoryNoteView`, `GraphView`.
+`Sidebar`'s four nav rows (Board, Graph, Documents, Memories) each lead with an
+icon glyph drawn in the theme's font; `tests/architecture/test_icon_glyphs.py`
+checks every glyph literal in `ui/` and `vendor/` against the installed Nerd
+Fonts, because a glyph the font does not have renders as an empty box.
 `ui/screens/DocumentsToolbar.qml` is the Documents half of the panel's fixed
 toolbar - the category chips of the list, and the path and type picker of an
 open document - so only the document body scrolls.
