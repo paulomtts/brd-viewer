@@ -100,3 +100,15 @@ function detailLinks(card, cardMap) {
   })
   return links
 }
+
+// A card's ancestors, outermost first, as ids: the trail the breadcrumbs walk.
+// Cards carry the `parentId` indexTree() injected; a broken chain simply stops.
+function ancestorIds(id, cardMap) {
+  var out = []
+  var card = cardMap[id]
+  while (card && card.parentId && cardMap[card.parentId] && out.indexOf(card.parentId) < 0) {
+    out.unshift(card.parentId)
+    card = cardMap[card.parentId]
+  }
+  return out
+}

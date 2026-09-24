@@ -174,4 +174,15 @@ TestCase {
     compare(Board.detailLinks(card, map).length, 0)
     compare(Board.detailLinks(undefined, {}).length, 0)
   }
+
+  function test_ancestor_ids_walk_from_the_outermost_card_down() {
+    var leaf = makeCard("t1", "todo")
+    var mid = makeCard("s1", "todo", [leaf])
+    var root = makeCard("m1", "todo", [mid])
+    var map = Board.indexTree([root]).cardMap
+    compare(Board.ancestorIds("t1", map).join(","), "m1,s1")
+    compare(Board.ancestorIds("s1", map).join(","), "m1")
+    compare(Board.ancestorIds("m1", map).length, 0)
+    compare(Board.ancestorIds("nope", map).length, 0)
+  }
 }

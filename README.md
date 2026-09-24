@@ -81,6 +81,12 @@ until it is next saved, and existing snapshots and backups are left in their
   and re-fetches automatically when it changes on disk (e.g. an agent
   updates the board while the panel is open), plus a manual refresh
   button.
+- **Breadcrumbs** - the toolbar always leads with the trail to where you are:
+  `Board`, or `Board › Milestone › Story › Subtask` inside a card (`Graph ›` …
+  when the card was opened from the graph), `Documents › <title>` and
+  `Memories › <note>`. Click the section crumb to go back the way the old
+  "Back" did, or an ancestor crumb to open that card; the last crumb is where
+  you are.
 - **Keyboard navigation** - Up/Down moves the highlight (the panel scrolls to
   keep it visible) through Board cards or documents and, inside a card, its
   parent/blocked-by/children links; Enter or Right-at-end opens the

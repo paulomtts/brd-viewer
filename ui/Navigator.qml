@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/domain/board.js" as Board
 
 // The ui-side navigation controller: where the panel is, what the cursor is on,
 // and the return-stack bookkeeping around an open card, document or memory note.
@@ -25,6 +26,53 @@ QtObject {
 
   function resetSearch() {
     navi.app.nav.resetSearch()
+  }
+
+  // ---- Breadcrumbs: where the panel is, as [{ label, clickable, id? }],
+  // outermost first. The last crumb is the current location; the first one is
+  // the section, and clicking it is what "‹ Back" used to be.
+  readonly property var crumbs: navi.buildCrumbs()
+
+  function buildCrumbs() {
+    if (!navi.app) return []
+    if (!navi.app.projects.selectedProject) return [{ label: "Project Manager", clickable: false }]
+    var mode = navi.app.nav.viewMode
+    var section = { label: navi.app.nav.sectionTitle, clickable: mode === "entry" || mode === "document" || mode === "memory" }
+    if (mode === "document")
+      return [section, { label: navi.documentTitle(navi.app.docs.selectedDocPath), clickable: false }]
+    if (mode === "memory") {
+      var entry = navi.app.memories.selectedMemoryEntry
+      return [section, { label: entry && entry.name ? entry.name : navi.app.memories.selectedMemory, clickable: false }]
+    }
+    if (mode === "entry") {
+      var trail = [section]
+      var ids = Board.ancestorIds(navi.app.board.selectedCardId, navi.app.board.cardMap)
+      for (var i = 0; i < ids.length; i++)
+        trail.push({ label: navi.app.board.cardMap[ids[i]].title, clickable: true, id: ids[i] })
+      var card = navi.app.board.cardMap[navi.app.board.selectedCardId]
+      trail.push({ label: card ? card.title : navi.app.board.selectedCardId, clickable: false })
+      return trail
+    }
+    return [section]
+  }
+
+  // The listing's title for an open document, or its file name when it has none.
+  function documentTitle(path) {
+    var docs = navi.app.docs.docs
+    for (var i = 0; i < docs.length; i++)
+      if (docs[i].path === path && docs[i].title) return docs[i].title
+    return String(path || "").split("/").pop()
+  }
+
+  // A click on a crumb: the section goes back the way "‹ Back" did, an ancestor
+  // opens that card, and the current location does nothing.
+  function activateCrumb(index) {
+    var trail = navi.crumbs
+    if (index < 0 || index >= trail.length) return
+    var crumb = trail[index]
+    if (!crumb.clickable) return
+    if (index === 0) { navi.goBack(); return }
+    if (crumb.id) navi.openCard(crumb.id)
   }
 
   function moveGraph(direction) {

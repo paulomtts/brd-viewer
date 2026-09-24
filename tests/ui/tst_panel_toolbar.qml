@@ -180,4 +180,48 @@ TestCase {
     compare(H.find(p, "docChips").visible, false)
     compare(H.find(p, "tagPicker").visible, false)
   }
+
+  // ---- the breadcrumb trail
+
+  function texts(item, out) {
+    out = out || []
+    if (item.visible === false) return out
+    if (item.text !== undefined && String(item.text) !== "") out.push(String(item.text))
+    var kids = item.children || []
+    for (var i = 0; i < kids.length; i++) texts(kids[i], out)
+    return out
+  }
+
+  function test_the_toolbar_leads_with_the_breadcrumb_trail() {
+    var p = inDocuments(); if (!p) return
+    var heading = H.find(p, "projectHeading")
+    verify(heading, "the current crumb still carries the heading object name")
+    compare(String(heading.text), "Documents")
+    verify(isUnder(heading, "panelToolbar"), "the trail is in the fixed toolbar")
+    var crumb = H.find(p, "crumb0")
+    verify(crumb, "the first crumb")
+    verify(crumb.mapToItem(p, 0, 0).x < H.find(p, "refreshButton").mapToItem(p, 0, 0).x,
+      "the trail leads the toolbar row")
+  }
+
+  function test_an_open_document_shows_a_two_crumb_trail_and_no_back_label() {
+    var p = inDocuments(); if (!p) return
+    p.app.nav.cursorIndex = 1
+    p.navigator.activateCursor()
+    wait(50)
+    compare(String(H.find(p, "crumbText0").text), "Documents")
+    compare(String(H.find(p, "projectHeading").text), "Spec")
+    verify(texts(p).indexOf("\u2039 Back") < 0, "the Back label is gone")
+  }
+
+  function test_clicking_the_section_crumb_goes_back_to_the_list() {
+    var p = inDocuments(); if (!p) return
+    p.app.nav.cursorIndex = 1
+    p.navigator.activateCursor()
+    wait(50)
+    compare(p.app.nav.viewMode, "document")
+    var crumb = H.find(p, "crumbText0")
+    mouseClick(crumb, crumb.width / 2, crumb.height / 2)
+    compare(p.app.nav.viewMode, "documents")
+  }
 }

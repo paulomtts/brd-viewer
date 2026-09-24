@@ -40,6 +40,9 @@ Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `tre
 ## Shared components (`ui/components`) - reuse before writing a second copy
 
 `ThemedText` (text), `ActionButton` (bordered button), `Badge` (pill),
+`Breadcrumbs` (the toolbar's location trail; `Navigator.crumbs` builds the list
+and `Navigator.activateCrumb(index)` acts on a click, so the component stays
+presentational),
 `Chip` and `ChipRow` (filter chips), `ModalCard` (dimmed backdrop and card),
 `TypedConfirmDialog`, `ListRow` (hover / keyboard cursor / reveal),
 `ListStatus` (loading/error/empty), `FilterableList`, `TextAreaBox`,

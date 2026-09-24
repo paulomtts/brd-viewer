@@ -269,21 +269,13 @@ Panel {
           width: parent.width
           spacing: Style.spacing.md
 
-          UI.ThemedText {
-            theme: panelTheme
-            visible: appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory"
-            text: "‹ Back"
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: navi.goBack() }
-          }
-
-          UI.ThemedText {
-            objectName: "projectHeading"
-            variant: "heading"
-            theme: panelTheme
+          // Where the panel is, and the way out of a detail view: the first
+          // crumb does what "‹ Back" used to, the ones after it open ancestors.
+          UI.Breadcrumbs {
             Layout.fillWidth: true
-            text: appStores.projects.selectedProject ? appStores.nav.sectionTitle : "Project Manager"
-            font.bold: true
-            elide: Text.ElideMiddle
+            theme: panelTheme
+            crumbs: navi.crumbs
+            onCrumbActivated: function(index) { navi.activateCrumb(index) }
           }
 
           // Icon-only refresh, square and as tall as the New button beside it.
