@@ -5,11 +5,11 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
-import "../core/domain/board.js" as Board
 import "../core/domain/documents.js" as Documents
 import "../core/stores" as Core
 import "components"
 import "components" as UI
+import "screens"
 import "theme" as T
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
@@ -372,58 +372,12 @@ Panel {
             wrapMode: Text.WordWrap
           }
 
-          Column {
-            visible: appStores.nav.viewMode === "board" && !!appStores.projects.selectedProject
+          BoardScreen {
             width: parent.width
-            spacing: Style.space(10)
-
-            UI.ThemedText {
-              variant: "dim"
-              theme: panelTheme
-              visible: appStores.board.cardRoots.length === 0 && appStores.projects.loadError === ""
-              width: parent.width
-              text: "This project's board is empty."
-              wrapMode: Text.WordWrap
-            }
-
-            UI.ThemedText {
-              variant: "dim"
-              theme: panelTheme
-              visible: appStores.board.cardRoots.length > 0 && appStores.board.visibleBoardRoots.length === 0
-              width: parent.width
-              text: "No cards match “" + appStores.nav.searchQuery + "”."
-              wrapMode: Text.WordWrap
-            }
-
-            Repeater {
-              model: appStores.board.statuses
-
-              Column {
-                required property string modelData
-                width: parent.width
-                spacing: Style.space(6)
-
-                PanelSectionHeader {
-                  text: appStores.board.statusLabel(modelData) + " (" + appStores.board.boardColumn(modelData).length + ")"
-                  foreground: Board.statusColor(modelData, root.foreground)
-                  fontFamily: root.fontFamily
-                }
-
-                Repeater {
-                  model: appStores.board.boardColumn(modelData)
-
-                  BoardCard {
-                    required property var modelData
-                    width: parent.width
-                    cardIndex: appStores.board.boardIndexOf(modelData.id)
-                    title: modelData.title
-                    status: modelData.status
-                    progress: Board.subtreeCounts(modelData)
-                    onActivated: navi.openCard(modelData.id)
-                  }
-                }
-              }
-            }
+            app: appStores
+            navigator: navi
+            theme: panelTheme
+            onRevealRequested: function(item) { root.scrollItemIntoView(item) }
           }
 
           GraphView {
@@ -538,95 +492,12 @@ Panel {
             }
           }
 
-          Column {
-            id: detailCard
-            visible: appStores.nav.viewMode === "entry" && !!appStores.board.cardMap[appStores.board.selectedCardId]
+          CardDetailScreen {
             width: parent.width
-            spacing: Style.space(10)
-
-            readonly property var card: appStores.board.cardMap[appStores.board.selectedCardId]
-
-            DetailLink {
-              visible: !!(detailCard.card && detailCard.card.parentId)
-              width: parent.width
-              prefix: "↑ "
-              resolved: detailCard.card && detailCard.card.parentId
-                ? appStores.board.resolvedCard(detailCard.card.parentId) : ({ title: "", status: "", inBoard: false })
-              rowIndex: detailCard.card && detailCard.card.parentId ? appStores.board.linkIndex("parent", detailCard.card.parentId) : -1
-              onActivated: if (resolved.inBoard) navi.openCard(detailCard.card.parentId)
-            }
-
-            UI.ThemedText {
-              variant: "heading"
-              theme: panelTheme
-              width: parent.width
-              text: detailCard.card ? detailCard.card.title : ""
-              font.bold: true
-              wrapMode: Text.WordWrap
-            }
-
-            Row {
-              spacing: Style.space(6)
-
-              Badge {
-                text: detailCard.card ? Board.kindLabel(detailCard.card.depth) : ""
-                tone: root.foreground
-              }
-
-              Badge {
-                text: detailCard.card ? appStores.board.statusText(detailCard.card.status) : ""
-                tone: detailCard.card ? Board.statusColor(detailCard.card.status, root.dim) : root.dim
-              }
-            }
-
-            PanelSeparator { foreground: root.foreground }
-
-            UI.ThemedText {
-              variant: "small"
-              theme: panelTheme
-              width: parent.width
-              text: (detailCard.card && detailCard.card.description) ? detailCard.card.description : "No description."
-              wrapMode: Text.WordWrap
-              textFormat: Text.MarkdownText
-            }
-
-            PanelSectionHeader {
-              visible: !!(detailCard.card && detailCard.card.blocked_by && detailCard.card.blocked_by.length > 0)
-              text: "BLOCKED BY"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Repeater {
-              model: (detailCard.card && detailCard.card.blocked_by) ? detailCard.card.blocked_by : []
-
-              DetailLink {
-                required property string modelData
-                width: parent.width
-                resolved: appStores.board.resolvedCard(modelData)
-                rowIndex: appStores.board.linkIndex("blocker", modelData)
-                onActivated: if (resolved.inBoard) navi.openCard(modelData)
-              }
-            }
-
-            PanelSectionHeader {
-              visible: !!(detailCard.card && detailCard.card.children && detailCard.card.children.length > 0)
-              text: "CHILDREN"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Repeater {
-              model: (detailCard.card && detailCard.card.children) ? detailCard.card.children : []
-
-              DetailLink {
-                required property var modelData
-                width: parent.width
-                resolved: appStores.board.resolvedCard(modelData.id)
-                rowIndex: appStores.board.linkIndex("child", modelData.id)
-                onActivated: navi.openCard(modelData.id)
-              }
-            }
+            app: appStores
+            navigator: navi
+            theme: panelTheme
+            onRevealRequested: function(item) { root.scrollItemIntoView(item) }
           }
         }
       }
@@ -677,133 +548,6 @@ Panel {
         onCreateRequested: function(name, type, description, body) { appStores.memories.createMemory(name, type, description, body) }
         onCancelRequested: appStores.memories.cancelNewMemory()
       }
-    }
-  }
-
-  component Badge: Rectangle {
-    id: badge
-    property string text: ""
-    property color tone: root.foreground
-
-    visible: text !== ""
-    width: implicitWidth
-    height: implicitHeight
-    implicitWidth: badgeLabel.implicitWidth + Style.space(14)
-    implicitHeight: badgeLabel.implicitHeight + Style.space(4)
-    radius: height / 2
-    color: Qt.rgba(tone.r, tone.g, tone.b, 0.16)
-    border.color: tone
-    border.width: 1
-
-    UI.ThemedText {
-      id: badgeLabel
-      variant: "caption"
-      theme: panelTheme
-      anchors.centerIn: parent
-      text: badge.text
-      color: badge.tone
-      font.bold: true
-    }
-  }
-
-  component DetailLink: UI.ListRow {
-    id: detailLink
-    property var resolved: ({ title: "", status: "", inBoard: true })
-    property alias rowIndex: detailLink.index
-    property string prefix: ""
-
-    theme: panelTheme
-    cursorIndex: appStores.nav.cursorIndex
-    scrollOnCursor: appStores.nav.scrollOnCursor
-    contentMargin: Style.space(6)
-    hoverCursorShape: detailLink.resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onHovered: function(index) { navi.hoverCursor(index) }
-    onRevealRequested: function(item) { root.scrollItemIntoView(item) }
-
-    RowLayout {
-      id: detailLinkLayout
-      width: parent.width
-
-      UI.ThemedText {
-        variant: "small"
-        theme: panelTheme
-        Layout.fillWidth: true
-        text: detailLink.prefix + detailLink.resolved.title + (detailLink.resolved.inBoard ? "" : " (not in this board)")
-        color: detailLink.resolved.inBoard ? root.foreground : root.dim
-        elide: Text.ElideRight
-      }
-
-      UI.ThemedText {
-        variant: "caption"
-        theme: panelTheme
-        visible: detailLink.resolved.inBoard
-        text: "[" + detailLink.resolved.status + "]"
-        color: Board.statusColor(detailLink.resolved.status, root.dim)
-      }
-    }
-  }
-
-  component BoardCard: CursorSurface {
-    id: boardCard
-    property int cardIndex: -1
-    property string title: ""
-    property string status: "todo"
-    property var progress: ({ done: 0, total: 0 })
-    signal activated()
-
-    hasCursor: cardIndex >= 0 && appStores.nav.cursorIndex === cardIndex
-    onHasCursorChanged: if (hasCursor && appStores.nav.scrollOnCursor) root.scrollItemIntoView(boardCard)
-    foreground: root.foreground
-    bordered: true
-    implicitHeight: cardLayout.implicitHeight + Style.space(16)
-
-    Rectangle {
-      anchors.left: parent.left
-      anchors.top: parent.top
-      anchors.bottom: parent.bottom
-      anchors.margins: Style.space(4)
-      width: Style.space(3)
-      radius: width / 2
-      color: Board.statusColor(boardCard.status, root.dim)
-    }
-
-    ColumnLayout {
-      id: cardLayout
-      anchors.fill: parent
-      anchors.margins: Style.space(8)
-      anchors.leftMargin: Style.space(14)
-      spacing: Style.space(4)
-
-      UI.ThemedText {
-        theme: panelTheme
-        Layout.fillWidth: true
-        text: boardCard.title
-        wrapMode: Text.WordWrap
-      }
-
-      UI.ThemedText {
-        variant: "caption"
-        theme: panelTheme
-        visible: boardCard.status === "blocked"
-        text: "Blocked"
-        color: Board.statusColor("blocked", root.dim)
-        font.bold: true
-      }
-
-      UI.ThemedText {
-        variant: "caption"
-        theme: panelTheme
-        visible: boardCard.progress.total > 0
-        text: boardCard.progress.done + "/" + boardCard.progress.total + " done"
-      }
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onEntered: if (boardCard.cardIndex >= 0) navi.hoverCursor(boardCard.cardIndex)
-      onClicked: boardCard.activated()
     }
   }
 }
