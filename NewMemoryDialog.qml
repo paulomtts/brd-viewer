@@ -166,28 +166,20 @@ Item {
       Row {
         spacing: Style.spacing.md
 
-        Button {
+        UI.ActionButton {
           objectName: "newMemoryCancel"
           text: "Cancel"
           enabled: !dialog.busy
-          bordered: true
-          foreground: dialog.foreground
-          fontFamily: dialog.fontFamily
-          fontSize: Style.font.bodySmall
-          verticalPadding: Style.spacing.controlPaddingY
+          opacity: 1
+          theme: dialog.theme
           onClicked: dialog.cancelRequested()
         }
 
-        Button {
+        UI.ActionButton {
           objectName: "newMemoryCreate"
           text: dialog.busy ? "Creating…" : "Create"
           enabled: !dialog.busy && dialog.valid
-          opacity: enabled ? 1 : 0.5
-          bordered: true
-          foreground: dialog.foreground
-          fontFamily: dialog.fontFamily
-          fontSize: Style.font.bodySmall
-          verticalPadding: Style.spacing.controlPaddingY
+          theme: dialog.theme
           onClicked: dialog.submit()
         }
       }

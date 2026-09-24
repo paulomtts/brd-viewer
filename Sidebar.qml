@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
+import "ui/components" as UI
+import "ui/theme" as T
 
 // The panel's left column: a project dropdown, the section list, and a Delete
 // project button. It renders and emits only; Panel.qml owns every piece of
@@ -22,6 +24,14 @@ Item {
   property color dim: Qt.darker(foreground, 1.55)
   property color urgent: Color.urgent
   property string fontFamily: Style.font.family
+  // What the shared components draw with; Panel still passes the colours one
+  // by one, so the theme follows them.
+  property var theme: T.Theme {
+    foreground: sidebar.foreground
+    dim: sidebar.dim
+    urgent: sidebar.urgent
+    fontFamily: sidebar.fontFamily
+  }
 
   signal dropdownToggled()
   signal projectChosen(var project)
@@ -93,17 +103,15 @@ Item {
 
     Item { Layout.fillHeight: true }
 
-    Button {
+    UI.ActionButton {
       objectName: "deleteButton"
       Layout.fillWidth: true
       text: "Delete project…"
       enabled: sidebar.hasProject && sidebar.canDelete
+      // The sidebar dims its disabled button a touch less than the rest.
       opacity: enabled ? 1 : 0.4
-      bordered: true
-      foreground: sidebar.urgent
-      fontFamily: sidebar.fontFamily
-      fontSize: Style.font.bodySmall
-      verticalPadding: Style.spacing.controlPaddingY
+      tone: "danger"
+      theme: sidebar.theme
       onClicked: sidebar.deleteRequested()
     }
   }

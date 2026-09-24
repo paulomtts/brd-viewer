@@ -95,54 +95,39 @@ Column {
     spacing: Style.spacing.md
     visible: view.readError === ""
 
-    Button {
+    UI.ActionButton {
       objectName: "memoryEdit"
       visible: !view.editing
       text: "Edit"
-      bordered: true
-      foreground: view.foreground
-      fontFamily: view.fontFamily
-      fontSize: Style.font.bodySmall
-      verticalPadding: Style.spacing.controlPaddingY
+      theme: view.theme
       onClicked: view.editRequested()
     }
 
-    Button {
+    UI.ActionButton {
       objectName: "memoryDelete"
       visible: !view.editing
       text: "Delete"
-      bordered: true
-      foreground: view.urgent
-      fontFamily: view.fontFamily
-      fontSize: Style.font.bodySmall
-      verticalPadding: Style.spacing.controlPaddingY
+      tone: "danger"
+      theme: view.theme
       onClicked: view.deleteRequested()
     }
 
-    Button {
+    UI.ActionButton {
       objectName: "memorySave"
       visible: view.editing
       text: view.busy ? "Saving…" : "Save"
       enabled: !view.busy && view.dirty
-      opacity: enabled ? 1 : 0.5
-      bordered: true
-      foreground: view.foreground
-      fontFamily: view.fontFamily
-      fontSize: Style.font.bodySmall
-      verticalPadding: Style.spacing.controlPaddingY
+      theme: view.theme
       onClicked: view.saveRequested()
     }
 
-    Button {
+    UI.ActionButton {
       objectName: "memoryCancelEdit"
       visible: view.editing
       text: "Cancel"
       enabled: !view.busy
-      bordered: true
-      foreground: view.foreground
-      fontFamily: view.fontFamily
-      fontSize: Style.font.bodySmall
-      verticalPadding: Style.spacing.controlPaddingY
+      opacity: 1
+      theme: view.theme
       onClicked: view.cancelEditRequested()
     }
   }

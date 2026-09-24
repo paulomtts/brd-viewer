@@ -2,6 +2,8 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "core/domain/projects.js" as Projects
+import "ui/components" as UI
+import "ui/theme" as T
 
 // A modal card over a dimmed backdrop that asks for a typed word before a
 // destructive action. Renders and emits only.
@@ -20,6 +22,14 @@ Item {
   property color urgent: Color.urgent
   property color dim: Qt.darker(foreground, 1.55)
   property string fontFamily: Style.font.family
+  // What the shared components draw with; Panel still passes the colours one
+  // by one, so the theme follows them.
+  property var theme: T.Theme {
+    foreground: dialog.foreground
+    dim: dialog.dim
+    urgent: dialog.urgent
+    fontFamily: dialog.fontFamily
+  }
   readonly property Item focusItem: field
   readonly property bool confirmed: Projects.isDeleteConfirmed(field.text)
 
@@ -105,28 +115,21 @@ Item {
       Row {
         spacing: Style.spacing.md
 
-        Button {
+        UI.ActionButton {
           objectName: "confirmCancel"
           text: "Cancel"
           enabled: !dialog.busy
-          bordered: true
-          foreground: dialog.foreground
-          fontFamily: dialog.fontFamily
-          fontSize: Style.font.bodySmall
-          verticalPadding: Style.spacing.controlPaddingY
+          opacity: 1
+          theme: dialog.theme
           onClicked: dialog.cancelRequested()
         }
 
-        Button {
+        UI.ActionButton {
           objectName: "confirmAccept"
           text: dialog.busy ? "Working…" : dialog.confirmLabel
           enabled: !dialog.busy && dialog.confirmed
-          opacity: enabled ? 1 : 0.5
-          bordered: true
-          foreground: dialog.urgent
-          fontFamily: dialog.fontFamily
-          fontSize: Style.font.bodySmall
-          verticalPadding: Style.spacing.controlPaddingY
+          tone: "danger"
+          theme: dialog.theme
           onClicked: dialog.confirmRequested()
         }
       }
