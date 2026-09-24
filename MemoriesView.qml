@@ -57,20 +57,19 @@ Column {
     onChosen: function(id) { view.typeToggled(id) }
   }
 
-  UI.ThemedText {
+  UI.ListStatus {
     objectName: "memoriesMessage"
-    variant: "dim"
     theme: view.theme
-    visible: text !== ""
     width: parent.width
-    text: view.loading ? "Loading memories…"
-      : view.error !== "" ? view.error
-      : !view.found ? "Claude Code has no memory for this project yet."
-      : view.notes.length === 0 ? (view.query !== "" ? "No memories match “" + view.query + "”."
-        : view.activeType !== "" ? "No " + Memories.memoryTypeLabel(view.activeType) + " memories."
-        : "No memories yet. Use ＋ New to add one.")
-      : ""
-    wrapMode: Text.WordWrap
+    loading: view.loading
+    loadingText: "Loading memories…"
+    error: view.error
+    empty: !view.found || view.notes.length === 0
+    filtered: view.found && (view.query !== "" || view.activeType !== "")
+    filteredText: view.query !== "" ? "No memories match “" + view.query + "”."
+      : "No " + Memories.memoryTypeLabel(view.activeType) + " memories."
+    emptyText: !view.found ? "Claude Code has no memory for this project yet."
+      : "No memories yet. Use ＋ New to add one."
   }
 
   Repeater {
@@ -78,65 +77,49 @@ Column {
     delegate: NoteRow {}
   }
 
-  component NoteRow: CursorSurface {
+  component NoteRow: UI.ListRow {
     id: row
     required property var modelData
-    required property int index
-    objectName: "memoryRow" + index
+    required index
+    objectName: "memoryRow" + row.index
 
     width: view.width
-    implicitHeight: rowColumn.implicitHeight + Style.spacing.rowPaddingX
-    hasCursor: view.cursorIndex === index
-    foreground: view.foreground
-    onHasCursorChanged: if (hasCursor && view.scrollOnCursor) view.revealRequested(row)
+    theme: view.theme
+    cursorIndex: view.cursorIndex
+    scrollOnCursor: view.scrollOnCursor
+    onHovered: function(index) { view.hovered(index) }
+    onActivated: view.noteChosen(row.modelData.file)
+    onRevealRequested: function(item) { view.revealRequested(item) }
 
-    Column {
-      id: rowColumn
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(10)
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(2)
-
-      Row {
-        width: parent.width
-        spacing: Style.space(8)
-
-        UI.ThemedText {
-          objectName: "memoryRowTitle" + row.index
-          theme: view.theme
-          width: Math.max(0, parent.width - badge.width - parent.spacing)
-          text: row.modelData.name
-          elide: Text.ElideRight
-        }
-
-        UI.Badge {
-          id: badge
-          theme: view.theme
-          textObjectName: "memoryRowBadge" + row.index
-          text: Memories.memoryTypeLabel(row.modelData.type)
-          tint: Memories.memoryTypeColor(row.modelData.type, view.dim)
-        }
-      }
+    Row {
+      width: parent.width
+      spacing: Style.space(8)
 
       UI.ThemedText {
-        objectName: "memoryRowDescription" + row.index
-        variant: "caption"
+        objectName: "memoryRowTitle" + row.index
         theme: view.theme
-        visible: text !== ""
-        width: parent.width
-        text: row.modelData.description
+        width: Math.max(0, parent.width - badge.width - parent.spacing)
+        text: row.modelData.name
         elide: Text.ElideRight
+      }
+
+      UI.Badge {
+        id: badge
+        theme: view.theme
+        textObjectName: "memoryRowBadge" + row.index
+        text: Memories.memoryTypeLabel(row.modelData.type)
+        tint: Memories.memoryTypeColor(row.modelData.type, view.dim)
       }
     }
 
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onEntered: view.hovered(row.index)
-      onClicked: view.noteChosen(row.modelData.file)
+    UI.ThemedText {
+      objectName: "memoryRowDescription" + row.index
+      variant: "caption"
+      theme: view.theme
+      visible: text !== ""
+      width: parent.width
+      text: row.modelData.description
+      elide: Text.ElideRight
     }
   }
 }

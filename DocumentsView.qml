@@ -56,19 +56,18 @@ Column {
     onChosen: function(id) { view.categoryToggled(id) }
   }
 
-  UI.ThemedText {
+  UI.ListStatus {
     objectName: "docsMessage"
-    variant: "dim"
     theme: view.theme
-    visible: text !== ""
     width: parent.width
-    text: view.loading ? "Loading documents…"
-      : view.error !== "" ? view.error
-      : view.docs.length === 0 ? (view.query !== "" ? "No documents match “" + view.query + "”."
-        : view.activeCategory !== "" ? "No " + Documents.docCategoryLabel(view.activeCategory) + " documents."
-        : "No Markdown documents found in this project.")
-      : ""
-    wrapMode: Text.WordWrap
+    loading: view.loading
+    loadingText: "Loading documents…"
+    error: view.error
+    empty: view.docs.length === 0
+    filtered: view.query !== "" || view.activeCategory !== ""
+    filteredText: view.query !== "" ? "No documents match “" + view.query + "”."
+      : "No " + Documents.docCategoryLabel(view.activeCategory) + " documents."
+    emptyText: "No Markdown documents found in this project."
   }
 
   Repeater {
@@ -85,63 +84,47 @@ Column {
     text: "Showing the first 500 documents."
   }
 
-  component DocRow: CursorSurface {
+  component DocRow: UI.ListRow {
     id: row
     required property var modelData
-    required property int index
-    objectName: "docRow" + index
+    required index
+    objectName: "docRow" + row.index
 
     width: view.width
-    implicitHeight: rowColumn.implicitHeight + Style.spacing.rowPaddingX
-    hasCursor: view.cursorIndex === index
-    foreground: view.foreground
-    onHasCursorChanged: if (hasCursor && view.scrollOnCursor) view.revealRequested(row)
+    theme: view.theme
+    cursorIndex: view.cursorIndex
+    scrollOnCursor: view.scrollOnCursor
+    onHovered: function(index) { view.hovered(index) }
+    onActivated: view.docChosen(row.modelData.path)
+    onRevealRequested: function(item) { view.revealRequested(item) }
 
-    Column {
-      id: rowColumn
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(10)
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(2)
-
-      Row {
-        width: parent.width
-        spacing: Style.space(8)
-
-        UI.ThemedText {
-          theme: view.theme
-          width: Math.max(0, parent.width - (rowBadge.visible ? rowBadge.width + parent.spacing : 0))
-          text: row.modelData.title
-          elide: Text.ElideRight
-        }
-
-        UI.Badge {
-          id: rowBadge
-          theme: view.theme
-          textObjectName: "docRowBadge" + row.index
-          visible: text !== ""
-          text: Documents.docCategoryLabel(row.modelData.category)
-          tint: Documents.docCategoryColor(row.modelData.category, view.dim)
-        }
-      }
+    Row {
+      width: parent.width
+      spacing: Style.space(8)
 
       UI.ThemedText {
-        variant: "caption"
         theme: view.theme
-        width: parent.width
-        text: row.modelData.path
-        elide: Text.ElideMiddle
+        width: Math.max(0, parent.width - (rowBadge.visible ? rowBadge.width + parent.spacing : 0))
+        text: row.modelData.title
+        elide: Text.ElideRight
+      }
+
+      UI.Badge {
+        id: rowBadge
+        theme: view.theme
+        textObjectName: "docRowBadge" + row.index
+        visible: text !== ""
+        text: Documents.docCategoryLabel(row.modelData.category)
+        tint: Documents.docCategoryColor(row.modelData.category, view.dim)
       }
     }
 
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onEntered: view.hovered(row.index)
-      onClicked: view.docChosen(row.modelData.path)
+    UI.ThemedText {
+      variant: "caption"
+      theme: view.theme
+      width: parent.width
+      text: row.modelData.path
+      elide: Text.ElideMiddle
     }
   }
 }

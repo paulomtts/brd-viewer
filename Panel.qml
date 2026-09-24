@@ -915,25 +915,23 @@ Panel {
     }
   }
 
-  component DetailLink: CursorSurface {
+  component DetailLink: UI.ListRow {
     id: detailLink
     property var resolved: ({ title: "", status: "", inBoard: true })
-    property int rowIndex: -1
+    property alias rowIndex: detailLink.index
     property string prefix: ""
-    signal activated()
 
-    hasCursor: rowIndex >= 0 && appStores.nav.cursorIndex === rowIndex
-    onHasCursorChanged: if (hasCursor && appStores.nav.scrollOnCursor) root.scrollItemIntoView(detailLink)
-    foreground: root.foreground
-    implicitHeight: detailLinkLayout.implicitHeight + Style.spacing.rowPaddingX
+    theme: panelTheme
+    cursorIndex: appStores.nav.cursorIndex
+    scrollOnCursor: appStores.nav.scrollOnCursor
+    contentMargin: Style.space(6)
+    hoverCursorShape: detailLink.resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
+    onHovered: function(index) { root.hoverCursor(index) }
+    onRevealRequested: function(item) { root.scrollItemIntoView(item) }
 
     RowLayout {
       id: detailLinkLayout
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
+      width: parent.width
 
       UI.ThemedText {
         variant: "small"
@@ -951,14 +949,6 @@ Panel {
         text: "[" + detailLink.resolved.status + "]"
         color: Board.statusColor(detailLink.resolved.status, root.dim)
       }
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: detailLink.resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
-      onEntered: if (detailLink.rowIndex >= 0) root.hoverCursor(detailLink.rowIndex)
-      onClicked: detailLink.activated()
     }
   }
 
