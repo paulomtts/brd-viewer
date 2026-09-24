@@ -167,6 +167,74 @@ TestCase {
     compare(status.text, "No documents found in this project.")
   }
 
+  function test_the_list_says_it_is_loading_or_why_it_could_not_instead_of_being_empty() {
+    var d = make("spec")
+    d.specs = []
+    var status = H.find(d, "specsMessage")
+    compare(status.text, "No documents found in this project.")
+    d.docsLoading = true
+    compare(status.text, "Loading documents…")
+    verify(!H.find(d, "specRow0"), "nothing is listed while it loads")
+    d.docsLoading = false
+    d.docsError = "list-docs.py failed."
+    compare(status.text, "list-docs.py failed.")
+  }
+
+  function test_an_error_hides_the_rows_it_could_not_trust() {
+    var d = make("spec")
+    verify(H.find(d, "specRow0"), "the rows are there")
+    d.docsError = "list-docs.py failed."
+    verify(!H.find(d, "specRow0"), "and gone once the listing failed")
+  }
+
+  function test_the_arrows_in_the_search_move_the_selection_through_the_visible_rows() {
+    var d = make("spec")
+    var search = H.find(d, "newMilestoneSearch")
+    search.forceActiveFocus()
+    keyClick(Qt.Key_Down)
+    compare(specs.count, 1)
+    compare(specs.signalArguments[0][0], "docs/specs/new-milestone.md")
+    d.selectedSpec = "docs/specs/new-milestone.md"
+    keyClick(Qt.Key_Down)
+    compare(specs.signalArguments[1][0], "docs/architecture.md")
+    d.selectedSpec = "docs/architecture.md"
+    keyClick(Qt.Key_Up)
+    compare(specs.signalArguments[2][0], "docs/specs/new-milestone.md")
+  }
+
+  function test_the_arrows_stop_at_the_ends_and_only_walk_what_the_search_left() {
+    var d = make("spec")
+    var search = H.find(d, "newMilestoneSearch")
+    search.text = "architecture"
+    search.forceActiveFocus()
+    keyClick(Qt.Key_Up)
+    compare(specs.signalArguments[0][0], "docs/architecture.md")
+    d.selectedSpec = "docs/architecture.md"
+    keyClick(Qt.Key_Down)
+    compare(specs.signalArguments[1][0], "docs/architecture.md")
+    search.text = "zzz"
+    var before = specs.count
+    keyClick(Qt.Key_Down)
+    compare(specs.count, before)
+  }
+
+  function test_return_in_the_search_submits_only_when_the_run_is_valid() {
+    var d = make("spec")
+    H.find(d, "newMilestoneSearch").forceActiveFocus()
+    keyClick(Qt.Key_Return)
+    compare(submits.count, 0)
+    d.selectedSpec = "docs/architecture.md"
+    keyClick(Qt.Key_Return)
+    compare(submits.count, 1)
+  }
+
+  function test_the_focused_field_follows_the_mode() {
+    var d = make("manual")
+    compare(d.focusItem, H.find(d, "newMilestoneTitle"))
+    d.mode = "spec"
+    compare(d.focusItem, H.find(d, "newMilestoneSearch"))
+  }
+
   function test_the_agent_line_names_the_agent_and_its_note() {
     var d = make("spec")
     d.agentName = "claude"
@@ -187,6 +255,39 @@ TestCase {
     compare(message.text, "gemini has no supported unattended mode.")
     compare(message.color, d.theme.urgent)
     compare(H.find(d, "newMilestoneAgent").visible, false)
+  }
+
+  function test_an_agent_error_shows_in_the_message_line_and_disables_ok() {
+    var d = make("spec")
+    d.selectedSpec = "docs/architecture.md"
+    compare(H.find(d, "newMilestoneOk").enabled, true)
+    d.agentMessage = "omarchy-default-agent failed: exit 2"
+    compare(H.find(d, "newMilestoneAgentMessage").visible, true)
+    compare(H.find(d, "newMilestoneAgentMessage").text, "omarchy-default-agent failed: exit 2")
+    compare(H.find(d, "newMilestoneOk").enabled, false)
+  }
+
+  function test_while_the_agent_is_being_checked_ok_waits_and_the_dialog_says_so() {
+    var d = make("spec")
+    var checking = H.find(d, "newMilestoneAgentChecking")
+    compare(checking.visible, false)
+    d.selectedSpec = "docs/architecture.md"
+    compare(H.find(d, "newMilestoneOk").enabled, true)
+    d.agentChecking = true
+    compare(checking.visible, true)
+    compare(checking.text, "Checking the default agent…")
+    compare(H.find(d, "newMilestoneOk").enabled, false)
+    compare(H.find(d, "newMilestoneAgent").visible, false)
+    d.agentChecking = false
+    compare(H.find(d, "newMilestoneOk").enabled, true)
+  }
+
+  function test_the_agent_check_says_nothing_in_manual_mode() {
+    var d = make("manual")
+    d.agentChecking = true
+    compare(H.find(d, "newMilestoneAgentChecking").visible, false)
+    H.find(d, "newMilestoneTitle").text = "Ship the panel"
+    compare(H.find(d, "newMilestoneOk").enabled, true)
   }
 
   // ---- errors, cancelling, busy ----------------------------------------
@@ -247,6 +348,9 @@ TestCase {
     click(H.find(d, "milestoneModemanual"))
     compare(modes.count, 0)
     compare(H.find(d, "newMilestoneSearch").enabled, false)
+    compare(H.find(d, "specRow0").enabled, false)
+    click(H.find(d, "specRow0"))
+    compare(specs.count, 0)
   }
 
   // ---- what a mode switch and a reopen keep -----------------------------

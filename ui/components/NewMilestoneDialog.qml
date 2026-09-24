@@ -34,6 +34,13 @@ Item {
   property string agentMessage: ""
   property string agentName: ""
   property string agentNote: ""
+  // True while the default agent is still being looked up: nothing is known
+  // yet, so OK waits rather than starting a run that may be refused.
+  property bool agentChecking: false
+  // The documents listing's own state, so an empty list while it is still
+  // being fetched never reads as "this project has no documents".
+  property bool docsLoading: false
+  property string docsError: ""
   // The one input for every colour and font: Panel passes its Theme down,
   // and a standalone instance renders with the shell defaults.
   property var theme: T.Theme {}
@@ -48,7 +55,7 @@ Item {
     return -1
   }
   readonly property bool valid: dialog.mode === "spec"
-    ? (dialog.selectedSpec !== "" && dialog.agentMessage === "")
+    ? (dialog.selectedSpec !== "" && dialog.agentMessage === "" && !dialog.agentChecking)
     : titleField.text.trim() !== ""
 
   signal modeChosen(string mode)
@@ -74,6 +81,18 @@ Item {
   function submit() {
     if (!dialog.valid || dialog.busy) return
     dialog.submitRequested()
+  }
+
+  // The keyboard's way through the spec list: the neighbour of whatever is
+  // selected, clamped at both ends, over the rows the search actually left.
+  function moveSelection(step) {
+    if (dialog.busy) return
+    var list = dialog.visibleSpecs
+    if (list.length === 0) return
+    var at = dialog.selectedIndex
+    var next = at < 0 ? (step > 0 ? 0 : list.length - 1)
+      : Math.max(0, Math.min(list.length - 1, at + step))
+    dialog.specChosen(list[next].path)
   }
 
   UI.ModalCard {
@@ -157,8 +176,13 @@ Item {
         foreground: dialog.theme.foreground
         placeholderText: "Search documents…"
         enabled: !dialog.busy
+        // The search field is where the keyboard lives in spec mode, so it
+        // also walks the list and starts the run.
         Keys.onPressed: function(event) {
           if (event.key === Qt.Key_Escape) { dialog.cancel(); event.accepted = true }
+          else if (event.key === Qt.Key_Down) { dialog.moveSelection(1); event.accepted = true }
+          else if (event.key === Qt.Key_Up) { dialog.moveSelection(-1); event.accepted = true }
+          else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { dialog.submit(); event.accepted = true }
         }
       }
 
@@ -177,6 +201,9 @@ Item {
           width: specList.width
           theme: dialog.theme
           statusObjectName: "specsMessage"
+          loading: dialog.docsLoading
+          loadingText: "Loading documents…"
+          error: dialog.docsError
           empty: dialog.visibleSpecs.length === 0
           filtered: searchField.text !== ""
           emptyText: "No documents found in this project."
@@ -187,10 +214,19 @@ Item {
       }
 
       UI.ThemedText {
+        objectName: "newMilestoneAgentChecking"
+        variant: "caption"
+        theme: dialog.theme
+        visible: dialog.agentChecking
+        width: parent.width
+        text: "Checking the default agent…"
+      }
+
+      UI.ThemedText {
         objectName: "newMilestoneAgent"
         variant: "caption"
         theme: dialog.theme
-        visible: dialog.agentMessage === "" && dialog.agentName !== ""
+        visible: !dialog.agentChecking && dialog.agentMessage === "" && dialog.agentName !== ""
         width: parent.width
         text: "Agent: " + dialog.agentName
         elide: Text.ElideRight
@@ -200,7 +236,7 @@ Item {
         objectName: "newMilestoneAgentNote"
         variant: "caption"
         theme: dialog.theme
-        visible: dialog.agentMessage === "" && dialog.agentNote !== ""
+        visible: !dialog.agentChecking && dialog.agentMessage === "" && dialog.agentNote !== ""
         width: parent.width
         text: dialog.agentNote
         wrapMode: Text.WordWrap
@@ -210,7 +246,7 @@ Item {
         objectName: "newMilestoneAgentMessage"
         variant: "caption"
         theme: dialog.theme
-        visible: dialog.agentMessage !== ""
+        visible: !dialog.agentChecking && dialog.agentMessage !== ""
         width: parent.width
         text: dialog.agentMessage
         color: dialog.theme.urgent
@@ -261,6 +297,7 @@ Item {
 
     width: specList.width
     theme: dialog.theme
+    enabled: !dialog.busy
     cursorIndex: dialog.selectedIndex
     onActivated: dialog.specChosen(row.modelData.path)
 
