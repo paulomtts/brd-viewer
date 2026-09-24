@@ -187,3 +187,32 @@ function docAbsolutePath(rootPath, relPath) {
 function docTooLarge(size) {
   return size > MAX_DOC_BYTES
 }
+
+// The Documents badges: a fixed set, in display order. list-docs.py assigns
+// each document one of these ids.
+var DOC_CATEGORIES = [
+  { id: "architecture", label: "Architecture" },
+  { id: "specs", label: "Specs" },
+  { id: "audits", label: "Audits" }
+]
+
+function docCategoryLabel(id) {
+  for (var i = 0; i < DOC_CATEGORIES.length; i++)
+    if (DOC_CATEGORIES[i].id === id) return DOC_CATEGORIES[i].label
+  return ""
+}
+
+// An empty/undefined category means "all".
+function filterDocsByCategory(docs, categoryId) {
+  return (docs || []).filter(function(d) { return !categoryId || d.category === categoryId })
+}
+
+// [{ id, label, count }] for the categories that have at least one document.
+function docCategoryCounts(docs) {
+  var list = docs || []
+  return DOC_CATEGORIES.map(function(c) {
+    var n = 0
+    for (var i = 0; i < list.length; i++) if (list[i].category === c.id) n++
+    return { id: c.id, label: c.label, count: n }
+  }).filter(function(c) { return c.count > 0 })
+}

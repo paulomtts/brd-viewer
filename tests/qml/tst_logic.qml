@@ -337,4 +337,50 @@ TestCase {
     compare(Logic.docTooLarge(1048577), true)
     compare(Logic.docTooLarge(0), false)
   }
+
+  // ---- document categories -------------------------------------------------
+
+  property var catDocs: [
+    { path: "docs/architecture/a.md", title: "Arch", size: 1, category: "architecture" },
+    { path: "docs/specs/s1.md", title: "Spec one", size: 1, category: "specs" },
+    { path: "docs/superpowers/specs/s2.md", title: "Spec two", size: 1, category: "specs" },
+    { path: "docs/audits/u.md", title: "Audit", size: 1, category: "audits" }
+  ]
+
+  function test_doc_categories_are_fixed_and_ordered() {
+    compare(Logic.DOC_CATEGORIES.map(function(c) { return c.id }).join(","), "architecture,specs,audits")
+    compare(Logic.DOC_CATEGORIES.map(function(c) { return c.label }).join(","), "Architecture,Specs,Audits")
+    compare(Logic.docCategoryLabel("specs"), "Specs")
+    compare(Logic.docCategoryLabel("nope"), "")
+  }
+
+  function test_filter_docs_by_category() {
+    compare(Logic.filterDocsByCategory(catDocs, "").length, 4)
+    compare(Logic.filterDocsByCategory(catDocs, undefined).length, 4)
+    compare(Logic.filterDocsByCategory(catDocs, "specs").map(function(d) { return d.title }).join(","), "Spec one,Spec two")
+    compare(Logic.filterDocsByCategory(catDocs, "audits").length, 1)
+    compare(Logic.filterDocsByCategory(catDocs, "unknown").length, 0)
+    compare(Logic.filterDocsByCategory(undefined, "specs").length, 0)
+  }
+
+  function test_doc_category_counts_in_display_order() {
+    var counts = Logic.docCategoryCounts(catDocs)
+    compare(counts.map(function(c) { return c.id + ":" + c.count }).join(","), "architecture:1,specs:2,audits:1")
+    compare(counts[1].label, "Specs")
+  }
+
+  function test_doc_category_counts_hide_empty_categories() {
+    var counts = Logic.docCategoryCounts([catDocs[3], catDocs[3]])
+    compare(counts.length, 1)
+    compare(counts[0].id, "audits")
+    compare(counts[0].count, 2)
+    compare(Logic.docCategoryCounts([]).length, 0)
+    compare(Logic.docCategoryCounts(undefined).length, 0)
+  }
+
+  function test_doc_category_counts_ignore_docs_with_an_unknown_category() {
+    var counts = Logic.docCategoryCounts([{ path: "x.md", title: "X", size: 1, category: "weird" }, catDocs[0]])
+    compare(counts.length, 1)
+    compare(counts[0].id, "architecture")
+  }
 }
