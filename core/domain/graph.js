@@ -22,6 +22,26 @@ function openIssueLabel(count) {
 // many open issues block it -- only when brd reports it blocked, since the
 // count is there to explain that status. Positions come from the canvas's own layered
 // layout so the panel can navigate by geometry.
+// The blocker -> blocked arrows of a card list: only blockers `known` holds (an
+// id nothing in the view carries -- an issue, a card of another level, a ghost
+// -- is no dependency of it), never a self-link, and the same pair only ONCE
+// however often brd repeats it in blocked_by. `known` is read with
+// hasOwnProperty, so an id like "constructor" cannot match Object.prototype.
+function dependencyEdges(cards, known) {
+  var edges = []
+  var seen = {}
+  ;(cards || []).forEach(function(card) {
+    ;(card.blocked_by || []).forEach(function(blocker) {
+      if (!Object.prototype.hasOwnProperty.call(known, blocker) || blocker === card.id) return
+      var id = blocker + ">" + card.id
+      if (Object.prototype.hasOwnProperty.call(seen, id)) return
+      seen[id] = true
+      edges.push({ id: id, from: blocker, to: card.id })
+    })
+  })
+  return edges
+}
+
 function graphModel(roots, issueMap) {
   var cards = roots || []
   var known = {}
@@ -34,12 +54,7 @@ function graphModel(roots, issueMap) {
              openIssues: card.status === "blocked" ? openIssueCount(card, issueMap) : 0,
              w: GRAPH_NODE_W, h: GRAPH_NODE_H }
   })
-  var edges = []
-  cards.forEach(function(card) {
-    ;(card.blocked_by || []).forEach(function(blocker) {
-      if (known[blocker] && blocker !== card.id) edges.push({ id: blocker + ">" + card.id, from: blocker, to: card.id })
-    })
-  })
+  var edges = dependencyEdges(cards, known)
 
   var placed = nodes.length > 0 ? Layout.layout(nodes, edges) : {}
   nodes.forEach(function(node) {
@@ -119,13 +134,7 @@ function storyGraphModel(roots, issueMap) {
 
   // Story links only: a blocker that is a milestone, a subtask, an issue or an
   // unknown id is not a story dependency.
-  var edges = []
-  cards.forEach(function(card) {
-    ;(card.blocked_by || []).forEach(function(blocker) {
-      if (groupOf[blocker] && blocker !== card.id)
-        edges.push({ id: blocker + ">" + card.id, from: blocker, to: card.id })
-    })
-  })
+  var edges = dependencyEdges(cards, groupOf)
 
   // Inside every box: the stories of that milestone, laid out by the links that
   // stay inside it. The box is the bounding box of the result, padded, with a

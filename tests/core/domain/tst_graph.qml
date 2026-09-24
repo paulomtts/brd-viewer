@@ -223,6 +223,19 @@ TestCase {
     compare(Graph.graphMove(g.nodes, "", "right"), "s1")
   }
 
+  function test_a_repeated_blocker_draws_one_edge_only() {
+    var milestones = Graph.graphModel([makeCard("m1", "done", []), makeCard("m2", "todo", [], ["m1", "m1"])])
+    compare(milestones.edges.map(function(e) { return e.id }).join(","), "m1>m2")
+    var stories = Graph.storyGraphModel([
+      makeCard("m1", "todo", [makeCard("s1", "done", []), makeCard("s2", "todo", [], ["s1", "s1"])]),
+      makeCard("m2", "todo", [makeCard("s3", "todo", [], ["s1", "s1"])])])
+    compare(stories.edges.map(function(e) { return e.id }).join(","), "s1>s2,s1>s3")
+    // A blocker named after an Object.prototype member is still just an
+    // unknown id: it links nothing.
+    compare(Graph.graphModel([makeCard("m1", "todo", [], ["constructor"])]).edges.length, 0)
+    compare(Graph.storyGraphModel([makeCard("m1", "todo", [makeCard("s1", "todo", [], ["toString"])])]).edges.length, 0)
+  }
+
   function test_the_story_graph_is_deterministic_and_empty_of_nothing() {
     var once = JSON.stringify(Graph.storyGraphModel(storyRoots()))
     var twice = JSON.stringify(Graph.storyGraphModel(storyRoots()))
