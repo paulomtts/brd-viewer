@@ -28,7 +28,13 @@ Scope {
 
   readonly property string issueStatus: issueFilter.active
   readonly property alias issueFilter: issueFilter
-  readonly property alias exportProc: exportProc
+
+  // Latest run wins, like HelperRunner: every fetch takes the next sequence
+  // number and its own Process carrying it, so a late reply from a run that has
+  // since been superseded -- the same project fetched twice in a row -- can
+  // never be mistaken for the current one.
+  property int seq: 0
+  property var exportProc: null   // the newest run's Process
 
   // The open issue is gone from the export: the panel puts its list back.
   signal listViewRequested()
@@ -51,16 +57,21 @@ Scope {
 
   function fetchExtras() {
     if (!extras.project) return
+    if (extras.exportProc) extras.exportProc.running = false
+    extras.seq += 1
     extras.extrasLoading = true
-    exportProc.workingDirectory = extras.project.root_path
-    exportProc.running = false
-    exportProc.running = true
+    var proc = procC.createObject(extras, { launchSeq: extras.seq, launchGuard: extras.currentGuard() })
+    proc.workingDirectory = extras.project.root_path
+    extras.exportProc = proc
+    proc.running = true
   }
 
-  // `launchedGuard` is the project root the fetch was launched for: a reply for
-  // a project the user has since left is dropped, but the loading flag still
-  // clears, or nothing would ever clear it again.
-  function applyExportResult(stdout, exitCode, launchedGuard) {
+  // `launchedSeq` and `launchedGuard` are the run's own: a reply a newer run has
+  // already superseded changes nothing at all (that newer run still holds the
+  // loading flag), and a reply for a project the user has since left is dropped
+  // -- but the newest run still clears the flag, or nothing ever would again.
+  function applyExportResult(stdout, exitCode, launchedGuard, launchedSeq) {
+    if ((launchedSeq === undefined ? extras.seq : launchedSeq) !== extras.seq) return
     extras.extrasLoading = false
     var guard = launchedGuard === undefined ? extras.currentGuard() : launchedGuard
     if (guard !== extras.currentGuard()) return
@@ -132,20 +143,27 @@ Scope {
   }
 
   // A brd CLI call, like treeProc and issueProc: a plain Process with its own
-  // exit handling (HelperRunner only ever runs python3 helpers).
-  Process {
-    id: exportProc
-    objectName: "exportProc"
-    command: ["brd", "export"]
-    property string launchGuard: ""
-    onRunningChanged: if (running) launchGuard = extras.currentGuard()
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: extras.applyExportResult(String(text || ""), 0, exportProc.launchGuard)
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      if (exitCode !== 0) extras.applyExportResult("", exitCode, exportProc.launchGuard)
+  // exit handling (HelperRunner only ever runs python3 helpers), one per run.
+  // The collector only stashes what it read; the exit is what decides, so a
+  // perfectly good line from a run that then failed is read with its real exit
+  // code and comes out as no extras -- never as extras with a faked 0.
+  Component {
+    id: procC
+
+    Process {
+      id: p
+      objectName: "exportProc"
+      command: ["brd", "export"]
+      property int launchSeq: 0
+      property string launchGuard: ""
+      property string outText: ""
+      stdout: StdioCollector { waitForEnd: true; onStreamFinished: p.outText = String(text || "") }
+      stderr: StdioCollector { waitForEnd: true }
+      onExited: function(exitCode) {
+        extras.applyExportResult(p.outText, exitCode, p.launchGuard, p.launchSeq)
+        // The newest run stays reachable as `exportProc`; an older one is done.
+        if (extras.exportProc !== p) p.destroy()
+      }
     }
   }
 }

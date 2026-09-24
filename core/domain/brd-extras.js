@@ -25,6 +25,9 @@ function str(value) {
 
 // entityId -> comments, oldest first. brd already returns them oldest first;
 // a missing/garbage created_at sorts last rather than throwing off the order.
+// Equal timestamps (brd writes whole seconds, so a burst of comments shares
+// one) keep the order they were exported in: the comparator breaks the tie on
+// the original index itself rather than trusting the engine's sort to be stable.
 function indexComments(data) {
   var map = {}
   ;((data || {}).comments || []).forEach(function(c) {
@@ -35,13 +38,16 @@ function indexComments(data) {
                          body: str(c.body), createdAt: str(c.created_at) })
   })
   Object.keys(map).forEach(function(key) {
-    map[key].sort(function(a, b) {
-      var ta = Date.parse(a.createdAt), tb = Date.parse(b.createdAt)
-      if (isNaN(ta) && isNaN(tb)) return 0
+    var rows = map[key].map(function(comment, index) { return { index: index, comment: comment } })
+    rows.sort(function(a, b) {
+      var ta = Date.parse(a.comment.createdAt), tb = Date.parse(b.comment.createdAt)
+      if (isNaN(ta) && isNaN(tb)) return a.index - b.index
       if (isNaN(ta)) return 1
       if (isNaN(tb)) return -1
-      return ta - tb
+      if (ta !== tb) return ta - tb
+      return a.index - b.index
     })
+    map[key] = rows.map(function(row) { return row.comment })
   })
   return map
 }

@@ -70,7 +70,27 @@ TestCase {
     compare(map["i1"].refs.join(","), "c1")
     compare(map["i1"].referencedBy.join(","), "c1")
     compare(map["c1"].refs.join(","), "i1")
-    compare(Extras.indexRefs({}).x, undefined)
+    compare(Object.keys(Extras.indexRefs({})).length, 0, "no refs means no entries")
+    compare(Object.keys(Extras.indexRefs({ refs: [{ src_id: "a" }, { dst_id: "b" }, null] })).length, 0,
+            "a ref missing an end is skipped")
+  }
+
+  // Ordering equal timestamps must not rest on the engine's sort being stable.
+  function test_comments_with_the_same_timestamp_keep_the_export_order() {
+    var same = "2026-09-24T09:00:00+00:00"
+    var map = Extras.indexComments({ comments: [
+      { id: "a", entity_id: "c1", body: "a", created_at: same },
+      { id: "b", entity_id: "c1", body: "b", created_at: same },
+      { id: "c", entity_id: "c1", body: "c", created_at: same },
+      { id: "d", entity_id: "c1", body: "d", created_at: same },
+      { id: "e", entity_id: "c1", body: "e", created_at: same },
+      { id: "f", entity_id: "c1", body: "f", created_at: same },
+      { id: "g", entity_id: "c1", body: "g", created_at: same },
+      { id: "h", entity_id: "c1", body: "h", created_at: same },
+      { id: "i", entity_id: "c1", body: "i", created_at: same },
+      { id: "j", entity_id: "c1", body: "j", created_at: same },
+      { id: "k", entity_id: "c1", body: "k", created_at: same }] })
+    compare(map["c1"].map(function(c) { return c.body }).join(","), "a,b,c,d,e,f,g,h,i,j,k")
   }
 
   function test_issues_are_open_first_then_newest_updated() {
@@ -116,7 +136,8 @@ TestCase {
     compare(ids(result.issues), "i3,i1,i2")
     compare(result.commentsByEntity["c1"].length, 2)
     compare(result.refsByEntity["i1"].refs.join(","), "c1")
-    compare(result.documents, undefined, "the export's documents are never carried")
+    compare(Object.keys(result).sort().join(","), "commentsByEntity,error,issues,ok,refsByEntity",
+            "the export's documents are never carried")
   }
 
   function test_a_failed_or_old_brd_parses_to_empty_extras() {

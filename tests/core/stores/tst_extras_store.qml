@@ -44,6 +44,14 @@ TestCase {
     return app
   }
   function ids(list) { return list.map(function(x) { return x.id }).join(",") }
+  // What Quickshell does to the newest run: the collector fills, then the
+  // process exits with its code -- and only that exit decides anything.
+  function finish(app, text, exitCode) {
+    var proc = app.extras.exportProc
+    proc.stdout.text = text
+    proc.stdout.streamFinished()
+    proc.exited(exitCode === undefined ? 0 : exitCode)
+  }
 
   function test_the_export_runs_with_the_board_in_the_projects_directory() {
     var app = make(); if (!app) return
@@ -52,19 +60,18 @@ TestCase {
     compare(proc.command.join(" "), "brd export")
     compare(proc.workingDirectory, "/home/u/a")
     compare(proc.running, true)
-    proc.running = false
     app.board.dbFile.fileChanged()
-    compare(proc.running, true, "a database change refetches the extras too")
-    proc.running = false
+    verify(app.extras.exportProc !== proc, "a database change launches its own run")
+    compare(proc.running, false, "the run it supersedes is stopped")
+    compare(app.extras.exportProc.running, true, "a database change refetches the extras too")
     app.projects.chooseProject(pB)
-    compare(proc.workingDirectory, "/home/u/b")
-    compare(proc.running, true)
+    compare(app.extras.exportProc.workingDirectory, "/home/u/b")
+    compare(app.extras.exportProc.running, true)
   }
 
   function test_a_parsed_export_fills_issues_comments_and_refs() {
     var app = make(); if (!app) return
-    app.extras.exportProc.stdout.text = exportLine()
-    app.extras.exportProc.stdout.streamFinished()
+    finish(app, exportLine(), 0)
     compare(ids(app.extras.issues), "i1,i2")
     compare(app.extras.issues[0].commentCount, 1)
     compare(app.extras.issues[0].blocks.join(","), "m1", "blocks are derived from the card tree")
@@ -81,16 +88,58 @@ TestCase {
                  "Usage: brd [OPTIONS] COMMAND", "not json", ""]
     for (var i = 0; i < cases.length; i++) {
       app.extras.applyExportResult(exportLine(), 0)
-      app.extras.exportProc.stdout.text = cases[i]
-      app.extras.exportProc.stdout.streamFinished()
+      finish(app, cases[i], 0)
       compare(app.extras.issues.length, 0, "case " + i)
       compare(app.projects.loadError, "", "case " + i)
     }
     app.extras.applyExportResult(exportLine(), 0)
-    app.extras.exportProc.exited(2)
+    finish(app, "", 2)
     compare(app.extras.issues.length, 0)
     compare(app.extras.extrasLoading, false)
     compare(app.projects.loadError, "")
+  }
+
+  // The exit code is the only thing that decides: a collector that has filled
+  // says nothing until the process has exited, and a perfectly good line from a
+  // run that then failed is not extras.
+  function test_the_exit_code_decides_what_a_finished_run_meant() {
+    var app = make(); if (!app) return
+    var proc = app.extras.exportProc
+    proc.stdout.text = exportLine()
+    proc.stdout.streamFinished()
+    compare(app.extras.issues.length, 0, "nothing is applied before the exit code is known")
+    compare(app.extras.extrasLoading, true, "and the run is still in flight")
+    proc.exited(3)
+    compare(app.extras.issues.length, 0, "a good line from a failed run is not extras")
+    compare(app.extras.extrasLoading, false)
+    compare(app.projects.loadError, "")
+    app.extras.fetchExtras()
+    finish(app, exportLine(), 0)
+    compare(ids(app.extras.issues), "i1,i2")
+  }
+
+  // Two runs for the same project: the older one's late exit must not undo the
+  // newer one's work, nor release the loading flag the newer one owns.
+  function test_a_superseded_run_for_the_same_project_changes_nothing() {
+    var app = make(); if (!app) return
+    var first = app.extras.exportProc
+    app.extras.applyExportResult(exportLine(), 0)
+    app.extras.openIssue("i1")
+    app.nav.viewMode = "issue"
+    app.extras.fetchExtras()
+    verify(app.extras.exportProc !== first, "the second run is its own process")
+    var spy = Qt.createQmlObject('import QtTest; SignalSpy {}', tc)
+    spy.target = app.extras
+    spy.signalName = "listViewRequested"
+    first.stdout.text = ""
+    first.stdout.streamFinished()
+    first.exited(1)
+    compare(ids(app.extras.issues), "i1,i2", "the superseded run leaves the list alone")
+    compare(app.extras.selectedIssueId, "i1")
+    compare(spy.count, 0, "and never sends the open issue back to the list")
+    compare(app.extras.extrasLoading, true, "the newest run still owns the loading flag")
+    finish(app, exportLine(), 0)
+    compare(app.extras.extrasLoading, false)
   }
 
   function test_a_reply_for_a_project_the_user_has_left_is_dropped() {
