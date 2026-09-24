@@ -29,13 +29,13 @@ Rectangle {
   border.width: 1
   border.color: chip.active ? chip.tint : Qt.alpha(chip.tint, 0.4)
 
-  Text {
+  ThemedText {
     id: label
     anchors.centerIn: parent
+    theme: chip.palette
+    variant: "caption"
     text: chip.text
     color: chip.palette ? chip.palette.foreground : Color.foreground
-    font.family: chip.palette ? chip.palette.fontFamily : Style.font.family
-    font.pixelSize: chip.palette ? chip.palette.captionSize : Style.font.caption
     font.bold: chip.active
   }
 

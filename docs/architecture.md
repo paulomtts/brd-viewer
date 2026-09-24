@@ -10,6 +10,7 @@ Design background: `docs/superpowers/specs/2026-09-24-core-ui-architecture-desig
 |---|---|---|
 | `core/domain/*.js` | other `core/domain` files, `vendor/canvas/*.js` (`.pragma library`, `.import "x.js" as X` only) | any QML, `Qt*`, `Quickshell*`, `qs.*` |
 | `core/backend/**` | Python stdlib, `core/backend/common` | any QML |
+| `core/*` | only `domain/`, `backend/`, `stores/` (no loose files); `backend/` has no `.js`/`.qml` | |
 | `core/stores/*.qml` | `QtQml`, `Quickshell`, `Quickshell.Io`, `../domain/*.js` | `QtQuick*`, `qs.*`, `ui/`, `vendor/`, sibling directories |
 | `ui/**` | everything in `core/`, `qs.Ui`, `qs.Commons`, `QtQuick*`, `vendor/canvas` | `ui/screens/**` must not import `core/stores` (they receive `app`) |
 | `vendor/**` | its own files, `qs.*`, `QtQuick*` | `core/`, `ui/` |
@@ -77,4 +78,4 @@ would load its own type instead of ours.
 - `vendor/canvas/Canvas.qml`: always used qualified.
 - Panel-detail tone pill (`CardDetailScreen`) uses `radius: height / 2` itself, not `Badge`.
 - `BoardCard` (BoardScreen) and Sidebar's project button, `NavRow`, `ProjectItem` use `CursorSurface` directly (and `bordered: true` for the two bordered ones).
-- `Badge`, `Chip`, `TextAreaBox` set `font.family` on the primitive they own.
+- `TextAreaBox` sets `font.family` itself: it is a `Controls.TextArea`, not a `Text`, so it cannot be a `ThemedText`.

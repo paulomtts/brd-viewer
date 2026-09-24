@@ -24,13 +24,13 @@ Rectangle {
   radius: height / 2
   color: Qt.alpha(label.color, 0.18)
 
-  Text {
+  ThemedText {
     id: label
     anchors.centerIn: parent
+    theme: badge.palette
+    variant: "caption"
     text: badge.text
     color: badge.tint
-    font.family: badge.palette ? badge.palette.fontFamily : Style.font.family
-    font.pixelSize: badge.palette ? badge.palette.captionSize : Style.font.caption
   }
 
   T.Theme { id: badgeTheme }

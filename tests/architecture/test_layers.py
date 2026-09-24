@@ -75,99 +75,135 @@ def test_clash_allowlist_is_explained_and_canvas_is_only_used_qualified():
 
 # ---- import rules (allowlists) -------------------------------------------------------------
 
-QML_IMPORT_RE = re.compile(r'^\s*import\s+(?:"([^"]+)"|([\w.]+))(?:\s+[\d.]+)?(?:\s+as\s+\w+)?\s*;?\s*$')
-JS_IMPORT_RE = re.compile(r'^\s*\.import\s+"([^"]+)"\s+as\s+\w+\s*;?\s*$')
-JS_PRAGMA_RE = re.compile(r"^\s*\.pragma\s+library\s*$")
-IMPORTISH_RE = re.compile(r"^\s*\.?(?:import|pragma)\b")
-
 STORE_MODULES = {"QtQml", "Quickshell", "Quickshell.Io"}
+BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
+LINE_COMMENT_RE = re.compile(r"//.*$")
+IMPORTISH_RE = re.compile(r"^\s*\.?import\b")
+PRAGMA_RE = re.compile(r"^\s*\.pragma\s+library\s*$")
+_QUOTED = r"(?:\"([^\"]+)\"|'([^']+)')"
+IMPORT_LINE_RE = re.compile(r"^\s*(\.?)import\s+(?:" + _QUOTED + r"|([\w.]+)(?:\s+[\d.]+)?)(?:\s+as\s+\w+)?\s*;?\s*$")
+
+
+def scan_imports(text):
+    """Every import of a source text as (kind, value), kind in path | module | pragma | unknown.
+
+    Comments are stripped first. A line that starts with import/.import (or .pragma) but cannot be
+    classified is returned as ("unknown", line): the rules treat that as a violation (fail closed).
+    """
+    text = BLOCK_COMMENT_RE.sub("", text)
+    found = []
+    for raw in text.splitlines():
+        line = LINE_COMMENT_RE.sub("", raw) if IMPORTISH_RE.match(raw) or raw.lstrip().startswith(".pragma") else raw
+        if PRAGMA_RE.match(line):
+            found.append(("pragma", "library"))
+        elif line.lstrip().startswith(".pragma"):
+            found.append(("unknown", line.strip()))
+        elif IMPORTISH_RE.match(line):
+            m = IMPORT_LINE_RE.match(line)
+            if not m:
+                found.append(("unknown", line.strip()))
+            elif m.group(2) or m.group(3):
+                found.append(("path", m.group(2) or m.group(3)))
+            else:
+                found.append(("module", m.group(4)))
+    return found
 
 
 def resolve(path, target):
     return Path(os.path.normpath(path.parent / target))
 
 
+def under(target, root, *dirs):
+    return any(str(target).startswith(str(root / d) + os.sep) for d in dirs)
+
+
 def violations_domain(path, text, root=ROOT):
     """core/domain/*.js: only `.pragma library` and `.import "x.js" as X` into core/domain or vendor/canvas."""
     bad = []
-    for line in text.splitlines():
-        if not IMPORTISH_RE.match(line):
+    for kind, value in scan_imports(text):
+        if kind == "pragma":
             continue
-        if JS_PRAGMA_RE.match(line):
+        if kind == "path" and value.endswith(".js") and under(resolve(path, value), root, "core/domain", "vendor/canvas"):
             continue
-        m = JS_IMPORT_RE.match(line)
-        if not m or not m.group(1).endswith(".js"):
-            bad.append(line.strip())
-            continue
-        target = resolve(path, m.group(1))
-        if not any(str(target).startswith(str(root / d) + os.sep) for d in ("core/domain", "vendor/canvas")):
-            bad.append(line.strip())
+        bad.append(value)
     return bad
 
 
 def violations_store(path, text, root=ROOT):
     """core/stores/*.qml: QtQml, Quickshell, Quickshell.Io and "../domain/x.js" only."""
     bad = []
-    for line in text.splitlines():
-        if not IMPORTISH_RE.match(line):
+    for kind, value in scan_imports(text):
+        if kind == "module" and value in STORE_MODULES:
             continue
-        m = QML_IMPORT_RE.match(line)
-        if not m:
-            bad.append(line.strip())
-        elif m.group(2):
-            if m.group(2) not in STORE_MODULES:
-                bad.append(line.strip())
-        else:
-            target = resolve(path, m.group(1))
-            if not (target.suffix == ".js" and target.parent == root / "core" / "domain"):
-                bad.append(line.strip())
+        if kind == "path" and value.endswith(".js") and resolve(path, value).parent == root / "core" / "domain":
+            continue
+        bad.append(value)
     return bad
 
 
 def violations_screen(path, text, root=ROOT):
-    """ui/screens/**: no import of core/stores (screens get `app` injected)."""
+    """ui/screens/**: no import of core/stores (screens get `app` injected); unparseable imports fail."""
     bad = []
-    for line in text.splitlines():
-        m = QML_IMPORT_RE.match(line)
-        if m and m.group(1) and str(resolve(path, m.group(1))).startswith(str(root / "core" / "stores")):
-            bad.append(line.strip())
+    for kind, value in scan_imports(text):
+        if kind == "unknown" or (kind == "path" and (resolve(path, value) == root / "core" / "stores"
+                                                     or under(resolve(path, value), root, "core/stores"))):
+            bad.append(value)
     return bad
 
 
 def violations_vendor(path, text, root=ROOT):
-    """vendor/**: no import of core/ or ui/."""
+    """vendor/**: no import of core/ or ui/; unparseable imports fail."""
     bad = []
-    for line in text.splitlines():
-        m = QML_IMPORT_RE.match(line) or JS_IMPORT_RE.match(line)
-        if m and m.group(1):
-            target = resolve(path, m.group(1))
-            if any(str(target).startswith(str(root / d)) for d in ("core", "ui")):
-                bad.append(line.strip())
+    for kind, value in scan_imports(text):
+        if kind == "unknown" or (kind == "path" and any(
+                resolve(path, value) == root / d or under(resolve(path, value), root, d) for d in ("core", "ui"))):
+            bad.append(value)
     return bad
 
 
 def test_import_rule_regexes_flag_and_accept_what_they_should():
-    d = ROOT / "core/domain/x.js"
+    d, s = ROOT / "core/domain/x.js", ROOT / "core/stores/S.qml"
+    sc, v = ROOT / "ui/screens/S.qml", ROOT / "vendor/canvas/V.qml"
+    # domain
     assert violations_domain(d, ".pragma library\n.import \"y.js\" as Y\n") == []
     assert violations_domain(d, '.import "../../vendor/canvas/layout.js" as L') == []
-    assert violations_domain(d, "import QtQuick") != []
-    assert violations_domain(d, "import qs.Commons") != []
-    assert violations_domain(d, '.import "../stores/App.qml" as A') != []
-    assert violations_domain(d, '.import "../../ui/x.js" as A') != []
-    assert violations_domain(d, ".pragma nonshared") != []
-    s = ROOT / "core/stores/S.qml"
+    assert violations_domain(d, ".import 'y.js' as Y // ok") == []
+    assert violations_domain(d, '.import "y.js" as Y /* ok */') == []
+    for evil in ["import QtQuick", "import QtQuick 2.15", "import qs.Commons", '.import "../stores/App.qml" as A',
+                 '.import "../../ui/x.js" as A', ".pragma nonshared", ".import '../../ui/x.js' as A // c",
+                 "import QtQuick as QQ", ".import y.js as Y"]:
+        assert violations_domain(d, evil) != [], evil
+    # stores
     assert violations_store(s, 'import QtQml\nimport Quickshell\nimport Quickshell.Io\nimport "../domain/x.js" as X') == []
-    for evil in ["import QtQuick", "import QtQuick.Layouts", "import qs.Ui", 'import "../../ui/components" as C',
-                 'import "../../vendor/canvas" as V', 'import "." as Sib', 'import "../domain/y.qml" as Q',
-                 "import Quickshell.Widgets"]:
+    assert violations_store(s, "import QtQml // c\nimport Quickshell.Io /* c */") == []
+    assert violations_store(s, "import '../domain/x.js' as X") == []
+    for evil in ["import QtQuick", "import QtQuick 2.15", "import QtQuick as QQ", "import qs.Ui",
+                 'import "../../ui/components" as C', 'import "../../vendor/canvas" as V', 'import "." as Sib',
+                 'import "../domain/y.qml" as Q', "import Quickshell.Widgets", "import '../../ui/x' as C",
+                 'import "../../ui/x" as C // c', "import QtQuick // QtQml"]:
         assert violations_store(s, evil) != [], evil
-    sc = ROOT / "ui/screens/S.qml"
-    assert violations_screen(sc, 'import "../../core/stores" as Core') != []
+    # screens
     assert violations_screen(sc, 'import "../../core/domain/board.js" as Board\nimport "../components" as UI') == []
-    v = ROOT / "vendor/canvas/V.qml"
-    assert violations_vendor(v, 'import "../../core/domain/x.js" as X') != []
-    assert violations_vendor(v, 'import "../../ui/theme" as T') != []
-    assert violations_vendor(v, 'import "positions.js" as P\nimport qs.Commons') == []
+    assert violations_screen(sc, "import QtQuick 2.15\nimport QtQuick as QQ\nimport '../components' as UI") == []
+    assert violations_screen(sc, '// import "../../core/stores" as C') == []
+    assert violations_screen(sc, '/* import "../../core/stores" as C */') == []
+    for evil in ['import "../../core/stores" as Core', "import '../../core/stores' as C",
+                 'import "../../core/stores" as C // x', 'import "../../core/stores" as C /* x */',
+                 'import "../../core/stores/App.qml" as C', "import ../../core/stores as C"]:
+        assert violations_screen(sc, evil) != [], evil
+    # vendor
+    assert violations_vendor(v, 'import "positions.js" as P\nimport qs.Commons\nimport QtQuick 2.15') == []
+    for evil in ['import "../../core/domain/x.js" as X', 'import "../../ui/theme" as T', "import '../../core/x' as C",
+                 'import "../../ui/theme" as T // c', '.import "../../core/domain/x.js" as X /* c */']:
+        assert violations_vendor(v, evil) != [], evil
+
+
+def test_core_layout_is_closed_and_layers_are_populated():
+    core = ROOT / "core"
+    assert sorted(p.name for p in core.iterdir() if p.name != "__pycache__") == ["backend", "domain", "stores"]
+    for d in ("domain", "stores", "backend"):
+        assert any(p.is_file() and "__pycache__" not in p.parts for p in (core / d).rglob("*")), d
+    assert [rel(p) for p in source_files(".js", ".qml") if rel(p).startswith("core/backend/")] == []
 
 
 def test_layers_import_only_what_their_allowlist_permits():
@@ -180,7 +216,7 @@ def test_layers_import_only_what_their_allowlist_permits():
             assert path.suffix == ".qml", r
             assert violations_store(path, text) == [], r
         elif r.startswith("core/backend/"):
-            assert path.suffix != ".qml", r
+            assert path.suffix not in {".qml", ".js"}, r
         elif r.startswith("ui/screens/"):
             assert violations_screen(path, text) == [], r
         elif r.startswith("vendor/"):
@@ -220,9 +256,8 @@ GUARDS = {
     r"font\.family:": {
         "ui/components/ThemedText.qml": "the one text primitive",
         "vendor/": "vendored",
-        "ui/components/Badge.qml": "shared primitive owning its caption Text (resolves the family in one place)",
-        "ui/components/Chip.qml": "shared primitive owning its caption Text (resolves the family in one place)",
-        "ui/components/TextAreaBox.qml": "shared primitive owning its Controls.TextArea (resolves the family in one place)",
+        # A Controls.TextArea, not a Text, so it cannot be a ThemedText; the one single-file exception.
+        "ui/components/TextAreaBox.qml": "Controls.TextArea primitive; not a Text, cannot use ThemedText",
     },
     r"\bCursorSurface\s*\{": {
         "ui/components/ListRow.qml": "the row primitive",
