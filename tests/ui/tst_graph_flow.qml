@@ -102,6 +102,73 @@ TestCase {
     compare(p.app.board.selectedCardId, "m2")
   }
 
+  // ---- The Milestone | Story switch in the toolbar.
+
+  function storyRoots() {
+    return [card("m1", "in_progress", [card("s1", "done", [card("t1", "done")]), card("s2", "todo")]),
+            card("m2", "todo", [card("s3", "todo", [], ["s1"])])]
+  }
+
+  function test_the_toolbar_offers_the_two_graph_views_with_one_always_active() {
+    var p = make(); if (!p) return
+    p.navigator.showSection("graph")
+    var row = find(p, "graphViewChips")
+    verify(row, "the view switch")
+    compare(find(p, "graphViewChipmilestone").active, true, "Milestone is the default")
+    compare(find(p, "graphViewChipstory").active, false)
+    row.chosen("story")
+    compare(p.app.graph.graphView, "story")
+    compare(find(p, "graphViewChipstory").active, true)
+    compare(find(p, "graphViewChipmilestone").active, false)
+    row.chosen("milestone")
+    compare(find(p, "graphViewChipmilestone").active, true)
+  }
+
+  function test_the_story_view_reaches_the_canvas_and_opens_a_story_card() {
+    var p = make(); if (!p) return
+    p.app.board.applyTreeData(storyRoots())
+    p.navigator.showSection("graph")
+    find(p, "graphViewChips").chosen("story")
+    wait(100)
+    var gv = find(p, "graphView")
+    compare(gv.mode, "story")
+    compare(gv.nodes.length, 3)
+    compare(gv.groups.length, 2)
+    compare(p.app.graph.graphCursor, "s1")
+    var kc = p.focusItem
+    kc.moveRequested(1, 0)
+    compare(p.app.graph.graphCursor, "s3", "the arrow keys walk the story graph")
+    kc.activateRequested()
+    compare(p.app.nav.viewMode, "entry")
+    compare(p.app.board.selectedCardId, "s3")
+  }
+
+  function test_back_from_a_story_returns_to_the_story_view_and_its_selection() {
+    var p = make(); if (!p) return
+    p.app.board.applyTreeData(storyRoots())
+    p.navigator.showSection("graph")
+    find(p, "graphViewChips").chosen("story")
+    p.navigator.moveGraph("right")
+    p.navigator.activateGraphNode()
+    compare(p.app.nav.viewMode, "entry")
+    compare(p.app.board.selectedCardId, "s3")
+    p.navigator.goBack()
+    compare(p.app.nav.viewMode, "graph")
+    compare(p.app.graph.graphView, "story", "Back comes back to the view it left")
+    compare(p.app.graph.graphCursor, "s3")
+    wait(100)
+    compare(find(p, "graphView").mode, "story")
+  }
+
+  function test_entering_the_graph_seeds_the_cursor_from_the_view_on_show() {
+    var p = make(); if (!p) return
+    p.app.board.applyTreeData(storyRoots())
+    p.app.graph.setGraphView("story")
+    p.app.graph.graphCursor = ""
+    p.navigator.showSection("graph")
+    compare(p.app.graph.graphCursor, "s1", "the first node of the CURRENT view")
+  }
+
   function test_the_popup_is_at_least_eighty_percent_of_the_screen_tall() {
     var p = make(); if (!p) return
     var panel = named(p, "mainPanel")

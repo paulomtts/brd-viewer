@@ -26,8 +26,10 @@ Item {
   UI.GraphView {
     id: view
     anchors.fill: parent
-    nodes: graphScreen.app.graph.graph.nodes
-    edges: graphScreen.app.graph.graph.edges
+    nodes: graphScreen.app.graph.currentNodes
+    edges: graphScreen.app.graph.currentEdges
+    groups: graphScreen.app.graph.currentGroups
+    mode: graphScreen.app.graph.graphView
     cursorId: graphScreen.app.graph.graphCursor
     theme: graphScreen.theme
     onNodeClicked: function(id) { graphScreen.app.graph.graphCursor = id; graphScreen.navigator.openCard(id) }

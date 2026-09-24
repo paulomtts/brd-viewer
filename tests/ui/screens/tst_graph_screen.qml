@@ -120,6 +120,41 @@ TestCase {
     compare(find(s, "graphView").height, s.height)
   }
 
+  function test_the_story_view_draws_a_node_per_story_inside_its_milestone_box() {
+    var s = make(); if (!s) return
+    s.navigator.showSection("graph")
+    s.app.board.applyTreeData([
+      card("m1", "First", "in_progress", [card("s1", "Story one", "in_progress", [card("t1", "Sub", "in_progress")])]),
+      card("m2", "Second", "todo", [card("s2", "Story two", "todo")]),
+      card("m3", "Third", "todo")])
+    s.app.graph.setGraphView("story")
+    wait(100)
+    var gv = find(s, "graphView")
+    compare(gv.mode, "story")
+    compare(gv.nodes.map(function(n) { return n.id }).join(","), "s1,s2")
+    compare(gv.groups.map(function(g) { return g.id }).join(","), "m1,m2")
+    compare(find(find(s, "graphNodes1"), "graphNodeTitle").text, "Story one")
+    compare(find(s, "graphGroupLabelm1").text, "First")
+    compare(find(find(s, "graphNodes1"), "graphNodePips").model.length, 1)
+    verify(!find(s, "graphNodem1"), "no milestone nodes in the story view")
+    s.app.graph.setGraphView("milestone")
+    wait(100)
+    compare(find(s, "graphView").mode, "milestone")
+    verify(find(s, "graphNodem1"), "and back again")
+  }
+
+  function test_clicking_a_story_node_opens_that_story_card() {
+    var s = make(); if (!s) return
+    s.navigator.showSection("graph")
+    s.app.board.applyTreeData([card("m1", "First", "todo", [card("s1", "Story one", "todo")])])
+    s.app.graph.setGraphView("story")
+    wait(100)
+    find(s, "graphView").nodeClicked("s1")
+    compare(s.app.graph.graphCursor, "s1")
+    compare(s.app.nav.viewMode, "entry")
+    compare(s.app.board.selectedCardId, "s1")
+  }
+
   function test_open_issues_from_the_board_mark_the_milestone_they_block() {
     var s = make(); if (!s) return
     s.navigator.showSection("graph")

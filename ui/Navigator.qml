@@ -82,6 +82,14 @@ QtObject {
     if (crumb.id) navi.openCard(crumb.id)
   }
 
+  // The Milestone | Story switch: the store picks the model and keeps the
+  // selection on a node of it; the canvas then follows that selection, exactly
+  // as it does after an arrow key.
+  function showGraphView(name) {
+    navi.app.graph.setGraphView(name)
+    if (navi.app.graph.graphCursor !== "") navi.actions.centerOnGraphNode(navi.app.graph.graphCursor)
+  }
+
   function moveGraph(direction) {
     var next = navi.app.graph.moveGraph(direction)
     if (next === "") return
@@ -177,7 +185,7 @@ QtObject {
       if (wasSection !== "documents") navi.app.docs.fetchRegisteredDocs()
     }
     if (name === "memories") navi.app.memories.fetchMemories()
-    if (name === "graph" && navi.app.graph.graphCursor === "" && navi.app.graph.graph.nodes.length > 0) navi.app.graph.graphCursor = navi.app.graph.graph.nodes[0].id
+    if (name === "graph" && navi.app.graph.graphCursor === "" && navi.app.graph.currentNodes.length > 0) navi.app.graph.graphCursor = navi.app.graph.currentNodes[0].id
     Qt.callLater(navi.actions.scrollToTop)
     navi.actions.focusForView()
   }

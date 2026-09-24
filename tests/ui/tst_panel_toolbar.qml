@@ -124,6 +124,34 @@ TestCase {
     compare(H.find(p, "refreshButton").visible, true)
   }
 
+  // ---- the Graph's Milestone | Story switch
+
+  function test_the_graph_view_chips_live_in_the_toolbar_of_the_graph_section() {
+    var p = make(); if (!p) return
+    var chips = H.find(p, "graphViewChips")
+    verify(chips, "the view switch")
+    compare(chips.visible, false, "not in the board")
+    p.navigator.showSection("graph")
+    wait(50)
+    compare(chips.visible, true)
+    verify(isUnder(chips, "panelToolbar"), "inside the fixed toolbar")
+    verify(!isUnder(chips, "panelFlick"), "and not inside the scrolling content")
+  }
+
+  function test_clicking_the_story_chip_switches_the_graph_view() {
+    var p = make(); if (!p) return
+    p.navigator.showSection("graph")
+    wait(50)
+    var story = H.find(p, "graphViewChipstory")
+    verify(story, "the Story chip")
+    compare(p.app.graph.graphView, "milestone")
+    mouseClick(story, story.width / 2, story.height / 2)
+    compare(p.app.graph.graphView, "story")
+    var milestone = H.find(p, "graphViewChipmilestone")
+    mouseClick(milestone, milestone.width / 2, milestone.height / 2)
+    compare(p.app.graph.graphView, "milestone")
+  }
+
   // ---- the Documents pieces the toolbar owns
 
   function test_the_document_category_chips_live_in_the_toolbar() {

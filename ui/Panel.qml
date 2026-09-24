@@ -320,6 +320,19 @@ Panel {
             onCrumbActivated: function(index) { navi.activateCrumb(index) }
           }
 
+          // The Graph's two views. Single select with no empty state: the store
+          // refuses anything but the two, so one chip is always the active one.
+          UI.ChipRow {
+            objectName: "graphViewChips"
+            chipPrefix: "graphViewChip"
+            theme: panelTheme
+            visible: appStores.nav.viewMode === "graph" && !!appStores.projects.selectedProject
+            Layout.preferredWidth: implicitWidth
+            model: [{ id: "milestone", label: "Milestone" }, { id: "story", label: "Story" }]
+            active: appStores.graph.graphView
+            onChosen: function(id) { navi.showGraphView(id) }
+          }
+
           // Icon-only refresh, square and as tall as the New button beside it.
           UI.ActionButton {
             objectName: "refreshButton"
