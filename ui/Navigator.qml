@@ -229,6 +229,18 @@ QtObject {
     navi.actions.focusForView()
   }
 
+  // ---- Issues: the issues themselves live in ExtrasStore; the navigation and
+  // focus work around them is here, like the cards and the documents.
+  function openIssue(id) {
+    if (!navi.app.extras.openIssue(id)) return
+    navi.app.nav.pushReturn(navi.flick ? navi.flick.contentY : 0)
+    navi.app.nav.viewMode = "issue"
+    navi.app.nav.scrollOnCursor = false
+    navi.app.nav.cursorIndex = 0
+    Qt.callLater(navi.actions.scrollToTop)
+    navi.actions.focusForView()
+  }
+
   function goBack() {
     if (navi.app.nav.viewMode === "memory") { if (navi.app.memories.memoryEditing) navi.app.memories.memoryEscape(); else navi.restoreMemoriesList(); return }
     if (navi.app.nav.viewMode === "entry") { navi.restoreListView(); return }
