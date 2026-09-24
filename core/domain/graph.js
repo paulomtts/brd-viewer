@@ -5,11 +5,31 @@
 var GRAPH_NODE_W = 230
 var GRAPH_NODE_H = 78
 
+// How many OPEN issues (from Board.indexIssues) block this card directly.
+// Closed issues stay in blocked_by but no longer block, so they add nothing.
+function openIssueCount(card, issueMap) {
+  if (!card || !issueMap) return 0
+  var seen = {}
+  var count = 0
+  ;(card.blocked_by || []).forEach(function(id) {
+    if (seen[id]) return
+    seen[id] = true
+    if (issueMap[id] && issueMap[id].status === "open") count += 1
+  })
+  return count
+}
+
+function openIssueLabel(count) {
+  if (!count) return ""
+  return count + (count === 1 ? " open issue" : " open issues")
+}
+
 // One node per milestone (top-level card), one edge per blocked_by link between
-// two milestones (blocker -> blocked; links to sub-cards or unknown ids are not
-// milestone dependencies and are skipped). Positions come from the canvas's
-// own layered layout so the panel can navigate by geometry.
-function graphModel(roots) {
+// two milestones (blocker -> blocked; links to sub-cards, issues or unknown ids
+// are not milestone dependencies and are skipped). Each node also carries how
+// many open issues block it. Positions come from the canvas's own layered
+// layout so the panel can navigate by geometry.
+function graphModel(roots, issueMap) {
   var cards = roots || []
   var known = {}
   cards.forEach(function(card) { known[card.id] = true })
@@ -18,6 +38,7 @@ function graphModel(roots) {
     var counts = Board.subtreeCounts(card)
     return { id: card.id, title: card.title, status: card.status,
              done: counts.done, total: counts.total,
+             openIssues: openIssueCount(card, issueMap),
              w: GRAPH_NODE_W, h: GRAPH_NODE_H }
   })
   var edges = []

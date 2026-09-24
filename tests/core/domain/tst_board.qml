@@ -185,4 +185,61 @@ TestCase {
     compare(Board.ancestorIds("m1", map).length, 0)
     compare(Board.ancestorIds("nope", map).length, 0)
   }
+
+  function test_index_issues_keeps_id_title_and_open_or_closed_status() {
+    var map = Board.indexIssues([
+      { id: "i1", kind: "issue", title: "Broken build", body: "b", status: "open", blocks: ["c1"] },
+      { id: "i2", kind: "issue", title: "Old bug", status: "closed", close_reason: "fixed" },
+      { title: "no id" }
+    ])
+    compare(Object.keys(map).sort().join(","), "i1,i2")
+    compare(map.i1.id, "i1")
+    compare(map.i1.title, "Broken build")
+    compare(map.i1.status, "open")
+    compare(map.i2.status, "closed")
+    compare(map.i1.body, undefined, "only what a blocker row needs")
+  }
+
+  function test_index_issues_of_nothing_is_empty() {
+    compare(Object.keys(Board.indexIssues(undefined)).length, 0)
+    compare(Object.keys(Board.indexIssues(null)).length, 0)
+    compare(Object.keys(Board.indexIssues([])).length, 0)
+  }
+
+  function test_resolved_card_prefers_a_card_then_an_issue_then_the_bare_id() {
+    var cardMap = { c1: { id: "c1", title: "Card one", status: "todo" } }
+    var issueMap = { i1: { id: "i1", title: "Broken build", status: "open" },
+                     i2: { id: "i2", title: "Old bug", status: "closed" },
+                     c1: { id: "c1", title: "An issue with a card's id", status: "open" } }
+    var card = Board.resolvedCard("c1", cardMap, issueMap)
+    compare(card.title, "Card one")
+    compare(card.status, "todo")
+    compare(card.inBoard, true)
+    compare(card.kind, undefined)
+    var open = Board.resolvedCard("i1", cardMap, issueMap)
+    compare(open.id, "i1")
+    compare(open.title, "Broken build")
+    compare(open.status, "open")
+    compare(open.kind, "issue")
+    compare(open.inBoard, false)
+    compare(Board.resolvedCard("i2", cardMap, issueMap).status, "closed")
+    var ghost = Board.resolvedCard("ghost", cardMap, issueMap)
+    compare(ghost.title, "ghost")
+    compare(ghost.status, "")
+    compare(ghost.inBoard, false)
+    compare(ghost.kind, undefined)
+    compare(Board.resolvedCard("ghost", cardMap, undefined).title, "ghost")
+  }
+
+  function test_issue_blocker_label_names_the_issue_state() {
+    compare(Board.issueBlockerLabel("open"), "Issue · open")
+    compare(Board.issueBlockerLabel("closed"), "Issue · closed")
+  }
+
+  function test_detail_links_skip_issue_blockers_like_dangling_ids() {
+    var c1 = { id: "c1", title: "C", status: "todo", blocked_by: ["x1", "i1"], children: [] }
+    var x1 = { id: "x1", title: "X", status: "done", blocked_by: [], children: [] }
+    var links = Board.detailLinks(c1, { c1: c1, x1: x1 })
+    compare(links.map(function(l) { return l.section + ":" + l.id }).join(","), "blocker:x1")
+  }
 }

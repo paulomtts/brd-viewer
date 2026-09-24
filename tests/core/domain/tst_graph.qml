@@ -78,4 +78,33 @@ TestCase {
     compare(Graph.graphMove(nodes, "gone", "left"), "a")
     compare(Graph.graphMove([], "", "right"), "")
   }
+
+  function test_open_issue_count_counts_only_open_issue_blockers() {
+    var issues = { i1: { id: "i1", title: "A", status: "open" },
+                   i2: { id: "i2", title: "B", status: "closed" },
+                   i3: { id: "i3", title: "C", status: "open" } }
+    compare(Graph.openIssueCount(makeCard("m", "todo", [], ["i1", "i2", "i3", "m9", "ghost"]), issues), 2)
+    compare(Graph.openIssueCount(makeCard("m", "todo", [], ["i2"]), issues), 0, "a closed issue adds nothing")
+    compare(Graph.openIssueCount(makeCard("m", "todo", [], ["i1", "i1"]), issues), 1, "an id counts once")
+    compare(Graph.openIssueCount(makeCard("m", "todo", []), issues), 0)
+    compare(Graph.openIssueCount(makeCard("m", "todo", [], ["i1"]), undefined), 0)
+    compare(Graph.openIssueCount(undefined, issues), 0)
+  }
+
+  function test_open_issue_label_says_how_many_open_issues_block_a_milestone() {
+    compare(Graph.openIssueLabel(0), "")
+    compare(Graph.openIssueLabel(1), "1 open issue")
+    compare(Graph.openIssueLabel(2), "2 open issues")
+  }
+
+  function test_graph_nodes_carry_their_open_issue_count_and_issues_draw_no_edges() {
+    var issues = { i1: { id: "i1", title: "A", status: "open" },
+                   i2: { id: "i2", title: "B", status: "closed" } }
+    var roots = graphRoots()
+    roots[3].blocked_by = ["i1", "i2"]
+    var g = Graph.graphModel(roots, issues)
+    compare(g.nodes.map(function(n) { return n.openIssues }).join(","), "0,0,0,1")
+    compare(g.edges.map(function(e) { return e.from + ">" + e.to }).join(","), "m1>m2,m2>m3")
+    compare(Graph.graphModel(graphRoots()).nodes[0].openIssues, 0, "no issue map: nothing open")
+  }
 }

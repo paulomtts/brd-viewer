@@ -86,8 +86,37 @@ function boardOrder(roots, statuses) {
   return out
 }
 
+// Issue shape, as returned by `brd issue list`:
+// {id, kind: "issue", title, body, status: "open"|"closed", close_reason, blocks, ...}
+// A card's blocked_by may name an issue; closing it unblocks the card but the
+// id stays in blocked_by. Returns id -> {id, title, status}, all a blocker
+// row or the graph needs.
+function indexIssues(issues) {
+  var issueMap = {}
+  ;(issues || []).forEach(function(issue) {
+    if (!issue || !issue.id) return
+    issueMap[issue.id] = { id: issue.id, title: issue.title || issue.id,
+                           status: issue.status === "closed" ? "closed" : "open" }
+  })
+  return issueMap
+}
+
+// What a link row shows for an id: a card in this board, else an issue, else
+// the bare id. Only a card is inBoard (navigable).
+function resolvedCard(id, cardMap, issueMap) {
+  var card = (cardMap || {})[id]
+  if (card) return { id: id, title: card.title, status: card.status, inBoard: true }
+  var issue = (issueMap || {})[id]
+  if (issue) return { id: id, title: issue.title, status: issue.status, kind: "issue", inBoard: false }
+  return { id: id, title: id, status: "", inBoard: false }
+}
+
+function issueBlockerLabel(status) {
+  return "Issue · " + status
+}
+
 // The clickable rows of a card's detail view, in display order. Dangling
-// blockers (not in cardMap) are not navigable, so they are not listed.
+// blockers and issues (not in cardMap) are not navigable, so they are not listed.
 function detailLinks(card, cardMap) {
   if (!card) return []
   var links = []
