@@ -18,11 +18,13 @@ QtObject {
       app.nav.resetSearch()
       app.graph.graphCursor = ""
       app.board.fetchBoard()
+      app.docs.reset()
     }
     onCleared: {
       app.nav.viewMode = "board"
       app.board.applyTreeData([])
       app.graph.graphCursor = ""
+      app.docs.reset()
     }
     onChosen: app.deleter.lastSnapshot = ""
     onOpened: {
@@ -38,6 +40,17 @@ QtObject {
     viewMode: app.nav.viewMode
     searchQuery: app.nav.searchQuery
     onErrored: function(message) { app.projects.loadError = message }
+  }
+
+  readonly property DocumentsStore docs: DocumentsStore {
+    backendDir: app.backendDir
+    project: app.projects.selectedProject
+    viewMode: app.nav.viewMode
+    searchQuery: app.nav.searchQuery
+    onCategoryToggled: {
+      app.nav.cursorIndex = 0
+      app.nav.scrollOnCursor = false
+    }
   }
 
   readonly property GraphStore graph: GraphStore {
