@@ -6,14 +6,21 @@ import "../../core/domain/graph.js" as Graph
 import "../components" as UI
 import "../theme" as T
 
-// The Graph section: one node per milestone on a pan/zoom canvas. It renders
-// and emits only; Panel.qml owns the model (Graph.graphModel) and the cursor.
+// The Graph section on a pan/zoom canvas, in either of its two views: one node
+// per milestone, or one per story with a labelled box around each milestone's
+// own. It renders and emits only; the store owns the model and the cursor.
 Item {
   id: view
   objectName: "graphView"
 
   property var nodes: []
   property var edges: []
+  // "milestone" or "story": which delegate the nodes take, and whether the
+  // boxes below are drawn at all.
+  property string mode: "milestone"
+  // [{ id, title, x, y, w, h }] -- the story view's milestone boxes, in world
+  // coordinates, empty in the milestone view.
+  property var groups: []
   property string cursorId: ""
   // The one input for every colour and font: Panel passes its Theme down,
   // and a standalone instance renders with the shell defaults.
@@ -30,13 +37,60 @@ Item {
     anchors.fill: parent
     nodes: view.nodes
     edges: view.edges
-    nodeDelegate: milestoneDelegate
+    nodeDelegate: view.mode === "story" ? storyDelegate : milestoneDelegate
     // Read-only board: the canvas may drag nodes around, but never draws a
     // dependency of its own.
     canConnect: function() { return false }
     onNodeClicked: function(id) { view.nodeClicked(id) }
     onWidthChanged: Qt.callLater(canvas.fitAll)
     Component.onCompleted: Qt.callLater(canvas.fitAll)
+
+    // The story view's milestone boxes. The canvas draws nodes and edges only,
+    // so this layer sits inside it, applies the very same camera, and is pushed
+    // behind the canvas's own world item -- the boxes must never cover a node.
+    Item {
+      objectName: "graphGroupLayer"
+      z: -1
+      visible: view.mode === "story"
+      x: canvas.panX
+      y: canvas.panY
+      scale: canvas.zoom
+      transformOrigin: Item.TopLeft
+
+      Repeater {
+        model: view.groups
+
+        delegate: Rectangle {
+          id: box
+          required property var modelData
+
+          objectName: "graphGroup" + (box.modelData ? box.modelData.id : "")
+          x: box.modelData ? box.modelData.x : 0
+          y: box.modelData ? box.modelData.y : 0
+          width: box.modelData ? box.modelData.w : 0
+          height: box.modelData ? box.modelData.h : 0
+          radius: 12
+          color: Qt.alpha(view.theme.foreground, 0.04)
+          border.width: 1
+          border.color: Qt.alpha(view.theme.foreground, 0.18)
+
+          UI.ThemedText {
+            objectName: "graphGroupLabel" + (box.modelData ? box.modelData.id : "")
+            variant: "caption"
+            theme: view.theme
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.leftMargin: 10
+            anchors.topMargin: 6
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            text: box.modelData ? box.modelData.title : ""
+            font.bold: true
+            elide: Text.ElideRight
+          }
+        }
+      }
+    }
   }
 
   // Live refreshes replace the model every time the board changes; only a
@@ -54,7 +108,7 @@ Item {
     theme: view.theme
     anchors.centerIn: parent
     visible: view.nodes.length === 0
-    text: "No milestones in this project."
+    text: view.mode === "story" ? "No stories in this project." : "No milestones in this project."
   }
 
   Component {
@@ -126,6 +180,82 @@ Item {
             anchors.right: parent.right
             visible: (node.entry.openIssues || 0) > 0
             text: "\uF024 " + Graph.openIssueLabel(node.entry.openIssues || 0)
+            color: Board.statusColor("blocked", view.theme.dim)
+          }
+        }
+      }
+    }
+  }
+
+  // A story node: the same frame, status stripe and open-issue flag as a
+  // milestone, with one pip per subtask where the milestone shows done/total.
+  Component {
+    id: storyDelegate
+
+    Rectangle {
+      id: storyNode
+      readonly property var entry: modelData ? modelData
+        : ({ id: "", title: "", status: "", openIssues: 0, pips: [], morePips: 0 })
+      readonly property bool current: entry.id !== "" && view.cursorId === entry.id
+      readonly property color tint: Board.statusColor(entry.status, view.theme.dim)
+      objectName: "graphNode" + entry.id
+      implicitWidth: Graph.STORY_NODE_W
+      implicitHeight: Graph.STORY_NODE_H
+      radius: 8
+      color: Qt.alpha(view.theme.foreground, current ? 0.14 : 0.06)
+      border.width: current ? 2 : 1
+      border.color: current ? view.theme.foreground : Qt.alpha(view.theme.foreground, 0.25)
+
+      Rectangle {
+        width: 5
+        height: parent.height - 2 * storyNode.radius
+        anchors.left: parent.left
+        anchors.leftMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
+        radius: 2
+        color: storyNode.tint
+      }
+
+      Column {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 20
+        anchors.rightMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 6
+
+        UI.ThemedText {
+          objectName: "graphNodeTitle"
+          theme: view.theme
+          width: parent.width
+          text: storyNode.entry.title
+          font.bold: true
+          elide: Text.ElideRight
+        }
+
+        Item {
+          width: parent.width
+          height: Math.max(pips.implicitHeight, storyIssues.implicitHeight)
+
+          UI.StatusPips {
+            id: pips
+            objectName: "graphNodePips"
+            theme: view.theme
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            model: storyNode.entry.pips || []
+            more: storyNode.entry.morePips || 0
+          }
+
+          UI.ThemedText {
+            id: storyIssues
+            objectName: "graphNodeIssues"
+            variant: "caption"
+            theme: view.theme
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            visible: (storyNode.entry.openIssues || 0) > 0
+            text: "\uF024 " + Graph.openIssueLabel(storyNode.entry.openIssues || 0)
             color: Board.statusColor("blocked", view.theme.dim)
           }
         }
