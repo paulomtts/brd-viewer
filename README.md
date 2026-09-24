@@ -65,7 +65,7 @@ section on the right.
   typed a search, Escape clears it first. Going Back restores the list
   highlight and scroll position you left.
 - **Delete a project** - click **Delete project...** in the sidebar footer,
-  then type `delete` to confirm, as in the Claude Memory plugin. This runs
+  then type `delete` in the confirmation dialog (a modal over a dimmed backdrop; Escape or a click outside cancels) to confirm, as in the Claude Memory plugin. This runs
   `brd forget`, which removes the project's board from brd. Your project's
   files are not touched. **A snapshot is always saved first**, to
   `~/Snapshots/brd-viewer/<name>-<timestamp>/` (override with
