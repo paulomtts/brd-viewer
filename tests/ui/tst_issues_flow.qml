@@ -136,6 +136,53 @@ TestCase {
     compare(p.app.extras.selectedIssueId, "")
   }
 
+  // A card's issue-blocker row opens that issue (the README promises it), and
+  // Back from the issue returns to the card, whose own way back is untouched.
+  function test_a_cards_issue_blocker_opens_the_issue_and_back_returns_to_the_card() {
+    var p = make(); if (!p) return
+    p.navigator.openCard("m1")
+    compare(p.app.nav.viewMode, "entry")
+    compare(p.navigator.currentList().map(function(l) { return l.id }).join(","), "i1")
+    p.app.nav.cursorIndex = 0
+    p.navigator.activateCursor()
+    compare(p.app.nav.viewMode, "issue")
+    compare(p.app.extras.selectedIssueId, "i1")
+    compare(p.app.nav.section, "issues")
+    compare(p.app.board.selectedCardId, "m1", "the card stays open behind it")
+    p.shortcuts.closeRequested()
+    compare(p.app.nav.viewMode, "entry", "Escape from that issue returns to the card")
+    compare(p.app.board.selectedCardId, "m1")
+    compare(p.app.extras.selectedIssueId, "")
+    p.navigator.goBack()
+    compare(p.app.nav.viewMode, "board", "and the card still goes back to the board")
+  }
+
+  // The return slot a card opened from an issue uses is the Issues list's own,
+  // so the list comes back on the row it was left on -- not on the detail's
+  // link index -- and no issue is left selected behind it.
+  function test_returning_from_a_card_opened_from_an_issue_restores_the_issues_list() {
+    var p = make(); if (!p) return
+    p.app.extras.applyExportResult(JSON.stringify({ ok: true, data: { issues: [
+      { id: "i0", title: "Newer one", body: "", status: "open", close_reason: null, blocks: [],
+        created_at: "2026-09-22T10:00:00+00:00", updated_at: "2026-09-25T10:00:00+00:00" },
+      { id: "i1", title: "Broken build", body: "b", status: "open", close_reason: null, blocks: ["m1"],
+        created_at: "2026-09-20T10:00:00+00:00", updated_at: "2026-09-24T10:00:00+00:00" }],
+      comments: [], refs: [] } }), 0)
+    p.navigator.showSection("issues")
+    compare(p.navigator.currentList().map(function(i) { return i.id }).join(","), "i0,i1")
+    p.app.nav.cursorIndex = 1
+    p.navigator.activateCursor()
+    compare(p.app.extras.selectedIssueId, "i1")
+    p.app.nav.cursorIndex = 0
+    p.navigator.activateCursor()
+    compare(p.app.nav.viewMode, "entry")
+    compare(p.app.board.selectedCardId, "m1")
+    p.navigator.goBack()
+    compare(p.app.nav.viewMode, "issues")
+    compare(p.app.extras.selectedIssueId, "", "no issue is left selected behind the list")
+    compare(p.app.nav.cursorIndex, 1, "the list comes back on the row it was left on")
+  }
+
   // The keyboard reaches the Issue detail like the card detail does, and the
   // section's modals still swallow the chords.
   function test_the_issue_detail_is_a_keyboard_view_and_the_modals_still_block() {

@@ -191,6 +191,31 @@ TestCase {
     compare(p.app.docs.brdDocsProc.running, true)
   }
 
+  // `brd doc list` syncs every backup as it lists -- it WRITES -- so Ctrl+3
+  // pressed again while the Documents section is already open must not run it.
+  // The plain listing still refreshes.
+  function test_re_entering_the_documents_section_does_not_list_brds_documents_again() {
+    var p = make(); if (!p) return
+    p.navigator.showSection("documents")
+    compare(p.app.docs.brdDocsProc.running, true)
+    p.app.docs.brdDocsProc.running = false
+    var seq = p.app.docs.brdDocsSeq
+    p.navigator.showSection("documents")
+    compare(p.app.docs.brdDocsProc.running, false, "the writing call is not repeated")
+    compare(p.app.docs.brdDocsSeq, seq)
+    compare(p.app.docs.docsLoading, true, "the read-only listing still refreshes")
+    // An open document going back to the section is the same section, too.
+    p.app.docs.applyDocsResult(docList, 0)
+    p.navigator.openDoc("README.md")
+    compare(p.app.nav.viewMode, "document")
+    p.navigator.showSection("documents")
+    compare(p.app.docs.brdDocsProc.running, false)
+    // Leaving the section and coming back does run it again.
+    p.navigator.showSection("board")
+    p.navigator.showSection("documents")
+    compare(p.app.docs.brdDocsProc.running, true)
+  }
+
   function test_a_registered_document_with_no_file_opens_saying_so() {
     var p = make(); if (!p) return
     p.navigator.showSection("documents")

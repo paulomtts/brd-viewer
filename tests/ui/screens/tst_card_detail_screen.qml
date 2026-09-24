@@ -151,7 +151,7 @@ TestCase {
     compare(s.app.board.selectedCardId, "m1")
   }
 
-  function test_an_issue_blocker_shows_its_title_and_state_and_is_not_openable() {
+  function test_an_issue_blocker_shows_its_title_and_state_and_opens_the_issue() {
     var s = make(); if (!s) return
     s.app.board.applyTreeData([
       card("m1", "Milestone one", "todo", "m desc", [], ["x1", "i1", "i2", "ghost"]),
@@ -165,9 +165,9 @@ TestCase {
     compare(rows.map(function(r) { return r.resolved.title }).join(","), "Other milestone,Broken build,Old bug,ghost")
     var open = rows[1]
     var closed = rows[2]
-    compare(open.rowIndex, -1, "an issue is kept out of the keyboard links")
-    compare(closed.rowIndex, -1)
-    compare(s.app.board.detailLinkList.map(function(l) { return l.id }).join(","), "x1")
+    compare(open.rowIndex, 1, "a known issue takes a keyboard link row")
+    compare(closed.rowIndex, 2)
+    compare(s.app.board.detailLinkList.map(function(l) { return l.id }).join(","), "x1,i1,i2")
     var openText = texts(open).join(" | ")
     verify(openText.indexOf("Broken build") >= 0, openText)
     verify(openText.indexOf("Issue · open") >= 0, openText)
@@ -176,8 +176,35 @@ TestCase {
     verify(closed.opacity < 1, "a closed issue is dimmed")
     compare(open.opacity, 1)
     compare(rows[0].opacity, 1)
+    // The README promises this row opens in the Issues section.
+    s.app.extras.applyExportResult(JSON.stringify({ ok: true, data: {
+      issues: [{ id: "i1", title: "Broken build", body: "b", status: "open", close_reason: null,
+                 blocks: ["m1"], created_at: "2026-09-20T10:00:00+00:00",
+                 updated_at: "2026-09-24T10:00:00+00:00" }], comments: [], refs: [] } }), 0)
+    wait(50)
     mouseClick(open)
+    compare(s.app.nav.viewMode, "issue")
+    compare(s.app.extras.selectedIssueId, "i1")
+    compare(s.app.board.selectedCardId, "m1", "the card stays open behind the issue")
+    s.navigator.goBack()
+    compare(s.app.nav.viewMode, "entry", "Back from that issue returns to the card")
     compare(s.app.board.selectedCardId, "m1")
+    compare(s.app.extras.selectedIssueId, "")
+  }
+
+  // An issue the export never carried cannot be opened: the row is inert rather
+  // than switching to a blank Issues detail.
+  function test_an_issue_blocker_the_extras_never_carried_does_not_open() {
+    var s = make(); if (!s) return
+    s.app.board.applyTreeData([card("m1", "Milestone one", "todo", "m desc", [], ["i1"])])
+    s.app.board.applyIssueData([{ id: "i1", kind: "issue", title: "Broken build", status: "open" }])
+    s.navigator.openCard("m1")
+    wait(50)
+    var row = links(s).filter(function(r) { return r.resolved.title === "Broken build" })[0]
+    verify(row, "the issue blocker row")
+    mouseClick(row)
+    compare(s.app.nav.viewMode, "entry")
+    compare(s.app.extras.selectedIssueId, "")
   }
 
   function test_the_card_detail_lists_the_cards_comments() {

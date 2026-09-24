@@ -138,14 +138,17 @@ function issueBlockerLabel(status) {
   return "Issue · " + status
 }
 
-// The clickable rows of a card's detail view, in display order. Dangling
-// blockers and issues (not in cardMap) are not navigable, so they are not listed.
-function detailLinks(card, cardMap) {
+// The clickable rows of a card's detail view, in display order. A blocker is
+// navigable when it is a card of this board (it opens as a card) or an issue
+// the issue map knows (it opens in the Issues section); an id that is neither
+// cannot be opened, so it is not listed.
+function detailLinks(card, cardMap, issueMap) {
   if (!card) return []
+  var issues = issueMap || {}
   var links = []
   if (card.parentId && cardMap[card.parentId]) links.push({ section: "parent", id: card.parentId })
   ;(card.blocked_by || []).forEach(function(id) {
-    if (cardMap[id]) links.push({ section: "blocker", id: id })
+    if (cardMap[id] || issues[id]) links.push({ section: "blocker", id: id })
   })
   ;(card.children || []).forEach(function(child) {
     links.push({ section: "child", id: child.id })

@@ -61,7 +61,9 @@ TestCase {
     compare(proc.workingDirectory, "/home/u/a")
     compare(proc.running, true)
     app.board.dbFile.fileChanged()
-    verify(app.extras.exportProc !== proc, "a database change launches its own run")
+    // The watch is debounced in BoardStore, so the refetch lands a moment later.
+    tryVerify(function() { return app.extras.exportProc !== proc }, 2000,
+              "a database change launches its own run")
     compare(proc.running, false, "the run it supersedes is stopped")
     compare(app.extras.exportProc.running, true, "a database change refetches the extras too")
     app.projects.chooseProject(pB)

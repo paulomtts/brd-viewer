@@ -48,6 +48,17 @@ TestCase {
     compare(Documents.docAbsolutePath("/home/u/p/", "README.md"), "/home/u/p/README.md")
   }
 
+  // The last line of defence: whatever a listing claims, a path that leaves the
+  // project resolves to nothing rather than to a file outside it.
+  function test_doc_absolute_path_refuses_to_leave_the_project() {
+    compare(Documents.docAbsolutePath("/home/u/p", "../../etc/passwd"), "")
+    compare(Documents.docAbsolutePath("/home/u/p", "/etc/passwd"), "")
+    compare(Documents.docAbsolutePath("/home/u/p", "docs/../../etc/passwd"), "")
+    compare(Documents.docAbsolutePath("/home/u/p", "docs\\..\\..\\etc\\passwd"), "")
+    compare(Documents.docAbsolutePath("/home/u/p", ""), "")
+    compare(Documents.docAbsolutePath("/home/u/p", "docs/..hidden.md"), "/home/u/p/docs/..hidden.md")
+  }
+
   function test_doc_too_large() {
     compare(Documents.MAX_DOC_BYTES, 1048576)
     compare(Documents.docTooLarge(1048576), false)

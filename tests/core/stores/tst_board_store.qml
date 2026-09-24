@@ -12,6 +12,8 @@ TestCase {
   property var pA: ({ root_path: "/home/u/a", name: "alpha" })
   property var pB: ({ root_path: "/home/u/b", name: "beta" })
 
+  SignalSpy { id: refetchSpy; signalName: "refetched" }
+
   function card(id, title, status, children, blockedBy) {
     return { id: id, title: title, status: status, description: "d", blocked_by: blockedBy || [], children: children || [] }
   }
@@ -148,7 +150,39 @@ TestCase {
     compare(db.path, "/home/u/a/.brd/brd.db")
     app.board.treeProc.running = false
     db.fileChanged()
+    tryCompare(app.board.treeProc, "running", true)
+  }
+
+  // A brd write touches the database several times in a row; each touch must
+  // not cost a tree + issue + export fetch. The watch is debounced, so a burst
+  // settles into exactly one refetch.
+  function test_a_burst_of_database_changes_refetches_the_board_once() {
+    var app = make(); if (!app) return
+    var spy = refetchSpy
+    spy.target = app.board
+    spy.clear()
+    app.board.treeProc.running = false
+    app.board.dbFile.fileChanged()
+    app.board.dbFile.fileChanged()
+    app.board.dbFile.fileChanged()
+    compare(spy.count, 0, "nothing is fetched while the writes are still arriving")
+    compare(app.board.treeProc.running, false)
+    tryCompare(spy, "count", 1)
     compare(app.board.treeProc.running, true)
+    wait(400)
+    compare(spy.count, 1, "the burst cost exactly one fetch")
+  }
+
+  // Refresh and a project switch are the user asking, not the watch: they fetch
+  // straight away.
+  function test_refresh_and_a_project_switch_still_fetch_immediately() {
+    var app = make(); if (!app) return
+    app.board.treeProc.running = false
+    app.board.fetchBoard()
+    compare(app.board.treeProc.running, true, "Refresh is immediate")
+    app.board.treeProc.running = false
+    app.projects.chooseProject(pB)
+    compare(app.board.treeProc.running, true, "a project switch is immediate")
   }
 
   function test_a_project_change_refetches_the_board() {
@@ -198,7 +232,7 @@ TestCase {
     compare(proc.running, true)
     proc.running = false
     app.board.dbFile.fileChanged()
-    compare(proc.running, true, "a database change refetches the issues too")
+    tryCompare(proc, "running", true, 2000, "a database change refetches the issues too")
     proc.running = false
     app.projects.chooseProject(pB)
     compare(proc.workingDirectory, "/home/u/b")
@@ -223,6 +257,21 @@ TestCase {
     compare(app.board.resolvedCard("s1").inBoard, true)
     compare(app.board.resolvedCard("nope").title, "nope")
     compare(app.projects.loadError, "")
+  }
+
+  // The open card's keyboard link rows include an issue blocker the issue map
+  // knows, so the cursor can land on it and open the Issues section.
+  function test_the_detail_links_of_a_card_include_its_known_issue_blockers() {
+    var app = make(); if (!app) return
+    app.board.applyTreeData([card("c1", "Card", "blocked", [], ["x1", "i1", "ghost"]),
+                             card("x1", "Other", "done")])
+    app.board.applyIssueData([{ id: "i1", title: "Broken build", status: "open" }])
+    app.nav.viewMode = "entry"
+    app.board.openCard("c1")
+    compare(app.board.detailLinkList.map(function(l) { return l.section + ":" + l.id }).join(","),
+            "blocker:x1,blocker:i1")
+    compare(app.board.linkIndex("blocker", "i1"), 1)
+    compare(app.board.linkIndex("blocker", "ghost"), -1)
   }
 
   function test_an_old_brd_without_issues_leaves_an_empty_map_and_no_error() {

@@ -2,6 +2,7 @@
 .import "results.js" as Results
 .import "taxonomy.js" as Taxonomy
 .import "text.js" as Text
+.import "documents.js" as Documents
 
 // The three read-only brd views' data, parsed from `brd export` (comments,
 // refs, issues) and `brd doc list` (registered documents). Pure: no Qt, no I/O.
@@ -53,6 +54,11 @@ function indexComments(data) {
 }
 
 // entityId -> { refs, referencedBy }: what it points at, and what points at it.
+// EXPLICIT references only. `brd export`'s refs[] carry the refs somebody wrote
+// with `--ref` (origin "explicit") and never the origin "link" refs a
+// [[wikilink]] in a body creates; those are reported per entity by `brd show`
+// and `brd issue list`, which this store does not read for refs.
+// tests/contract/test_brd_shapes.py pins that behaviour on the real brd.
 function indexRefs(data) {
   var map = {}
   function slot(id) {
@@ -204,7 +210,12 @@ function parseDocList(stdout, exitCode) {
   var rows = Array.isArray(result.data.data) ? result.data.data : []
   return {
     ok: true,
-    registered: rows.filter(function(d) { return d && d.source_path }).map(function(d) {
+    // A source_path is joined onto the project root to open the file, so one
+    // that leaves the project (absolute, or with a `..` segment) is not a
+    // document of this project: it is dropped rather than shown or opened.
+    registered: rows.filter(function(d) {
+      return d && d.source_path && Documents.isInsideProject(d.source_path)
+    }).map(function(d) {
       return { id: str(d.id), title: str(d.title), sourcePath: String(d.source_path),
                sourceState: str(d.source_state) !== "" ? str(d.source_state) : "ok",
                tags: (d.tags || []).map(String), createdAt: str(d.created_at), updatedAt: str(d.updated_at) }

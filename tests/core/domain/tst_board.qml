@@ -251,10 +251,29 @@ TestCase {
     compare(Board.issueBlockerLabel("closed"), "Issue · closed")
   }
 
+  // Without an issue map there is nothing to resolve an issue blocker against,
+  // so it is as unopenable as a dangling id. The three-argument form below is
+  // what the card detail actually calls.
   function test_detail_links_skip_issue_blockers_like_dangling_ids() {
     var c1 = { id: "c1", title: "C", status: "todo", blocked_by: ["x1", "i1"], children: [] }
     var x1 = { id: "x1", title: "X", status: "done", blocked_by: [], children: [] }
     var links = Board.detailLinks(c1, { c1: c1, x1: x1 })
     compare(links.map(function(l) { return l.section + ":" + l.id }).join(","), "blocker:x1")
+  }
+
+  // An issue blocker the issue map knows IS navigable -- it opens in the Issues
+  // section -- so it takes a keyboard link row, in blocked_by order.
+  function test_detail_links_list_the_issue_blockers_the_issue_map_knows() {
+    var c1 = { id: "c1", title: "C", status: "todo", blocked_by: ["x1", "i1", "ghost"], children: [] }
+    var x1 = { id: "x1", title: "X", status: "done", blocked_by: [], children: [] }
+    var cardMap = { c1: c1, x1: x1 }
+    var issueMap = Board.indexIssues([{ id: "i1", title: "Broken build", status: "open" }])
+    var links = Board.detailLinks(c1, cardMap, issueMap)
+    compare(links.map(function(l) { return l.section + ":" + l.id }).join(","), "blocker:x1,blocker:i1")
+    // A closed issue stays in blocked_by and stays readable, so it stays a row.
+    var closed = Board.indexIssues([{ id: "i1", title: "Broken build", status: "closed" }])
+    compare(Board.detailLinks(c1, cardMap, closed).length, 2)
+    // An id in neither map is still left out.
+    compare(Board.detailLinks(c1, cardMap, {}).map(function(l) { return l.id }).join(","), "x1")
   }
 }

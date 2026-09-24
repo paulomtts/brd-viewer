@@ -230,4 +230,21 @@ TestCase {
     compare(Extras.parseDocList("garbage", 0).registered.length, 0)
     compare(Extras.parseDocList("", 1).registered.length, 0)
   }
+
+  // A registered source_path is joined onto the project root to open the file,
+  // so a path that escapes the project (absolute, or with a `..` segment) is
+  // dropped: it is not a document of this project and must never be opened.
+  function test_a_source_path_that_escapes_the_project_is_dropped() {
+    var line = JSON.stringify({ ok: true, data: [
+      { id: "d1", title: "Fine", source_path: "docs/a.md", source_state: "ok", tags: [] },
+      { id: "d2", title: "Escape", source_path: "../../etc/passwd", source_state: "ok", tags: [] },
+      { id: "d3", title: "Absolute", source_path: "/etc/passwd", source_state: "ok", tags: [] },
+      { id: "d4", title: "Hidden", source_path: "docs/../../etc/passwd", source_state: "ok", tags: [] },
+      { id: "d5", title: "Backslash", source_path: "docs\\..\\..\\etc\\passwd", source_state: "ok", tags: [] },
+      { id: "d6", title: "Dotted", source_path: "docs/..hidden.md", source_state: "ok", tags: [] }] })
+    var result = Extras.parseDocList(line, 0)
+    compare(result.ok, true)
+    compare(result.registered.map(function(d) { return d.id }).join(","), "d1,d6",
+            "only the paths that stay inside the project survive")
+  }
 }

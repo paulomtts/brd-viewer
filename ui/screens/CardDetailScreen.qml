@@ -8,7 +8,7 @@ import "../theme" as T
 
 // One card, opened from the Board or the Graph: its parent, its blockers and
 // its children as keyboard-navigable link rows (an issue blocker is shown with
-// its title and open/closed state, but there is no issue screen to open), plus the kind/status badges,
+// its title and open/closed state and opens in the Issues section), plus the kind/status badges,
 // the description and the card's brd comments. It reads the board store and opens links through the
 // navigator; it owns no state of its own.
 Column {
@@ -93,7 +93,8 @@ Column {
       width: parent.width
       resolved: detailCard.app.board.resolvedCard(modelData)
       rowIndex: detailCard.app.board.linkIndex("blocker", modelData)
-      onActivated: if (resolved.inBoard) detailCard.navigator.openCard(modelData)
+      // A card opens as a card, an issue the board knows opens as an issue.
+      onActivated: detailCard.navigator.openBlocker(modelData)
     }
   }
 
@@ -167,7 +168,7 @@ Column {
     cursorIndex: detailCard.app.nav.cursorIndex
     scrollOnCursor: detailCard.app.nav.scrollOnCursor
     contentMargin: Style.space(6)
-    hoverCursorShape: detailLink.resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
+    hoverCursorShape: detailLink.resolved.inBoard || detailLink.isIssue ? Qt.PointingHandCursor : Qt.ArrowCursor
     onHovered: function(index) { detailCard.navigator.hoverCursor(index) }
     onRevealRequested: function(item) { detailCard.revealRequested(item) }
 

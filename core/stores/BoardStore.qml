@@ -25,6 +25,7 @@ Scope {
   readonly property alias treeProc: treeProc
   readonly property alias issueProc: issueProc
   readonly property alias dbFile: dbFile
+  readonly property alias watchTimer: watchTimer
 
   // The board could not be read, or was read again: the message the panel
   // shows lives on the project store, which App keeps in step.
@@ -74,7 +75,7 @@ Scope {
 
   // The clickable rows of the card being viewed, in display order.
   readonly property var detailLinkList: board.viewMode === "entry"
-    ? Board.detailLinks(board.cardMap[board.selectedCardId], board.cardMap) : []
+    ? Board.detailLinks(board.cardMap[board.selectedCardId], board.cardMap, board.issueMap) : []
 
   function boardIndexOf(id) {
     for (var i = 0; i < board.boardCards.length; i++)
@@ -120,7 +121,19 @@ Scope {
     path: board.dbPath !== "" ? board.dbPath : ""
     watchChanges: true
     printErrors: false
-    onFileChanged: board.fetchBoard()
+    // One brd write touches the database several times, and every touch would
+    // otherwise cost a tree + issue + export fetch. The burst is coalesced into
+    // a single refetch; Refresh and a project switch call fetchBoard() directly
+    // and stay immediate.
+    onFileChanged: watchTimer.restart()
+  }
+
+  Timer {
+    id: watchTimer
+    objectName: "watchTimer"
+    interval: 250
+    repeat: false
+    onTriggered: board.fetchBoard()
   }
 
   Process {

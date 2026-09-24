@@ -29,6 +29,12 @@ QtObject {
   property string returnMode: "board"   // the list a card was opened from
   property real returnScrollY: 0
 
+  // Where an open issue goes back to. An issue reached from a card's blocker
+  // row returns to that card, and the single return slot above -- which holds
+  // the card's own way back -- is left untouched, so Back from the card still
+  // works afterwards.
+  property string issueReturnMode: "issues"   // "issues" | "entry"
+
   property bool dropdownOpen: false
   property string dropdownQuery: ""
   property int dropdownCursor: 0

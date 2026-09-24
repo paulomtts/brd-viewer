@@ -108,6 +108,7 @@ QtObject {
     else if (navi.app.nav.viewMode === "memories") navi.openMemory(list[navi.app.nav.cursorIndex].file)
     else if (navi.app.nav.viewMode === "issues") navi.openIssue(list[navi.app.nav.cursorIndex].id)
     else if (navi.app.nav.viewMode === "issue") navi.openIssueLink(list[navi.app.nav.cursorIndex].id)
+    else if (navi.app.nav.viewMode === "entry") navi.openBlocker(list[navi.app.nav.cursorIndex].id)
     else navi.openCard(list[navi.app.nav.cursorIndex].id)
   }
 
@@ -160,15 +161,21 @@ QtObject {
     if (!navi.app.projects.selectedProject || navi.app.deleter.deleteTarget || navi.app.memories.memoryDeleteOpen || navi.app.memories.newMemoryOpen || navi.app.milestones.dialogOpen) return
     if (navi.app.memories.memoryEditing && navi.app.memories.memoryDraft !== navi.app.memories.memoryText) return
     if (name === "documents" && !navi.documentsEnabled) return
+    var wasSection = navi.app.nav.section
     if (navi.app.nav.dropdownOpen) navi.app.nav.dropdownOpen = false
     navi.resetSearch()
     navi.app.nav.scrollOnCursor = false
     navi.app.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph"
       : name === "memories" ? "memories" : name === "issues" ? "issues" : "board"
     navi.app.memories.memoryEditing = false
-    // Only here: `brd doc list` syncs every backup as it lists, so it follows
-    // the section opening and nothing else.
-    if (name === "documents") { navi.app.docs.fetchDocs(); navi.app.docs.fetchRegisteredDocs() }
+    // Only here: `brd doc list` syncs every backup as it lists -- it WRITES --
+    // so it follows the section being ENTERED and nothing else. Ctrl+3 pressed
+    // again inside the Documents section refreshes the read-only listing and
+    // leaves brd's backups alone.
+    if (name === "documents") {
+      navi.app.docs.fetchDocs()
+      if (wasSection !== "documents") navi.app.docs.fetchRegisteredDocs()
+    }
     if (name === "memories") navi.app.memories.fetchMemories()
     if (name === "graph" && navi.app.graph.graphCursor === "" && navi.app.graph.graph.nodes.length > 0) navi.app.graph.graphCursor = navi.app.graph.graph.nodes[0].id
     Qt.callLater(navi.actions.scrollToTop)
@@ -179,8 +186,12 @@ QtObject {
     var from = navi.app.nav.viewMode
     if (!navi.app.board.openCard(id)) return
     // A card opened from an issue comes back to the Issues list, not the board.
-    if (from === "board" || from === "graph" || from === "issue")
-      navi.app.nav.pushReturn(navi.flick ? navi.flick.contentY : 0, from === "issue" ? "issues" : from)
+    // openIssue() already stored that list's cursor and scroll position, so the
+    // return slot is only re-labelled: overwriting it would bring the list back
+    // on the detail's link index instead of the row the user left.
+    if (from === "issue") navi.app.nav.returnMode = "issues"
+    else if (from === "board" || from === "graph")
+      navi.app.nav.pushReturn(navi.flick ? navi.flick.contentY : 0, from)
     navi.app.nav.viewMode = "entry"
     navi.app.nav.scrollOnCursor = false
     navi.app.nav.cursorIndex = 0
@@ -192,6 +203,8 @@ QtObject {
   // card, same scroll position.
   function restoreListView() {
     var back = navi.app.nav.popReturn()
+    // Back to the Issues list: the issue that led here is no longer open.
+    if (back.mode === "issues") navi.app.extras.restoreIssuesList()
     navi.app.nav.viewMode = back.mode
     navi.app.nav.scrollOnCursor = false
     navi.app.nav.cursorIndex = back.cursor
@@ -245,8 +258,12 @@ QtObject {
   // ---- Issues: the issues themselves live in ExtrasStore; the navigation and
   // focus work around them is here, like the cards and the documents.
   function openIssue(id) {
+    var from = navi.app.nav.viewMode
     if (!navi.app.extras.openIssue(id)) return
-    navi.app.nav.pushReturn(navi.flick ? navi.flick.contentY : 0)
+    // From a card's blocker row the card stays open behind the issue and its
+    // return slot must survive, so only the Issues list pushes one.
+    navi.app.nav.issueReturnMode = from === "entry" ? "entry" : "issues"
+    if (from !== "entry") navi.app.nav.pushReturn(navi.flick ? navi.flick.contentY : 0)
     navi.app.nav.viewMode = "issue"
     navi.app.nav.scrollOnCursor = false
     navi.app.nav.cursorIndex = 0
@@ -263,6 +280,30 @@ QtObject {
     else if (resolved.kind === "issue") navi.openIssue(id)
   }
 
+  // A blocker row of an open card: a card of this board opens as a card, an
+  // issue the board knows opens in the Issues section (the same rule
+  // openIssueLink() follows for an issue's own link rows).
+  function openBlocker(id) {
+    var resolved = navi.app.board.resolvedCard(id)
+    if (resolved.inBoard) navi.openCard(id)
+    else if (resolved.kind === "issue") navi.openIssue(id)
+  }
+
+  // Leaving an issue that was opened from a card: back to that card, with the
+  // cursor on the blocker row it came from. The card's own return position was
+  // never touched, so Back from the card still reaches its list.
+  function restoreCardFromIssue() {
+    var id = navi.app.extras.selectedIssueId
+    navi.app.extras.restoreIssuesList()
+    navi.app.nav.issueReturnMode = "issues"
+    navi.app.nav.viewMode = "entry"
+    navi.app.nav.scrollOnCursor = false
+    var index = navi.app.board.linkIndex("blocker", id)
+    navi.app.nav.cursorIndex = index >= 0 ? index : 0
+    Qt.callLater(navi.actions.scrollToTop)
+    navi.actions.focusForView()
+  }
+
   function restoreIssuesList() {
     navi.app.extras.restoreIssuesList()
     var back = navi.app.nav.popReturn()
@@ -274,7 +315,11 @@ QtObject {
   }
 
   function goBack() {
-    if (navi.app.nav.viewMode === "issue") { navi.restoreIssuesList(); return }
+    if (navi.app.nav.viewMode === "issue") {
+      if (navi.app.nav.issueReturnMode === "entry") navi.restoreCardFromIssue()
+      else navi.restoreIssuesList()
+      return
+    }
     if (navi.app.nav.viewMode === "memory") { if (navi.app.memories.memoryEditing) navi.app.memories.memoryEscape(); else navi.restoreMemoriesList(); return }
     if (navi.app.nav.viewMode === "entry") { navi.restoreListView(); return }
     if (navi.app.nav.viewMode === "document") { navi.restoreDocumentsList(); return }

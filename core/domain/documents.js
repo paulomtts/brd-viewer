@@ -78,7 +78,23 @@ function brdStateLabel(entry) {
   return entry.brd.sourceState === "ok" ? "Registered in brd" : "Registered in brd · " + entry.brd.sourceState
 }
 
+// A path is inside the project when it is relative and no segment is `..`.
+// Both separators are checked: brd stores what it was given, and a Windows-style
+// `docs\..\..\etc` must not slip past a `/`-only test.
+function isInsideProject(relPath) {
+  var text = String(relPath === undefined || relPath === null ? "" : relPath)
+  if (text === "" || text.charAt(0) === "/" || text.charAt(0) === "\\") return false
+  if (/^[A-Za-z]:/.test(text)) return false
+  var parts = text.split(/[\/\\]/)
+  for (var i = 0; i < parts.length; i++) if (parts[i] === "..") return false
+  return true
+}
+
+// The absolute path of a document of this project. A path that would leave the
+// project (absolute, or with a `..` segment) resolves to nothing rather than to
+// a file outside it -- the last line of defence behind parseDocList().
 function docAbsolutePath(rootPath, relPath) {
+  if (!isInsideProject(relPath)) return ""
   return String(rootPath).replace(/\/+$/, "") + "/" + relPath
 }
 

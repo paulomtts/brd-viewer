@@ -26,16 +26,21 @@ manifest entry point.
 - `NavigationStore.qml` view mode, section, push/pop return positions, cursor, search, dropdown.
 - `ProjectStore.qml` registry, selection, remembered project, DB watch path.
 - `ProjectDeleteStore.qml` delete-project confirm/snapshot flow.
-- `BoardStore.qml` cards, index, selection, board order, the issue map (`brd issue list`; an old brd without issues is just an empty map); owns the DB `FileView`.
+- `BoardStore.qml` cards, index, selection, board order, the issue map (`brd issue list`; an old brd without issues is just an empty map); owns the DB `FileView` and the 250ms `watchTimer` that debounces it, so a burst of writes costs one tree+issue+export fetch (`fetchBoard()` itself -- Refresh, a project switch -- stays immediate).
 - `GraphStore.qml` graph model from the board (card roots and issue map, for each milestone's open-issue count), graph cursor and movement.
 - `DocumentsStore.qml` listing, category filter, open document, tagging, plus
   brd's registered documents (`brd doc list`, fetched only when the section
-  opens because it syncs -- writes -- every backup). `mergedDocs` matches the
+  opens because it syncs -- writes -- every backup; re-entering the section you
+  are already in does not run it again, and a `source_path` that leaves the
+  project -- absolute, or with a `..` segment -- is dropped). `mergedDocs` matches the
   listing and the registrations on the path relative to the project root; a
   registration whose file is gone stays in the list as `missing: true`. A failed
   listing leaves the registrations already shown in place.
 - `ExtrasStore.qml` the read-only extras from one `brd export`: comments by
-  entity, refs both ways, and the rich issue list (body, close reason, comment
+  entity, EXPLICIT refs both ways (the export's `refs[]` carry only the refs
+  written with `--ref`; the origin `"link"` refs a `[[wikilink]]` creates are
+  reported per entity by `brd show`/`brd issue list`, which this store does not
+  read), and the rich issue list (body, close reason, comment
   count, and the cards an issue blocks, derived from the export's nested card
   tree because an exported issue carries no `blocks` of its own). Fetched with
   the board through `BoardStore.refetched()`, and any failure -- an old brd

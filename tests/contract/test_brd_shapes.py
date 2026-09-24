@@ -77,6 +77,22 @@ def test_export_carries_every_collection_and_the_same_issue_facts(board):
         assert key in document, key
 
 
+def test_the_export_carries_only_explicit_refs_never_wikilink_ones(board):
+    """Why the panel says "explicit references only": `brd export`'s refs[] hold
+    the refs somebody wrote with `--ref`, and never the origin:"link" refs a
+    [[wikilink]] in a body creates. Those exist -- `brd show` and
+    `brd issue list` report them per entity -- but the export does not carry
+    them, so indexRefs() cannot see them either."""
+    run, card, _child, issue, _nested = board
+    linker = run("add", "--title", "Linker", "--description", "see [[%s]]" % card["id"])
+    data = run("export")
+    assert {r["origin"] for r in data["refs"]} == {"explicit"}
+    assert [r for r in data["refs"] if r["src_id"] == linker["id"]] == []
+    assert {r["dst_id"] for r in data["refs"] if r["src_id"] == issue["id"]} == {card["id"]}
+    # The very same wikilink IS reported by the per-entity commands.
+    assert [r["origin"] for r in run("show", linker["id"])["refs"]] == ["link"]
+
+
 def test_the_export_drops_an_issues_blocks_and_keeps_them_on_the_card_tree(board):
     """indexBlockedCards() exists because of this: the export's issues carry no
     `blocks`, so the relation is read back off the nested cards' `blocked_by`."""

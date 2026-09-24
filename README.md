@@ -105,8 +105,10 @@ until it is next saved, and existing snapshots and backups are left in their
   chips carry their counts; clicking the active one shows everything again, and
   the search box matches an issue's title, body and id. Enter or a click opens
   the issue: its status and close reason, its body as Markdown, the cards it
-  blocks, its references and what references it - each navigable when the target
-  is a card of this board or another issue - and its comments. Read-only: the
+  blocks, its explicit references and what explicitly references it - each
+  navigable when the target is a card of this board or another issue - and its
+  comments. Only references written with brd's `--ref` are listed: `brd export`
+  does not carry the ones a `[[wikilink]]` in a body creates. Read-only: the
   panel never opens, closes or comments on an issue.
 - **Documents** - lists every `.md` file under `docs/` (at most 500; a note says
   when the list was cut off). Each document has one type: Architecture, Specs,
@@ -140,7 +142,7 @@ until it is next saved, and existing snapshots and backups are left in their
 - **Live refresh** - watches the selected project's `brd` database file
   and re-fetches automatically when it changes on disk (e.g. an agent
   updates the board while the panel is open), plus a manual refresh
-  button.
+  button. The watch is debounced, so a burst of writes costs one refetch.
 - **Breadcrumbs** - the toolbar always leads with the trail to where you are:
   `Board`, or `Board › Milestone › Story › Subtask` inside a card (`Graph ›` …
   when the card was opened from the graph, `Issues ›` when it was opened from an
