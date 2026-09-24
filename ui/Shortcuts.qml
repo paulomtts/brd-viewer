@@ -18,8 +18,8 @@ QtObject {
   // Shortcuts that work wherever the caret is. Returns true when it handled the
   // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
   // move things underneath it. The digit chords follow the order the sidebar
-  // lists its sections in (Board, Graph, Documents, Memories) -- renumbering
-  // one means renumbering the sidebar too.
+  // lists its sections in (Board, Graph, Documents, Memories, Issues) --
+  // renumbering one means renumbering the sidebar too.
   function handleGlobalKey(event) {
     if (!(event.modifiers & Qt.ControlModifier) || keys.app.deleter.deleteTarget || keys.app.memories.memoryDeleteOpen || keys.app.memories.newMemoryOpen || keys.app.milestones.dialogOpen) return false
     if (event.key === Qt.Key_P) { keys.navigator.toggleDropdown(); return true }
@@ -27,6 +27,7 @@ QtObject {
     if (event.key === Qt.Key_2) { keys.navigator.showSection("graph"); return true }
     if (event.key === Qt.Key_3) { keys.navigator.showSection("documents"); return true }
     if (event.key === Qt.Key_4) { keys.navigator.showSection("memories"); return true }
+    if (event.key === Qt.Key_5) { keys.navigator.showSection("issues"); return true }
     if (event.key === Qt.Key_N && keys.app.nav.viewMode === "memories") { keys.app.memories.openNewMemory(); return true }
     if (event.key === Qt.Key_E && keys.app.nav.viewMode === "memory") { keys.app.memories.startMemoryEdit(); return true }
     return false
@@ -34,7 +35,7 @@ QtObject {
 
   // Escape (and the key catcher's close gesture): innermost thing first.
   function closeRequested() {
-    keys.app.deleter.deleteTarget ? keys.app.deleter.cancelDelete() : keys.app.memories.memoryDeleteOpen ? keys.app.memories.cancelMemoryDelete() : keys.app.memories.newMemoryOpen ? keys.app.memories.cancelNewMemory() : keys.app.milestones.dialogOpen ? keys.app.milestones.cancelDialog() : (keys.app.nav.dropdownOpen ? keys.navigator.closeDropdown() : ((keys.app.nav.viewMode === "entry" || keys.app.nav.viewMode === "document" || keys.app.nav.viewMode === "memory") ? keys.navigator.goBack() : keys.actions.close()))
+    keys.app.deleter.deleteTarget ? keys.app.deleter.cancelDelete() : keys.app.memories.memoryDeleteOpen ? keys.app.memories.cancelMemoryDelete() : keys.app.memories.newMemoryOpen ? keys.app.memories.cancelNewMemory() : keys.app.milestones.dialogOpen ? keys.app.milestones.cancelDialog() : (keys.app.nav.dropdownOpen ? keys.navigator.closeDropdown() : ((keys.app.nav.viewMode === "entry" || keys.app.nav.viewMode === "document" || keys.app.nav.viewMode === "memory" || keys.app.nav.viewMode === "issue") ? keys.navigator.goBack() : keys.actions.close()))
   }
 
   function handleMove(dx, dy) {
@@ -43,18 +44,19 @@ QtObject {
       else if (dy !== 0) keys.navigator.moveGraph(dy < 0 ? "up" : "down")
       return
     }
-    if (dx < 0 && (keys.app.nav.viewMode === "entry" || keys.app.nav.viewMode === "document" || keys.app.nav.viewMode === "memory")) { keys.navigator.goBack(); return }
-    if (keys.app.nav.viewMode !== "entry" && keys.app.nav.viewMode !== "document" && keys.app.nav.viewMode !== "memory") return
-    if (dx > 0) { if (keys.app.nav.viewMode === "entry") keys.navigator.activateCursor(); return }
+    if (dx < 0 && (keys.app.nav.viewMode === "entry" || keys.app.nav.viewMode === "document" || keys.app.nav.viewMode === "memory" || keys.app.nav.viewMode === "issue")) { keys.navigator.goBack(); return }
+    if (keys.app.nav.viewMode !== "entry" && keys.app.nav.viewMode !== "document" && keys.app.nav.viewMode !== "memory" && keys.app.nav.viewMode !== "issue") return
+    if (dx > 0) { if (keys.app.nav.viewMode === "entry" || keys.app.nav.viewMode === "issue") keys.navigator.activateCursor(); return }
     if (dy === 0) return
-    // Links are the cursor's targets; a card without any is just text,
-    // so the arrows scroll it instead.
-    if (keys.app.nav.viewMode === "entry" && keys.app.board.detailLinkList.length > 0) keys.navigator.moveCursor(dy)
+    // Links are the cursor's targets; a card or an issue without any is just
+    // text, so the arrows scroll it instead.
+    if ((keys.app.nav.viewMode === "entry" && keys.app.board.detailLinkList.length > 0)
+        || (keys.app.nav.viewMode === "issue" && keys.app.extras.detailLinkList.length > 0)) keys.navigator.moveCursor(dy)
     else keys.actions.scrollBy(dy * Style.space(56))
   }
 
   function handleActivate() {
-    if (keys.app.nav.viewMode === "entry") keys.navigator.activateCursor()
+    if (keys.app.nav.viewMode === "entry" || keys.app.nav.viewMode === "issue") keys.navigator.activateCursor()
     else if (keys.app.nav.viewMode === "graph") keys.navigator.activateGraphNode()
   }
 

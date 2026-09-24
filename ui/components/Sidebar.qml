@@ -96,6 +96,9 @@ Item {
     NavRow { objectName: "navGraph"; label: "Graph"; iconText: "\uf0e8"; section: "graph"; enabled: sidebar.hasProject }
     NavRow { objectName: "navDocuments"; label: "Documents"; iconText: "\uf15c"; section: "documents"; enabled: sidebar.hasProject && sidebar.documentsEnabled }
     NavRow { objectName: "navMemories"; label: "Memories"; iconText: "\udb82\uddd1"; section: "memories"; enabled: sidebar.hasProject }
+    // Appended after Memories, so the digit chords keep their meaning and
+    // Issues is Ctrl+5. Its glyph is the Nerd Font bug (U+F188).
+    NavRow { objectName: "navIssues"; label: "Issues"; iconText: "\uf188"; section: "issues"; enabled: sidebar.hasProject }
 
     Item { Layout.fillHeight: true }
 

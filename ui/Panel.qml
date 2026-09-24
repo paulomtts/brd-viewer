@@ -79,6 +79,14 @@ Panel {
     function onListViewRequested() { navi.restoreListView() }
   }
 
+  // The open issue left the export (closed and pruned, or another project):
+  // back to the Issues list.
+  Connections {
+    target: appStores.extras
+    function onListViewRequested() { navi.restoreIssuesList() }
+    function onStatusToggled() { Qt.callLater(root.scrollToTop) }
+  }
+
   // The dialog picks one of the project's Markdown documents, so the documents
   // listing has to exist by the time the list is drawn. The store never reaches
   // for another store: the panel does the fetching when the dialog opens, once
@@ -153,7 +161,7 @@ Panel {
     : appStores.milestones.dialogOpen ? newMilestoneDialog.focusItem
     : (appStores.nav.viewMode === "memory" && appStores.memories.memoryEditing) ? memoryNoteScreen.editorItem
     : appStores.nav.dropdownOpen ? sidebar.filterItem
-    : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "graph" || !appStores.projects.selectedProject) ? keyCatcher
+    : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "issue" || appStores.nav.viewMode === "graph" || !appStores.projects.selectedProject) ? keyCatcher
     : searchField
 
   function focusForView() {
@@ -316,7 +324,7 @@ Panel {
           UI.ActionButton {
             objectName: "refreshButton"
             theme: panelTheme
-            visible: appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph" || appStores.nav.viewMode === "memories"
+            visible: appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph" || appStores.nav.viewMode === "memories" || appStores.nav.viewMode === "issues"
             text: ""
             iconText: ""
             tooltipText: "Refresh"
@@ -369,10 +377,10 @@ Panel {
         TextField {
           id: searchField
           objectName: "searchField"
-          visible: !!appStores.projects.selectedProject && (appStores.nav.viewMode === "board" || appStores.nav.viewMode === "documents" || appStores.nav.viewMode === "memories")
+          visible: !!appStores.projects.selectedProject && (appStores.nav.viewMode === "board" || appStores.nav.viewMode === "documents" || appStores.nav.viewMode === "memories" || appStores.nav.viewMode === "issues")
           width: parent.width
           foreground: root.foreground
-          placeholderText: appStores.nav.viewMode === "documents" ? "Search documents…" : appStores.nav.viewMode === "memories" ? "Search memories…" : "Search cards…"
+          placeholderText: appStores.nav.viewMode === "documents" ? "Search documents…" : appStores.nav.viewMode === "memories" ? "Search memories…" : appStores.nav.viewMode === "issues" ? "Search issues…" : "Search cards…"
           text: appStores.nav.searchQuery
           Keys.forwardTo: [globalKeys]
 
@@ -491,6 +499,22 @@ Panel {
           }
 
           CardDetailScreen {
+            width: parent.width
+            app: appStores
+            navigator: navi
+            theme: panelTheme
+            onRevealRequested: function(item) { root.scrollItemIntoView(item) }
+          }
+
+          IssuesScreen {
+            width: parent.width
+            app: appStores
+            navigator: navi
+            theme: panelTheme
+            onRevealRequested: function(item) { root.scrollItemIntoView(item) }
+          }
+
+          IssueDetailScreen {
             width: parent.width
             app: appStores
             navigator: navi

@@ -21,6 +21,8 @@ QtObject {
     if (navi.app.nav.viewMode === "entry") return navi.app.board.detailLinkList
     if (navi.app.nav.viewMode === "documents") return navi.app.docs.filteredDocs
     if (navi.app.nav.viewMode === "memories") return navi.app.memories.filteredMemories
+    if (navi.app.nav.viewMode === "issues") return navi.app.extras.filteredIssues
+    if (navi.app.nav.viewMode === "issue") return navi.app.extras.detailLinkList
     return []
   }
 
@@ -37,7 +39,12 @@ QtObject {
     if (!navi.app) return []
     if (!navi.app.projects.selectedProject) return [{ label: "Project Manager", clickable: false }]
     var mode = navi.app.nav.viewMode
-    var section = { label: navi.app.nav.sectionTitle, clickable: mode === "entry" || mode === "document" || mode === "memory" }
+    var section = { label: navi.app.nav.sectionTitle,
+                    clickable: mode === "entry" || mode === "document" || mode === "memory" || mode === "issue" }
+    if (mode === "issue") {
+      var issue = navi.app.extras.selectedIssue
+      return [section, { label: issue ? issue.title : navi.app.extras.selectedIssueId, clickable: false }]
+    }
     if (mode === "document")
       return [section, { label: navi.documentTitle(navi.app.docs.selectedDocPath), clickable: false }]
     if (mode === "memory") {
@@ -99,6 +106,8 @@ QtObject {
     if (navi.app.nav.cursorIndex < 0 || navi.app.nav.cursorIndex >= list.length) return
     if (navi.app.nav.viewMode === "documents") navi.openDoc(list[navi.app.nav.cursorIndex].path)
     else if (navi.app.nav.viewMode === "memories") navi.openMemory(list[navi.app.nav.cursorIndex].file)
+    else if (navi.app.nav.viewMode === "issues") navi.openIssue(list[navi.app.nav.cursorIndex].id)
+    else if (navi.app.nav.viewMode === "issue") navi.openIssueLink(list[navi.app.nav.cursorIndex].id)
     else navi.openCard(list[navi.app.nav.cursorIndex].id)
   }
 
@@ -154,7 +163,8 @@ QtObject {
     if (navi.app.nav.dropdownOpen) navi.app.nav.dropdownOpen = false
     navi.resetSearch()
     navi.app.nav.scrollOnCursor = false
-    navi.app.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : name === "memories" ? "memories" : "board"
+    navi.app.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph"
+      : name === "memories" ? "memories" : name === "issues" ? "issues" : "board"
     navi.app.memories.memoryEditing = false
     if (name === "documents") navi.app.docs.fetchDocs()
     if (name === "memories") navi.app.memories.fetchMemories()
@@ -166,8 +176,9 @@ QtObject {
   function openCard(id) {
     var from = navi.app.nav.viewMode
     if (!navi.app.board.openCard(id)) return
-    if (from === "board" || from === "graph")
-      navi.app.nav.pushReturn(navi.flick ? navi.flick.contentY : 0, from)
+    // A card opened from an issue comes back to the Issues list, not the board.
+    if (from === "board" || from === "graph" || from === "issue")
+      navi.app.nav.pushReturn(navi.flick ? navi.flick.contentY : 0, from === "issue" ? "issues" : from)
     navi.app.nav.viewMode = "entry"
     navi.app.nav.scrollOnCursor = false
     navi.app.nav.cursorIndex = 0
@@ -241,7 +252,27 @@ QtObject {
     navi.actions.focusForView()
   }
 
+  // A link row of an open issue: a card opens as a card, a known issue as an
+  // issue. openIssue() pushes its own return position, so an issue reached from
+  // an issue still comes back one step at a time.
+  function openIssueLink(id) {
+    var resolved = navi.app.extras.resolvedTarget(id)
+    if (resolved.inBoard) navi.openCard(id)
+    else if (resolved.kind === "issue") navi.openIssue(id)
+  }
+
+  function restoreIssuesList() {
+    navi.app.extras.restoreIssuesList()
+    var back = navi.app.nav.popReturn()
+    navi.app.nav.viewMode = "issues"
+    navi.app.nav.scrollOnCursor = false
+    navi.app.nav.cursorIndex = back.cursor
+    Qt.callLater(function() { if (navi.flick) navi.actions.scrollBy(back.scrollY - navi.flick.contentY) })
+    navi.actions.focusForView()
+  }
+
   function goBack() {
+    if (navi.app.nav.viewMode === "issue") { navi.restoreIssuesList(); return }
     if (navi.app.nav.viewMode === "memory") { if (navi.app.memories.memoryEditing) navi.app.memories.memoryEscape(); else navi.restoreMemoriesList(); return }
     if (navi.app.nav.viewMode === "entry") { navi.restoreListView(); return }
     if (navi.app.nav.viewMode === "document") { navi.restoreDocumentsList(); return }

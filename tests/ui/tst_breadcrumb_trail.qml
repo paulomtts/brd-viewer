@@ -19,6 +19,12 @@ TestCase {
     '{"path": "docs/untitled.md", "size": 10}], "truncated": false}'
   property string memList: '{"ok": true, "found": true, "memory_dir": "/c/-home-u-a/memory", "notes": [' +
     '{"file": "user_role.md", "name": "Role", "description": "d", "type": "user", "size": 10, "indexed": true}]}'
+  // i1 blocks "m1", the board's top-level card, so a link row of the issue
+  // detail opens a card whose ancestors the trail can list.
+  property string exportLine: JSON.stringify({ ok: true, data: {
+    issues: [{ id: "i1", title: "Broken build", body: "b", status: "open", close_reason: null,
+               blocks: ["m1"], created_at: "2026-09-20T10:00:00+00:00", updated_at: "2026-09-24T10:00:00+00:00" }],
+    comments: [], refs: [] } })
 
   function card(id, title, status, children) {
     return { id: id, title: title, status: status, description: "d", blocked_by: [], children: children || [] }
@@ -154,6 +160,41 @@ TestCase {
     compare(labels(n), "Board › Milestone One › Story One")
     n.activateCrumb(1)
     compare(n.app.board.selectedCardId, "m1")
+  }
+
+  function issued() {
+    var n = boarded(); if (!n) return null
+    n.app.board.applyIssueData([{ id: "i1", title: "Broken build", status: "open" }])
+    if (n.app.extras.exportProc) {
+      n.app.extras.exportProc.running = false
+      n.app.extras.exportProc.launchGuard = "stale"
+    }
+    n.app.extras.extrasLoading = false
+    n.app.extras.applyExportResult(exportLine, 0)
+    n.showSection("issues")
+    return n
+  }
+
+  function test_an_open_issue_shows_its_title_and_the_section_goes_back() {
+    var n = issued(); if (!n) return
+    compare(labels(n), "Issues")
+    n.openIssue("i1")
+    compare(labels(n), "Issues › Broken build")
+    compare(clickable(n), "10")
+    n.activateCrumb(0)
+    compare(n.app.nav.viewMode, "issues")
+  }
+
+  // A card reached from an issue keeps the Issues trail, and Back returns to
+  // the Issues list rather than the Board.
+  function test_a_card_opened_from_an_issue_starts_at_the_issues_section() {
+    var n = issued(); if (!n) return
+    n.openIssue("i1")
+    n.openIssueLink("m1")
+    compare(n.app.nav.viewMode, "entry")
+    compare(labels(n), "Issues › Milestone One")
+    n.goBack()
+    compare(n.app.nav.viewMode, "issues")
   }
 
   function test_the_current_crumb_does_nothing() {

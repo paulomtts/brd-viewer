@@ -138,7 +138,7 @@ TestCase {
 
   function test_every_navigation_row_carries_its_own_icon_glyph() {
     var sb = make()
-    var names = ["navIconBoard", "navIconGraph", "navIconDocuments", "navIconMemories"]
+    var names = ["navIconBoard", "navIconGraph", "navIconDocuments", "navIconMemories", "navIconIssues"]
     var glyphs = []
     var size = -1
     for (var i = 0; i < names.length; i++) {
@@ -165,8 +165,20 @@ TestCase {
       navIconBoard: "\uf0db",        // columns
       navIconGraph: "\uf0e8",        // sitemap
       navIconDocuments: "\uf15c",    // file-lines
-      navIconMemories: "\udb82\uddd1" // brain (U+F09D1)
+      navIconMemories: "\udb82\uddd1", // brain (U+F09D1)
+      navIconIssues: "\uf188"        // bug
     }
     for (var name in wanted) compare(String(find(sb, name).text), wanted[name], name)
+  }
+
+  function test_the_sidebar_lists_issues_last_with_its_own_icon() {
+    var sb = make()
+    var row = find(sb, "navIssues")
+    verify(row, "the Issues nav row")
+    compare(String(find(sb, "navIconIssues").text), "\uf188")
+    verify(row.y > find(sb, "navMemories").y, "Issues comes after Memories, so it is Ctrl+5")
+    click(row)
+    compare(sectionSpy.count, 1)
+    compare(sectionSpy.signalArguments[0][0], "issues")
   }
 }

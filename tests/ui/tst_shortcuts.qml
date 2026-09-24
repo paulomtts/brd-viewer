@@ -20,6 +20,14 @@ TestCase {
     '{"file": "user_role.md", "name": "Role", "description": "d", "type": "user", "size": 10, "indexed": true},' +
     '{"file": "feedback_a.md", "name": "Terse", "description": "d", "type": "feedback", "size": 10, "indexed": true}]}'
 
+  // i1 blocks a card of this board (one link row), i2 blocks nothing.
+  property string exportLine: JSON.stringify({ ok: true, data: {
+    issues: [{ id: "i1", title: "Broken build", body: "b", status: "open", close_reason: null,
+               blocks: ["m1"], created_at: "2026-09-20T10:00:00+00:00", updated_at: "2026-09-24T10:00:00+00:00" },
+             { id: "i2", title: "Lonely", body: "b", status: "open", close_reason: null,
+               blocks: [], created_at: "2026-09-19T10:00:00+00:00", updated_at: "2026-09-19T10:00:00+00:00" }],
+    comments: [], refs: [] } })
+
   property var calls: []
   property var flick: null
   property bool atEnd: true
@@ -61,6 +69,21 @@ TestCase {
     return s
   }
 
+  function inIssues() {
+    var s = make(); if (!s) return null
+    s.app.board.applyTreeData([card("m1", "Milestone", "blocked")])
+    s.app.board.applyIssueData([{ id: "i1", title: "Broken build", status: "open" }])
+    wait(50)
+    if (s.app.extras.exportProc) {
+      s.app.extras.exportProc.running = false
+      s.app.extras.exportProc.launchGuard = "stale"
+    }
+    s.app.extras.extrasLoading = false
+    s.app.extras.applyExportResult(exportLine, 0)
+    s.navigator.showSection("issues")
+    return s
+  }
+
   function inMemories() {
     var s = make(); if (!s) return null
     s.navigator.showSection("memories")
@@ -70,11 +93,12 @@ TestCase {
 
   // ---- Ctrl chords
 
-  // The digits follow the sidebar's order: Board, Graph, Documents, Memories.
+  // The digits follow the sidebar's order: Board, Graph, Documents, Memories,
+  // Issues.
   function test_the_ctrl_digits_follow_the_order_of_the_sidebar_sections() {
     var s = make(); if (!s) return
-    var wanted = ["board", "graph", "documents", "memories"]
-    var digits = [Qt.Key_1, Qt.Key_2, Qt.Key_3, Qt.Key_4]
+    var wanted = ["board", "graph", "documents", "memories", "issues"]
+    var digits = [Qt.Key_1, Qt.Key_2, Qt.Key_3, Qt.Key_4, Qt.Key_5]
     for (var i = 0; i < digits.length; i++) {
       compare(s.handleGlobalKey(ctrl(digits[i])), true, wanted[i])
       compare(s.app.nav.section, wanted[i])
@@ -231,6 +255,55 @@ TestCase {
     s.navigator.openCard("m1")
     s.handleActivate()
     compare(s.app.board.selectedCardId, "s1")
+  }
+
+  // ---- An open issue is a keyboard view exactly like a card
+
+  function test_the_left_arrow_goes_back_from_an_open_issue() {
+    var s = inIssues(); if (!s) return
+    s.navigator.openIssue("i1")
+    s.handleMove(-1, 0)
+    compare(s.app.nav.viewMode, "issues")
+  }
+
+  function test_the_arrows_move_the_cursor_in_an_issue_that_has_links() {
+    var s = inIssues(); if (!s) return
+    s.navigator.openIssue("i1")
+    verify(s.app.extras.detailLinkList.length > 0, "the issue has links")
+    tc.calls = []
+    s.handleMove(0, 1)
+    compare(tc.calls.length, 0, "the cursor moved instead of scrolling")
+  }
+
+  function test_the_arrows_scroll_an_issue_that_has_no_links() {
+    var s = inIssues(); if (!s) return
+    s.navigator.openIssue("i2")
+    compare(s.app.extras.detailLinkList.length, 0)
+    tc.calls = []
+    s.handleMove(0, 1)
+    compare(tc.calls.length, 1)
+    verify(String(tc.calls[0]).indexOf("by:") === 0, "the issue scrolled instead of moving a cursor")
+  }
+
+  function test_activate_and_the_right_arrow_follow_the_cursor_link_of_an_issue() {
+    var s = inIssues(); if (!s) return
+    s.navigator.openIssue("i1")
+    s.handleActivate()
+    compare(s.app.nav.viewMode, "entry")
+    compare(s.app.board.selectedCardId, "m1")
+    s.navigator.goBack()
+    compare(s.app.nav.viewMode, "issues")
+    s.navigator.openIssue("i1")
+    s.handleMove(1, 0)
+    compare(s.app.board.selectedCardId, "m1")
+  }
+
+  function test_escape_goes_back_from_an_open_issue_before_closing_the_panel() {
+    var s = inIssues(); if (!s) return
+    s.navigator.openIssue("i1")
+    s.closeRequested()
+    compare(s.app.nav.viewMode, "issues")
+    compare(tc.calls.indexOf("close"), -1)
   }
 
   // ---- The search field

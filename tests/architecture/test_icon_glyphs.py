@@ -84,3 +84,4 @@ def test_the_sources_actually_carry_the_glyphs_this_guard_is_for():
     found = {cp for path in qml_sources() for cp in glyphs_of(path.read_text())}
     assert 0xF021 in found, "the toolbar's refresh icon"
     assert 0xF0DB in found, "the sidebar's Board icon"
+    assert 0xF188 in found, "the sidebar's Issues icon"

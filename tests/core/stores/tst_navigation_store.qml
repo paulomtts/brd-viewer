@@ -29,6 +29,26 @@ TestCase {
     compare(n.section, "graph"); compare(n.sectionTitle, "Graph")
   }
 
+  function test_the_issues_view_modes_share_one_section() {
+    var nav = make(); if (!nav) return
+    nav.viewMode = "issues"
+    compare(nav.section, "issues")
+    compare(nav.sectionTitle, "Issues")
+    nav.viewMode = "issue"
+    compare(nav.section, "issues")
+    compare(nav.sectionTitle, "Issues")
+  }
+
+  // A card opened from an issue is still the Issues section, so the sidebar
+  // keeps Issues lit and the trail keeps saying "Issues".
+  function test_a_card_opened_from_an_issue_keeps_the_issues_section() {
+    var nav = make(); if (!nav) return
+    nav.viewMode = "entry"
+    nav.returnMode = "issues"
+    compare(nav.section, "issues")
+    compare(nav.sectionTitle, "Issues")
+  }
+
   function test_a_card_opened_from_the_graph_keeps_the_graph_section() {
     var n = make(); if (!n) return
     n.viewMode = "entry"
