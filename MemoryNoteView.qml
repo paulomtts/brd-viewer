@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
 import "core/domain/documents.js" as Documents
@@ -35,7 +34,7 @@ Column {
     fontFamily: view.fontFamily
   }
   readonly property bool dirty: view.draft !== view.text
-  readonly property Item editorItem: editor
+  readonly property Item editorItem: editorBox.editorItem
 
   signal editRequested()
   signal deleteRequested()
@@ -166,37 +165,18 @@ Column {
     textFormat: Text.MarkdownText
   }
 
-  Rectangle {
+  UI.TextAreaBox {
+    id: editorBox
     visible: view.editing
     width: parent.width
-    height: Math.max(Style.space(280), editor.implicitHeight + Style.space(16))
-    radius: Style.space(6)
-    color: Qt.alpha(view.foreground, 0.06)
-    border.width: 1
-    border.color: editor.activeFocus ? view.foreground : Qt.alpha(view.foreground, 0.3)
-
-    Controls.TextArea {
-      id: editor
-      objectName: "memoryEditor"
-      anchors.fill: parent
-      anchors.margins: Style.space(8)
-      background: null
-      text: view.draft
-      color: view.foreground
-      font.family: view.fontFamily
-      font.pixelSize: Style.font.bodySmall
-      wrapMode: TextEdit.Wrap
-      selectByMouse: true
-      enabled: !view.busy
-      onTextChanged: if (text !== view.draft) view.draftEdited(text)
-
-      Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Escape) { view.escapePressed(); event.accepted = true; return }
-        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_S) {
-          view.saveRequested(); event.accepted = true
-        }
-      }
-    }
+    minHeight: Style.space(280)
+    editorObjectName: "memoryEditor"
+    theme: view.theme
+    enabled: !view.busy
+    text: view.draft
+    onEdited: function(text) { if (text !== view.draft) view.draftEdited(text) }
+    onEscapePressed: view.escapePressed()
+    onSubmitRequested: view.saveRequested()
   }
 
   Text {

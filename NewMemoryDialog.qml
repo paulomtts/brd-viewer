@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
 import "core/domain/memories.js" as Memories
@@ -107,34 +106,16 @@ Item {
       }
     }
 
-    Rectangle {
+    UI.TextAreaBox {
+      id: bodyArea
       width: parent.width
       height: Style.space(160)
-      radius: Style.space(6)
-      color: Qt.alpha(dialog.foreground, 0.06)
-      border.width: 1
-      border.color: bodyArea.activeFocus ? dialog.foreground : Qt.alpha(dialog.foreground, 0.3)
-
-      Controls.TextArea {
-        id: bodyArea
-        objectName: "newMemoryBody"
-        anchors.fill: parent
-        anchors.margins: Style.space(8)
-        background: null
-        placeholderText: "What should be remembered?"
-        color: dialog.foreground
-        font.family: dialog.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        wrapMode: TextEdit.Wrap
-        selectByMouse: true
-        enabled: !dialog.busy
-        Keys.onPressed: function(event) {
-          if (event.key === Qt.Key_Escape) { dialog.cancelRequested(); event.accepted = true }
-          else if ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-            dialog.submit(); event.accepted = true
-          }
-        }
-      }
+      editorObjectName: "newMemoryBody"
+      placeholder: "What should be remembered?"
+      theme: dialog.theme
+      enabled: !dialog.busy
+      onEscapePressed: dialog.cancelRequested()
+      onSubmitRequested: dialog.submit()
     }
 
     Text {
