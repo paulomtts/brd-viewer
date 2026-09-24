@@ -79,10 +79,28 @@ Item {
   }
   readonly property var boxKeys: (view.liveGroups || []).map(function(box) { return Positions.key(box.id) })
 
-  // Moving a whole box by a world delta: every story it holds moves with it,
-  // and nothing else does.
+  // One frame of a box move: the stories it holds are moved in the canvas's own
+  // working positions, so the boxes, the box edges and the nodes all follow the
+  // pointer WITHOUT a new nodes array -- which would lay the whole graph out
+  // again, on every pointer event.
+  function moveGroupLive(id, dx, dy) {
+    var moved = Graph.moveGroupPositions(view.nodes, id, dx, dy, view.livePositions)
+    ;(view.nodes || []).forEach(function(node) {
+      if (node.milestoneId === id) canvas._moveNode(node.id, moved[node.id])
+    })
+  }
+
+  // The end of a box move: where its stories ended up becomes the arrangement,
+  // once, so it survives the next model rebuild like any dropped node.
+  function commitGroup(id) {
+    view.arranged = Graph.adoptGroupPositions(view.nodes, id, view.arranged, view.livePositions)
+  }
+
+  // Moving a whole box by a world delta, frames and commit in one: every story
+  // it holds moves with it, and nothing else does.
   function moveGroup(id, dx, dy) {
-    view.arranged = Graph.moveGroupPositions(view.nodes, id, dx, dy, view.livePositions)
+    view.moveGroupLive(id, dx, dy)
+    view.commitGroup(id)
   }
 
   // The organize button. In the story view the model's own layout already puts
@@ -178,18 +196,28 @@ Item {
         hitWidth: 0
       }
 
+      // The model is the STABLE list of groups, never the live rects: a drag
+      // recomputes those on every pointer move, and a Repeater told its model
+      // changed rebuilds its delegates -- which would destroy the very handler
+      // driving the gesture. Each box looks its own rect up instead, so the
+      // geometry follows without the item ever being replaced.
       Repeater {
-        model: view.liveGroups
+        model: view.groups
 
         delegate: Rectangle {
           id: box
           required property var modelData
 
-          objectName: "graphGroup" + (box.modelData ? box.modelData.id : "")
-          x: box.modelData ? box.modelData.x : 0
-          y: box.modelData ? box.modelData.y : 0
-          width: box.modelData ? box.modelData.w : 0
-          height: box.modelData ? box.modelData.h : 0
+          readonly property string boxId: box.modelData ? box.modelData.id : ""
+          readonly property var rect: view.boxByKey[Positions.key(box.boxId)]
+
+          objectName: "graphGroup" + box.boxId
+          // A group whose stories are all gone has no rect, and no box.
+          visible: !!box.rect
+          x: box.rect ? box.rect.x : 0
+          y: box.rect ? box.rect.y : 0
+          width: box.rect ? box.rect.w : 0
+          height: box.rect ? box.rect.h : 0
           radius: 12
           color: Qt.alpha(view.theme.foreground, 0.04)
           border.width: 1
@@ -200,7 +228,7 @@ Item {
           // drag has to stay the canvas's pan.
           Item {
             id: handle
-            objectName: "graphGroupHandle" + (box.modelData ? box.modelData.id : "")
+            objectName: "graphGroupHandle" + box.boxId
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
@@ -210,21 +238,32 @@ Item {
               id: boxDrag
               target: null
 
-              // The pointer in WORLD coordinates. Mapped into the layer, which
-              // carries the camera but not this box: a point read in the box's
-              // own frame would move as the box follows the drag, and every
+              // A SCENE point in world coordinates. The layer carries the
+              // camera but not this box, so the mapping holds still while the
+              // box follows the drag -- read in the box's own frame, every
               // frame after the first would measure nothing.
-              function world() {
-                return handle.mapToItem(groupLayer, centroid.position.x, centroid.position.y)
+              function world(scenePoint) {
+                return groupLayer.mapFromItem(null, scenePoint.x, scenePoint.y)
               }
 
               property var last: null
-              onActiveChanged: boxDrag.last = boxDrag.active ? boxDrag.world() : null
+              // The gesture starts at the PRESS, not where the drag threshold
+              // was crossed, so the box lands exactly where the pointer took
+              // it; and it is committed ONCE, when it ends (a release or a
+              // cancelled grab both end it), because the frames below moved the
+              // stories in the canvas's working positions only.
+              onActiveChanged: {
+                if (boxDrag.active) {
+                  boxDrag.last = boxDrag.world(centroid.scenePressPosition)
+                  return
+                }
+                boxDrag.last = null
+                view.commitGroup(box.boxId)
+              }
               onCentroidChanged: {
                 if (!boxDrag.active || !boxDrag.last) return
-                var now = boxDrag.world()
-                view.moveGroup(box.modelData ? box.modelData.id : "",
-                               now.x - boxDrag.last.x, now.y - boxDrag.last.y)
+                var now = boxDrag.world(centroid.scenePosition)
+                view.moveGroupLive(box.boxId, now.x - boxDrag.last.x, now.y - boxDrag.last.y)
                 boxDrag.last = now
               }
             }

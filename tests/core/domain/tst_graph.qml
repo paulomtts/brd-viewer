@@ -363,6 +363,41 @@ TestCase {
     compare(Graph.withPosition({}, "s1", NaN, 0).s1, undefined, "a junk drop is no position")
   }
 
+  // A card is named by brd, so a card CAN be called after an Object.prototype
+  // member. No map here may confuse one with what every object already has.
+  function test_ids_named_after_object_members_are_ordinary_ids() {
+    var roots = [
+      makeCard("constructor", "todo", [makeCard("toString", "todo", [])]),
+      makeCard("__proto__", "todo", [makeCard("valueOf", "todo", [], ["toString"])], ["constructor"])]
+    var g = Graph.storyGraphModel(roots)
+    compare(g.nodes.map(function(n) { return n.id }).join(","), "toString,valueOf")
+    compare(g.nodes[1].milestoneId, "__proto__")
+    compare(g.edges.map(function(e) { return e.id }).join(","), "toString>valueOf")
+    compare(g.groups.map(function(gr) { return gr.id }).join(","), "constructor,__proto__")
+    compare(g.groupEdges.map(function(e) { return e.id }).join(","), "constructor>__proto__",
+            "declared and derived, still one box edge")
+    g.groups.forEach(function(gr) {
+      verify(isFinite(gr.x) && isFinite(gr.y) && gr.w > 0 && gr.h > 0, gr.id + " is a real box")
+    })
+    verify(g.groups[1].x > g.groups[0].x, "and the box edge ranked the two boxes")
+    compare(JSON.stringify(Graph.storyGroupRects(g.groups, g.nodes, {})), JSON.stringify(g.groups))
+    var moved = Graph.moveGroupPositions(g.nodes, "__proto__", 10, 0, {})
+    compare(moved.valueOf.x, g.nodes[1].x + 10, "and its stories move with its box")
+  }
+
+  function test_adopting_where_one_box_ended_up_touches_that_box_only() {
+    var nodes = [{ id: "s1", milestoneId: "m1", x: 0, y: 0, w: 200, h: 80 },
+                 { id: "s2", milestoneId: "m2", x: 600, y: 0, w: 200, h: 80 }]
+    var live = { s1: { x: 40, y: 40 }, s2: { x: 700, y: 0 } }
+    var at = Graph.adoptGroupPositions(nodes, "m1", { s9: { x: 1, y: 2 } }, live)
+    compare(at.s1.x, 40)
+    compare(at.s1.y, 40)
+    compare(at.s9.x, 1, "what was already arranged is kept")
+    verify(at.s2 === undefined, "another box's stories are not adopted")
+    compare(Graph.adoptGroupPositions(nodes, "m1", {}, { s1: { x: NaN, y: 0 } }).s1, undefined)
+    compare(Graph.adoptGroupPositions(nodes, "m1", {}, {}).s1, undefined, "nothing live, nothing adopted")
+  }
+
   function test_the_story_graph_is_deterministic_and_empty_of_nothing() {
     var once = JSON.stringify(Graph.storyGraphModel(storyRoots()))
     var twice = JSON.stringify(Graph.storyGraphModel(storyRoots()))

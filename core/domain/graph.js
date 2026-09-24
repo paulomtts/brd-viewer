@@ -25,17 +25,30 @@ function openIssueLabel(count) {
 // The blocker -> blocked arrows of a card list: only blockers `known` holds (an
 // id nothing in the view carries -- an issue, a card of another level, a ghost
 // -- is no dependency of it), never a self-link, and the same pair only ONCE
-// however often brd repeats it in blocked_by. `known` is read with
-// hasOwnProperty, so an id like "constructor" cannot match Object.prototype.
+// however often brd repeats it in blocked_by. `known` is keyed through mapKey,
+// so an id like "constructor" cannot match an Object.prototype member.
+
+// Every map in this file that is keyed by a CARD ID goes through this. A card
+// is named by brd, so a card can be called "constructor" -- which matches a
+// member every object has -- or "__proto__", which cannot even be written as a
+// plain key. The canvas's own positions.js keys its maps exactly this way.
+function mapKey(id) { return "id:" + id }
+
+// The value a map holds, or undefined: neither walks the prototype chain, so
+// the position maps below -- which cross into QML keyed by card id, not by
+// mapKey -- are read just as safely.
+function has(map, key) { return !!map && Object.prototype.hasOwnProperty.call(map, key) }
+function get(map, key) { return has(map, key) ? map[key] : undefined }
+
 function dependencyEdges(cards, known) {
   var edges = []
   var seen = {}
   ;(cards || []).forEach(function(card) {
     ;(card.blocked_by || []).forEach(function(blocker) {
-      if (!Object.prototype.hasOwnProperty.call(known, blocker) || blocker === card.id) return
+      if (!has(known, mapKey(blocker)) || blocker === card.id) return
       var id = blocker + ">" + card.id
-      if (Object.prototype.hasOwnProperty.call(seen, id)) return
-      seen[id] = true
+      if (has(seen, mapKey(id))) return
+      seen[mapKey(id)] = true
       edges.push({ id: id, from: blocker, to: card.id })
     })
   })
@@ -45,7 +58,7 @@ function dependencyEdges(cards, known) {
 function graphModel(roots, issueMap) {
   var cards = roots || []
   var known = {}
-  cards.forEach(function(card) { known[card.id] = true })
+  cards.forEach(function(card) { known[mapKey(card.id)] = true })
 
   var nodes = cards.map(function(card) {
     var counts = Board.subtreeCounts(card)
@@ -58,7 +71,7 @@ function graphModel(roots, issueMap) {
 
   var placed = nodes.length > 0 ? Layout.layout(nodes, edges) : {}
   nodes.forEach(function(node) {
-    var at = placed[node.id]
+    var at = get(placed, node.id)
     node.x = at ? at.x : 0
     node.y = at ? at.y : 0
   })
@@ -105,11 +118,9 @@ function isNumber(value) {
 }
 
 // Where a story actually is: the position `at` holds for it (a dragged story,
-// a moved box), else the one the layout gave it. `at` is read with
-// hasOwnProperty, so an id like "constructor" cannot match Object.prototype.
+// a moved box), else the one the layout gave it.
 function positionOf(node, at) {
-  if (at && Object.prototype.hasOwnProperty.call(at, node.id)) return at[node.id]
-  return node
+  return has(at, node.id) ? at[node.id] : node
 }
 
 // A position map plus one entry, as a NEW map: QML only notices a var property
@@ -121,10 +132,13 @@ function withPosition(at, id, x, y) {
   return next
 }
 
+// A position map has no prototype: it is keyed by raw card id (it crosses into
+// QML, where a story is looked up by the id it has), so a story called
+// "__proto__" would otherwise not be storable at all.
 function copyPositions(at) {
-  var next = {}
+  var next = Object.create(null)
   for (var key in at) {
-    if (Object.prototype.hasOwnProperty.call(at, key)) next[key] = at[key]
+    if (has(at, key)) next[key] = at[key]
   }
   return next
 }
@@ -137,7 +151,7 @@ function placedNodes(nodes, at) {
     var position = positionOf(node, at)
     var copy = {}
     for (var key in node) {
-      if (Object.prototype.hasOwnProperty.call(node, key)) copy[key] = node[key]
+      if (has(node, key)) copy[key] = node[key]
     }
     copy.x = position.x
     copy.y = position.y
@@ -157,10 +171,10 @@ function storyGroupRects(groups, nodes, at) {
     if (!isNumber(position.x) || !isNumber(position.y)) return
     var w = isNumber(node.w) ? node.w : 0
     var h = isNumber(node.h) ? node.h : 0
-    var box = bounds[node.milestoneId]
+    var box = get(bounds, mapKey(node.milestoneId))
     if (!box) {
-      bounds[node.milestoneId] = { minX: position.x, minY: position.y,
-                                   maxX: position.x + w, maxY: position.y + h }
+      bounds[mapKey(node.milestoneId)] = { minX: position.x, minY: position.y,
+                                           maxX: position.x + w, maxY: position.y + h }
       return
     }
     box.minX = Math.min(box.minX, position.x)
@@ -171,7 +185,7 @@ function storyGroupRects(groups, nodes, at) {
 
   var rects = []
   ;(groups || []).forEach(function(group) {
-    var box = Object.prototype.hasOwnProperty.call(bounds, group.id) ? bounds[group.id] : null
+    var box = get(bounds, mapKey(group.id))
     if (!box) return
     rects.push({ id: group.id, title: group.title,
                  x: box.minX - GROUP_PAD, y: box.minY - GROUP_HEADER,
@@ -192,6 +206,22 @@ function moveGroupPositions(nodes, groupId, dx, dy, at) {
     var position = positionOf(node, at)
     if (!isNumber(position.x) || !isNumber(position.y)) return
     next[node.id] = { x: position.x + dx, y: position.y + dy }
+  })
+  return next
+}
+
+// Adopting where one box's stories have ENDED UP: the arrangement gains that
+// box's members at the positions `live` reports for them, and nothing else
+// changes. This is what a finished box drag keeps -- the drag itself moves the
+// stories through the canvas's working positions, frame by frame, without
+// laying the graph out again.
+function adoptGroupPositions(nodes, groupId, at, live) {
+  var next = copyPositions(at)
+  ;(nodes || []).forEach(function(node) {
+    if (node.milestoneId !== groupId) return
+    var position = get(live, node.id)
+    if (!position || !isNumber(position.x) || !isNumber(position.y)) return
+    next[node.id] = { x: position.x, y: position.y }
   })
   return next
 }
@@ -220,7 +250,7 @@ function storyGraphModel(roots, issueMap) {
                    openIssues: story.status === "blocked" ? openIssueCount(story, issueMap) : 0,
                    pips: pips.pips, morePips: pips.morePips,
                    w: STORY_NODE_W, h: STORY_NODE_H }
-      groupOf[story.id] = milestone.id
+      groupOf[mapKey(story.id)] = milestone.id
       group.stories.push(node)
       nodes.push(node)
       cards.push(story)
@@ -238,22 +268,22 @@ function storyGraphModel(roots, issueMap) {
   var offsets = {}
   groups.forEach(function(group) {
     var inner = edges.filter(function(edge) {
-      return groupOf[edge.from] === group.id && groupOf[edge.to] === group.id
+      return get(groupOf, mapKey(edge.from)) === group.id && get(groupOf, mapKey(edge.to)) === group.id
     })
     var placed = Layout.layout(group.stories, inner,
                                { rankGap: 60, nodeGap: 24,
                                  defaultWidth: STORY_NODE_W, defaultHeight: STORY_NODE_H })
     var minX = 0, minY = 0, maxX = 0, maxY = 0
     group.stories.forEach(function(node, index) {
-      var at = placed[node.id] || { x: 0, y: 0 }
+      var at = get(placed, node.id) || { x: 0, y: 0 }
       if (index === 0) { minX = at.x; minY = at.y; maxX = at.x + node.w; maxY = at.y + node.h }
       minX = Math.min(minX, at.x); minY = Math.min(minY, at.y)
       maxX = Math.max(maxX, at.x + node.w); maxY = Math.max(maxY, at.y + node.h)
-      offsets[node.id] = at
+      offsets[mapKey(node.id)] = at
     })
     group.stories.forEach(function(node) {
-      offsets[node.id] = { x: offsets[node.id].x - minX + GROUP_PAD,
-                           y: offsets[node.id].y - minY + GROUP_HEADER }
+      offsets[mapKey(node.id)] = { x: get(offsets, mapKey(node.id)).x - minX + GROUP_PAD,
+                                   y: get(offsets, mapKey(node.id)).y - minY + GROUP_HEADER }
     })
     group.w = (maxX - minX) + 2 * GROUP_PAD
     group.h = (maxY - minY) + GROUP_HEADER + GROUP_PAD
@@ -266,20 +296,20 @@ function storyGraphModel(roots, issueMap) {
   // Deduplicated, never a box to itself, never to a milestone without a box.
   var boxed = {}
   var boxedCards = []
-  groups.forEach(function(group) { boxed[group.id] = true })
+  groups.forEach(function(group) { boxed[mapKey(group.id)] = true })
   milestones.forEach(function(milestone) {
-    if (Object.prototype.hasOwnProperty.call(boxed, milestone.id)) boxedCards.push(milestone)
+    if (has(boxed, mapKey(milestone.id))) boxedCards.push(milestone)
   })
   var groupEdges = dependencyEdges(boxedCards, boxed)
   var seenGroupEdge = {}
-  groupEdges.forEach(function(edge) { seenGroupEdge[edge.id] = true })
+  groupEdges.forEach(function(edge) { seenGroupEdge[mapKey(edge.id)] = true })
   edges.forEach(function(edge) {
-    var from = groupOf[edge.from]
-    var to = groupOf[edge.to]
+    var from = get(groupOf, mapKey(edge.from))
+    var to = get(groupOf, mapKey(edge.to))
     if (from === to) return
     var key = from + ">" + to
-    if (Object.prototype.hasOwnProperty.call(seenGroupEdge, key)) return
-    seenGroupEdge[key] = true
+    if (has(seenGroupEdge, mapKey(key))) return
+    seenGroupEdge[mapKey(key)] = true
     groupEdges.push({ id: key, from: from, to: to })
   })
 
@@ -288,12 +318,12 @@ function storyGraphModel(roots, issueMap) {
                     groupEdges, { rankGap: 100, nodeGap: 60 })
     : {}
   groups.forEach(function(group) {
-    var at = placedGroups[group.id] || { x: 0, y: 0 }
+    var at = get(placedGroups, group.id) || { x: 0, y: 0 }
     group.x = at.x
     group.y = at.y
     group.stories.forEach(function(node) {
-      node.x = group.x + offsets[node.id].x
-      node.y = group.y + offsets[node.id].y
+      node.x = group.x + get(offsets, mapKey(node.id)).x
+      node.y = group.y + get(offsets, mapKey(node.id)).y
     })
   })
 

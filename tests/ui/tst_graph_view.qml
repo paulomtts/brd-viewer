@@ -200,18 +200,68 @@ TestCase {
     verify(handle.height > 0 && handle.height <= 40, "and only the header strip")
   }
 
-  function test_dragging_the_label_strip_moves_the_whole_box() {
+  // A drag is many small moves, and every one of them has to land: the box
+  // delegate, and so the handler driving the gesture, must survive them all.
+  function test_dragging_the_label_strip_moves_the_box_by_the_whole_pointer_delta() {
     var v = story()
     var handle = find(v, "graphGroupHandlem1")
-    var at = handle.mapToItem(v, 10, handle.height / 2)
-    var before = v.livePositions.s1.x
+    var zoom = find(v, "graphCanvas").zoom
+    var at = handle.mapToItem(v, 20, handle.height / 2)
+    var before = v.livePositions.s1
     mousePress(v, at.x, at.y)
-    mouseMove(v, at.x + 40, at.y)
-    mouseMove(v, at.x + 90, at.y)
-    mouseRelease(v, at.x + 90, at.y)
+    for (var i = 1; i <= 8; i++) mouseMove(v, at.x + i * 12, at.y + i * 5)
+    mouseRelease(v, at.x + 96, at.y + 40)
     wait(50)
-    verify(v.livePositions.s1.x > before, "the story went with the box it is in")
+    verify(find(v, "graphGroupHandlem1") === handle, "the same handle drove the whole gesture")
+    fuzzyCompare(v.livePositions.s1.x, before.x + 96 / zoom, 0.6)
+    fuzzyCompare(v.livePositions.s1.y, before.y + 40 / zoom, 0.6)
     compare(v.livePositions.s2.x, storyNodes[1].x, "another milestone's story stays put")
+  }
+
+  function test_a_box_keeps_its_delegate_while_it_moves() {
+    var v = story()
+    var handle = find(v, "graphGroupHandlem1")
+    var one = box(v, "m1")
+    v.moveGroup("m1", 30, 15)
+    wait(50)
+    verify(box(v, "m1") === one, "the box item is updated, not rebuilt")
+    verify(find(v, "graphGroupHandlem1") === handle)
+    dragNode(v, "s1", 400, 300)
+    verify(box(v, "m1") === one, "and a node drag does not rebuild it either")
+  }
+
+  function test_a_box_drag_lays_the_graph_out_once_not_once_per_pointer_move() {
+    var v = story()
+    var canvas = find(v, "graphCanvas")
+    var handle = find(v, "graphGroupHandlem1")
+    var at = handle.mapToItem(v, 20, handle.height / 2)
+    var relayouts = 0
+    canvas.nodesChanged.connect(function() { relayouts++ })
+    mousePress(v, at.x, at.y)
+    for (var i = 1; i <= 8; i++) mouseMove(v, at.x + i * 12, at.y)
+    wait(50)
+    compare(relayouts, 0, "a pointer move goes through the working positions only")
+    mouseRelease(v, at.x + 96, at.y)
+    wait(50)
+    compare(relayouts, 1, "and the arrangement is committed once, at the end")
+  }
+
+  function test_organize_reframes_the_view_in_both_modes() {
+    var v = story()
+    var canvas = find(v, "graphCanvas")
+    canvas.panX = 5000; canvas.panY = 5000; canvas.zoom = 3
+    find(v, "organizeButton").clicked()
+    wait(150)
+    verify(canvas.panX !== 5000 && canvas.zoom !== 3, "the story view frames what it organized")
+    var m = createTemporaryObject(viewC, tc)
+    m.nodes = nodes.map(function(n) { return Object.assign({}, n, { x: 0, y: 0 }) })
+    m.edges = edges
+    wait(100)
+    var milestoneCanvas = find(m, "graphCanvas")
+    milestoneCanvas.panX = 5000; milestoneCanvas.panY = 5000; milestoneCanvas.zoom = 3
+    find(m, "organizeButton").clicked()
+    wait(150)
+    verify(milestoneCanvas.panX !== 5000 && milestoneCanvas.zoom !== 3, "and so does the milestone view")
   }
 
   function test_a_moved_box_survives_a_live_refresh_no_worse_than_a_dragged_node() {

@@ -184,8 +184,28 @@ would load its own type instead of ours.
 - The vendored `CanvasControls` are pointed at a small `QtObject` in `GraphView`
   rather than at the canvas: **Organize** and **Fit** are the view's (a story
   graph organizes per box, and framing has to take the boxes in), zoom and
-  culling stay the canvas's own.
+  culling stay the canvas's own. Both views re-frame after Organize: the
+  canvas's own `organize()` ends in `fitAll()`, and the story path re-fits with
+  the boxes in.
 - A box is dragged by its label strip only. The rest of a box is either a story,
   which drags itself, or empty space, where a drag has to stay the canvas's pan.
+- The box `Repeater`'s model is the STABLE group list, never the live rects: a
+  drag recomputes those on every pointer move, and a model change rebuilds the
+  delegates -- which would destroy the very handler driving the gesture. Each box
+  looks its own rect up by id instead. (The vendored `CanvasEdges` does rebuild
+  its Shapes when its geometry changes; that is how the canvas already draws node
+  edges during any drag, and it is not ours to change.)
+- A box move is applied to the canvas's WORKING positions frame by frame
+  (`canvas._moveNode`, the write counterpart of the read above) and committed to
+  `arranged` ONCE, when the gesture ends: handing the canvas a new `nodes` array
+  per pointer event would re-run the layout on every frame.
+- Every map in `graph.js` keyed by a card id goes through its `mapKey`, and the
+  position maps (keyed by raw card id, because they cross into QML that way) are
+  prototype-less and read with `hasOwnProperty`: brd can name a card
+  `constructor`, `toString` or `__proto__`. The vendored `layout.js` has its own
+  guard for that, but still mishandles the three ids whose names it uses
+  internally as functions (`hasOwnProperty`, `isPrototypeOf`,
+  `propertyIsEnumerable`) -- a pre-existing limitation of the vendored layout,
+  in both graph views.
 - `BoardCard` (BoardScreen) and Sidebar's project button, `NavRow`, `ProjectItem` use `CursorSurface` directly (and `bordered: true` for the two bordered ones).
 - `TextAreaBox` sets `font.family` itself: it is a `Controls.TextArea`, not a `Text`, so it cannot be a `ThemedText`.
