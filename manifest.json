@@ -1,21 +1,21 @@
 {
   "schemaVersion": 1,
-  "id": "paulomtts.brd-viewer",
-  "name": "brd Viewer",
+  "id": "paulomtts.omarchy-project-manager",
+  "name": "Omarchy Project Manager",
   "version": "1.0.0",
   "author": "paulomtts",
   "license": "MIT",
-  "description": "Browse brd's local kanban board and each project's Markdown documents, right from the bar.",
+  "description": "Per-project board, milestone graph, documents and Claude memories for brd projects, right from the bar.",
   "kinds": ["bar-widget"],
   "activation": "on-demand",
   "entryPoints": {
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "brd Viewer",
-    "description": "One bar icon and one panel: pick a project in the sidebar, then browse its board or documents.",
+    "displayName": "Project Manager",
+    "description": "One bar icon and one panel: pick a project in the sidebar, then browse its board, milestone graph, documents or Claude memories.",
     "category": "Productivity",
-    "aliases": ["brd", "brd-viewer", "board"],
+    "aliases": ["project manager", "brd", "board", "memories"],
     "allowMultiple": false
   }
 }

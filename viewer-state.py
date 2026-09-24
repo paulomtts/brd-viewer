@@ -4,7 +4,8 @@
     viewer-state.py get
     viewer-state.py set-project <root_path>
 
-State lives in ${XDG_STATE_HOME:-~/.local/state}/brd-viewer/state.json. QML
+State lives in ${XDG_STATE_HOME:-~/.local/state}/omarchy-project-manager/state.json
+(`get` also reads the old brd-viewer/state.json until a new one is written). QML
 cannot write files, hence this helper. Prints one JSON line. `get` never fails
 (a missing or corrupt file just means no stored project); `set-project` writes
 atomically and keeps any other keys already in the file.
@@ -15,18 +16,29 @@ import sys
 import tempfile
 
 
+def state_base():
+    return os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+
+
 def state_path():
-    base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
-    return os.path.join(base, "brd-viewer", "state.json")
+    return os.path.join(state_base(), "omarchy-project-manager", "state.json")
+
+
+def legacy_state_path():
+    return os.path.join(state_base(), "brd-viewer", "state.json")
 
 
 def load():
-    try:
-        with open(state_path(), "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    for path in (state_path(), legacy_state_path()):
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+    return {}
 
 
 def emit(payload, code):

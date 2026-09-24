@@ -1,14 +1,22 @@
-# brd-viewer
+# Omarchy Project Manager
 
-An [Omarchy](https://omarchy.org/) shell plugin that browses a
-[`brd`](https://github.com/paulomtts/brd) project's board (its cards, their
-kanban status and how they nest) and the project's Markdown documents, right
-from the bar. Cards and documents are strictly read-only; the one thing the
-plugin can change is removing a whole project from brd (see below).
+An [Omarchy](https://omarchy.org/) shell plugin for working across your
+[`brd`](https://github.com/paulomtts/brd) projects, right from the bar. Pick a
+project in the sidebar, then browse its kanban **Board**, its milestone
+**Graph**, its Markdown **Documents** (with typed badges you can assign), and
+the **Memories** Claude Code keeps for it, which you can read, edit, create and
+delete. Cards are read-only; the plugin's writes are limited to a document's
+frontmatter `tag:`, a project's Claude memory notes, and removing a whole
+project from brd (each described below, each with a backup or snapshot).
 
-The panel is a centered popup, 840 wide, with a sidebar on the left (project
-dropdown, Board / Documents navigation, Delete project...) and the current
-section on the right.
+The panel is a centered popup (about 80% of the screen), with a sidebar on the
+left (project dropdown, section navigation, Delete project...) and, on the
+right, a fixed toolbar above the scrolling content.
+
+Formerly named brd-viewer (`paulomtts.brd-viewer`). Data written under the old
+name stays where it is: the remembered project is read from the old location
+until it is next saved, and existing snapshots and backups are left in their
+`brd-viewer` folders.
 
 ## Features
 
@@ -17,7 +25,7 @@ section on the right.
   `brd` has registered (`brd projects`). Up/Down move, Enter or click selects.
 - **Remembered project** - the panel reopens on the project you last viewed,
   also after a shell restart. It is stored in
-  `~/.local/state/brd-viewer/state.json` (`$XDG_STATE_HOME` is respected). If
+  `~/.local/state/omarchy-project-manager/state.json` (`$XDG_STATE_HOME` is respected). If
   that project is no longer registered, the first one is shown.
 - **Sections** - **Board** (**Ctrl+1**), **Documents** (**Ctrl+2**), **Graph** (**Ctrl+3**) and **Memories** (**Ctrl+4**), also
   reachable from the sidebar with the mouse.
@@ -41,7 +49,7 @@ section on the right.
   change its raw text (Ctrl+S saves, Escape leaves a clean editor and never
   discards unsaved changes), **Delete** (type `delete`), or **＋ New** (Ctrl+N)
   to create one. Every change goes through `memory-op.py`, which first copies the
-  note and `MEMORY.md` to `~/.cache/brd-viewer/memory-backups/`, replaces files
+  note and `MEMORY.md` to `~/.cache/omarchy-project-manager/memory-backups/`, replaces files
   atomically, and keeps the note's `- [Title](file.md) - hook` line in
   `MEMORY.md` in sync (name and description come from the note's frontmatter).
   A project that was renamed since Claude Code stored its memory will show none,
@@ -83,8 +91,8 @@ section on the right.
   then type `delete` in the confirmation dialog (a modal over a dimmed backdrop; Escape or a click outside cancels) to confirm, as in the Claude Memory plugin. This runs
   `brd forget`, which removes the project's board from brd. Your project's
   files are not touched. **A snapshot is always saved first**, to
-  `~/Snapshots/brd-viewer/<name>-<timestamp>/` (override with
-  `BRD_VIEWER_SNAPSHOT_DIR`), and if a snapshot can't be saved the project is
+  `~/Snapshots/omarchy-project-manager/<name>-<timestamp>/` (override with
+  `OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR`), and if a snapshot can't be saved the project is
   not removed. Each snapshot holds `tree.json` and a `RESTORE.txt` with the
   exact commands (`brd init`, then `brd import tree.json`).
 - No card or document is ever created or edited from the panel.
@@ -97,8 +105,8 @@ project), `list-docs.py` (lists a project's documents) and
 ## Install
 
 ```bash
-git clone https://github.com/paulomtts/brd-viewer.git
-cd brd-viewer
+git clone https://github.com/paulomtts/omarchy-project-manager.git
+cd omarchy-project-manager
 ./install.sh              # links the plugin, rescans, enables it
 ./install.sh --with-brd   # ...and installs the brd CLI first if it is missing
 ```
@@ -120,7 +128,7 @@ Requires `brd` on `PATH` to show anything. See <https://github.com/paulomtts/brd
 Add to `~/.config/hypr/bindings.lua` (Hyprland reloads it on save):
 
 ```lua
-o.bind("CTRL + SUPER + J", "brd Viewer", "omarchy-shell shell toggle paulomtts.brd-viewer")
+o.bind("CTRL + SUPER + J", "Omarchy Project Manager", "omarchy-shell shell toggle paulomtts.omarchy-project-manager")
 ```
 
 `CTRL + SUPER + J` is free in a stock Omarchy setup (check yours with
@@ -129,8 +137,8 @@ o.bind("CTRL + SUPER + J", "brd Viewer", "omarchy-shell shell toggle paulomtts.b
 ## Uninstall
 
 ```bash
-omarchy plugin disable paulomtts.brd-viewer
-rm -rf ~/.config/omarchy/plugins/paulomtts.brd-viewer
+omarchy plugin disable paulomtts.omarchy-project-manager
+rm -rf ~/.config/omarchy/plugins/paulomtts.omarchy-project-manager
 ```
 
 ## Development

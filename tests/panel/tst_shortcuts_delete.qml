@@ -105,13 +105,13 @@ TestCase {
     p.confirmText = "delete"
     p.performDelete()
     var del = proc(p, "deleteProc")
-    del.outText = '{"ok": true, "snapshot": "/home/u/Snapshots/brd-viewer/beta-1"}'
+    del.outText = '{"ok": true, "snapshot": "/home/u/Snapshots/omarchy-project-manager/beta-1"}'
     del.exited(0)
     compare(p.deleteTarget, null)
-    compare(p.lastSnapshot, "/home/u/Snapshots/brd-viewer/beta-1")
+    compare(p.lastSnapshot, "/home/u/Snapshots/omarchy-project-manager/beta-1")
     p.applyProjectsList([pA])                       // what `brd projects` returns next
     compare(p.selectedProject.root_path, "/home/u/a")
-    compare(p.lastSnapshot, "/home/u/Snapshots/brd-viewer/beta-1")   // the note survives the reselection
+    compare(p.lastSnapshot, "/home/u/Snapshots/omarchy-project-manager/beta-1")   // the note survives the reselection
     compare(proc(p, "saveStateProc").command[3], "/home/u/a")
   }
 

@@ -4,7 +4,7 @@ import QtTest
 import "../../logic.js" as Logic
 
 TestCase {
-  name: "BrdViewerLogic"
+  name: "ProjectManagerLogic"
 
   function makeCard(id, status, children, blockedBy) {
     return {

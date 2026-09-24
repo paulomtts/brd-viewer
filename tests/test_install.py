@@ -10,7 +10,7 @@ import pytest
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INSTALL = os.path.join(REPO, "install.sh")
 BASH = shutil.which("bash")
-PLUGIN_ID = "paulomtts.brd-viewer"
+PLUGIN_ID = "paulomtts.omarchy-project-manager"
 
 
 def make_bin(bindir, name, body="exit 0"):

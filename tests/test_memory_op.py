@@ -53,7 +53,7 @@ def names(directory):
 
 
 def backups(tmp_path):
-    root = tmp_path / "cache" / "brd-viewer" / "memory-backups"
+    root = tmp_path / "cache" / "omarchy-project-manager" / "memory-backups"
     return sorted(root.glob("*/*")) if root.exists() else []
 
 

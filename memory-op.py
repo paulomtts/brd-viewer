@@ -6,7 +6,7 @@
 <memory_dir> must be a real directory named "memory"; <file> a plain lower-case
 ".md" name other than MEMORY.md. Before anything changes, the note (if it
 exists) and MEMORY.md are copied to
-<cache>/brd-viewer/memory-backups/<project dir name>/<UTC timestamp>/ (cache =
+<cache>/omarchy-project-manager/memory-backups/<project dir name>/<UTC timestamp>/ (cache =
 XDG_CACHE_HOME or ~/.cache); if that fails, nothing is changed. save and create
 keep MEMORY.md's line for the note in sync (rewritten in place, or appended);
 delete removes only that note's lines. Writes are atomic and keep the files'
@@ -42,7 +42,7 @@ def make_backup(memory_dir, files):
     if not files:
         return ""
     project = os.path.basename(os.path.dirname(os.path.abspath(memory_dir))) or "unknown"
-    base = os.path.join(lib.cache_root(), "brd-viewer", "memory-backups", project)
+    base = os.path.join(lib.cache_root(), "omarchy-project-manager", "memory-backups", project)
     try:
         os.makedirs(base, exist_ok=True)
         for _ in range(5):
@@ -65,7 +65,7 @@ def make_backup(memory_dir, files):
 @contextlib.contextmanager
 def project_lock(memory_dir):
     project = os.path.basename(os.path.dirname(os.path.abspath(memory_dir))) or "unknown"
-    base = os.path.join(lib.cache_root(), "brd-viewer", "memory-backups")
+    base = os.path.join(lib.cache_root(), "omarchy-project-manager", "memory-backups")
     try:
         os.makedirs(base, exist_ok=True)
         handle = open(os.path.join(base, project + ".lock"), "w")

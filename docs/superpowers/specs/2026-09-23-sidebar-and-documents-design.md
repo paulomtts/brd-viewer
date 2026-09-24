@@ -86,7 +86,7 @@ fetch/resolve-db-path flow, persist the choice, reset to the Board section list.
 ## Persistence: `viewer-state.py`
 
 QML cannot write files, so a small Python helper owns a state file at
-`${XDG_STATE_HOME:-~/.local/state}/brd-viewer/state.json`:
+`${XDG_STATE_HOME:-~/.local/state}/omarchy-project-manager/state.json`:
 
 - `viewer-state.py get` prints one JSON line: `{"last_project": "<root_path>"}`
   or `{"last_project": null}`. A missing, empty or corrupt file yields `null`;

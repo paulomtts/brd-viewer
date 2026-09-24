@@ -4,8 +4,8 @@
     snapshot-and-forget.py <root_path> [name]
 
 The snapshot comes first and is mandatory: if nothing can be saved, the
-project is NOT forgotten. It lands in $BRD_VIEWER_SNAPSHOT_DIR (default
-~/Snapshots/brd-viewer) as <name>-<UTC timestamp>/ holding
+project is NOT forgotten. It lands in $OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR (default
+~/Snapshots/omarchy-project-manager; the old BRD_VIEWER_SNAPSHOT_DIR still works) as <name>-<UTC timestamp>/ holding
 
   tree.json      `brd tree` output, the format `brd import` restores from
   project.db     a raw copy of the project's database, only when `brd tree`
@@ -74,7 +74,8 @@ def brd_error(proc, fallback):
 
 
 def snapshot_base():
-    return os.environ.get("BRD_VIEWER_SNAPSHOT_DIR") or os.path.expanduser("~/Snapshots/brd-viewer")
+    return (os.environ.get("OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR") or os.environ.get("BRD_VIEWER_SNAPSHOT_DIR")
+            or os.path.expanduser("~/Snapshots/omarchy-project-manager"))
 
 
 def make_snapshot_dir(name):

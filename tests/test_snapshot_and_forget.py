@@ -22,7 +22,7 @@ case "$1" in
     fi
     echo '{"ok": true, "data": [{"id": "a", "title": "T", "children": []}]}' ;;
   forget)
-    echo "snapshot_files_at_forget=$(ls "$BRD_VIEWER_SNAPSHOT_DIR"/*/tree.json "$BRD_VIEWER_SNAPSHOT_DIR"/*/project.db 2>/dev/null | wc -l)" >> "$CALLS"
+    echo "snapshot_files_at_forget=$(ls "$OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR"/*/tree.json "$OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR"/*/project.db 2>/dev/null | wc -l)" >> "$CALLS"
     if [ "$FAKE_FORGET_FAIL" = 1 ]; then
       echo '{"ok": false, "error": {"type": "ProjectNotFoundError", "message": "nope"}}'; exit 1
     fi
@@ -52,7 +52,7 @@ def box(tmp_path):
         "XDG_DATA_HOME": str(tmp_path / "xdg"),
         "PATH": str(bindir),
         "CALLS": str(calls),
-        "BRD_VIEWER_SNAPSHOT_DIR": str(snaps),
+        "OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR": str(snaps),
     }
     return {"env": env, "tmp": tmp_path, "snaps": snaps, "project": project, "calls": calls, "home": home}
 
@@ -150,14 +150,23 @@ def test_name_defaults_to_the_directory_name(box):
 
 def test_default_snapshot_dir_is_under_home(box):
     env = dict(box["env"])
-    del env["BRD_VIEWER_SNAPSHOT_DIR"]
+    del env["OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR"]
     box["env"] = env
     code, result, _ = run(box, str(box["project"]), "p")
     assert code == 0
-    assert result["snapshot"].startswith(str(box["home"] / "Snapshots" / "brd-viewer"))
+    assert result["snapshot"].startswith(str(box["home"] / "Snapshots" / "omarchy-project-manager"))
 
 
 def test_requires_a_path_argument(box):
     code, result, _ = run(box)
     assert code != 0 and result["ok"] is False
     assert calls(box) == []
+
+
+def test_the_old_snapshot_dir_variable_is_still_honoured(box):
+    env = dict(box["env"])
+    env["BRD_VIEWER_SNAPSHOT_DIR"] = env.pop("OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR")
+    box["env"] = env
+    code, result, _ = run(box, str(box["project"]), "p")
+    assert code == 0
+    assert Path(result["snapshot"]).resolve().parent == box["snaps"].resolve()

@@ -10,7 +10,7 @@ path, with a global registry (`~/.local/share/brd/master.db`) listing every
 registered project. There's no way to see the shape of a board — its
 columns, its hierarchy, which cards are blocked — without hand-composing
 `brd list`/`brd tree` calls and reading raw JSON. This adds an
-[Omarchy](https://omarchy.org/) bar-widget plugin, `paulomtts.brd-viewer`,
+[Omarchy](https://omarchy.org/) bar-widget plugin, `paulomtts.omarchy-project-manager`,
 that gives every registered project a Board view (kanban columns) and a
 Tree view (hierarchy + dependencies), one bar icon and one panel, following
 the same shape as the existing `paulomtts.claude-memory` plugin.
@@ -184,7 +184,7 @@ project's files.
   path; typing `delete` (trimmed, case-insensitive) enables **Confirm delete**;
   Enter confirms, Escape cancels. Same gate as the Claude Memory plugin.
 - **Snapshot first, always:** `snapshot-and-forget.py` saves the project to
-  `~/Snapshots/brd-viewer/<name>-<UTC timestamp>/` (`BRD_VIEWER_SNAPSHOT_DIR`
+  `~/Snapshots/omarchy-project-manager/<name>-<UTC timestamp>/` (`OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR`
   overrides) before running `brd forget`, and refuses to forget if nothing could
   be saved. The snapshot is `brd tree` JSON (restorable with `brd init` +
   `brd import`); if `brd tree` cannot run (e.g. the project directory is gone) a

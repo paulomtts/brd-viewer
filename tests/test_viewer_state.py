@@ -17,7 +17,7 @@ def env(tmp_path):
 
 
 def state_file(env):
-    return Path(env["XDG_STATE_HOME"]) / "brd-viewer" / "state.json"
+    return Path(env["XDG_STATE_HOME"]) / "omarchy-project-manager" / "state.json"
 
 
 def run(env, *args):
@@ -64,7 +64,7 @@ def test_set_leaves_no_temp_files_behind(env):
 def test_defaults_to_dot_local_state_under_home(env):
     del env["XDG_STATE_HOME"]
     run(env, "set-project", "/a")
-    assert (Path(env["HOME"]) / ".local" / "state" / "brd-viewer" / "state.json").is_file()
+    assert (Path(env["HOME"]) / ".local" / "state" / "omarchy-project-manager" / "state.json").is_file()
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
@@ -83,3 +83,23 @@ def test_unwritable_directory_fails_cleanly(env):
 def test_bad_usage_is_rejected(env, args):
     code, result = run(env, *args)
     assert code == 2 and result["ok"] is False
+
+
+def test_get_falls_back_to_the_state_left_by_the_old_brd_viewer_name(env):
+    old = Path(env["XDG_STATE_HOME"]) / "brd-viewer" / "state.json"
+    old.parent.mkdir(parents=True)
+    old.write_text('{"last_project": "/home/u/old"}')
+    assert run(env, "get") == (0, {"last_project": "/home/u/old"})
+    assert run(env, "set-project", "/home/u/new")[0] == 0
+    assert run(env, "get") == (0, {"last_project": "/home/u/new"})
+    assert json.loads(old.read_text())["last_project"] == "/home/u/old"
+    assert state_file(env).is_file()
+
+
+def test_the_new_state_file_wins_over_the_old_one(env):
+    old = Path(env["XDG_STATE_HOME"]) / "brd-viewer" / "state.json"
+    old.parent.mkdir(parents=True)
+    old.write_text('{"last_project": "/home/u/old"}')
+    state_file(env).parent.mkdir(parents=True)
+    state_file(env).write_text('{"last_project": "/home/u/new"}')
+    assert run(env, "get") == (0, {"last_project": "/home/u/new"})

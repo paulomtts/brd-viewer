@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Installs the brd-viewer Omarchy plugin from this checkout, and optionally
+# Installs the Omarchy Project Manager plugin from this checkout, and optionally
 # the `brd` CLI it reads from. The two are separate projects: the plugin
 # works with whatever `brd` is on PATH, so installing brd is opt-in.
 set -euo pipefail
 
-PLUGIN_ID="paulomtts.brd-viewer"
+PLUGIN_ID="paulomtts.omarchy-project-manager"
 BRD_SOURCE="${BRD_SOURCE:-git+https://github.com/paulomtts/brd.git}"
 
 usage() {
@@ -47,7 +47,7 @@ run() {
 }
 
 if ! command -v omarchy >/dev/null 2>&1; then
-  echo "The omarchy CLI was not found; brd-viewer is an Omarchy shell plugin." >&2
+  echo "The omarchy CLI was not found; Omarchy Project Manager is an Omarchy shell plugin." >&2
   exit 1
 fi
 

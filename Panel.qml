@@ -12,8 +12,8 @@ import "logic.js" as Logic
 // Read-only -- nothing here ever calls brd add/update/delete/block.
 Panel {
   id: root
-  moduleName: "paulomtts.brd-viewer"
-  ipcTarget: "paulomtts.brd-viewer"
+  moduleName: "paulomtts.omarchy-project-manager"
+  ipcTarget: "paulomtts.omarchy-project-manager"
   manageIpc: false
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -1164,7 +1164,7 @@ Panel {
           Text {
             objectName: "projectHeading"
             Layout.fillWidth: true
-            text: root.selectedProject ? root.sectionTitle : "brd Viewer"
+            text: root.selectedProject ? root.sectionTitle : "Project Manager"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading

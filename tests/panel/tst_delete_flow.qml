@@ -51,10 +51,10 @@ TestCase {
     compare(p.deleteError, "could not snapshot the project, so it was not removed")
 
     p.confirmText = "delete"; p.performDelete()
-    proc.outText = '{"ok": true, "snapshot": "/home/u/Snapshots/brd-viewer/alpha-1"}'
+    proc.outText = '{"ok": true, "snapshot": "/home/u/Snapshots/omarchy-project-manager/alpha-1"}'
     proc.exited(0)
     compare(p.deleting, false); compare(p.deleteTarget, null)
-    compare(p.lastSnapshot, "/home/u/Snapshots/brd-viewer/alpha-1")
+    compare(p.lastSnapshot, "/home/u/Snapshots/omarchy-project-manager/alpha-1")
     p.applyProjectsList([{ root_path: "/home/u/b", name: "beta" }])
     compare(p.selectedProject.root_path, "/home/u/b")
   }
