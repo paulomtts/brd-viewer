@@ -71,7 +71,7 @@ the Delete button are disabled, while the project dropdown stays enabled and
 shows "No projects registered."
 
 Keyboard, in addition to the existing per-view keys: **Ctrl+P** toggles the
-project dropdown, **Ctrl+1** shows Board, **Ctrl+2** shows Documents. The mouse
+project dropdown, **Ctrl+1** shows Board, **Ctrl+3** shows Documents. The mouse
 reaches every control.
 
 ## Project dropdown
@@ -215,7 +215,7 @@ Delete key handler and `ProjectRow` are removed.
 - The stub-panel harness flow tests are re-run for navigation: section switching,
   dropdown selection persisting, back-restores-position, delete from the sidebar.
 - Manual live checks after `omarchy-restart-shell`: sidebar layout at 840, dropdown
-  keyboard behaviour, Ctrl+P / Ctrl+1 / Ctrl+2 not being swallowed by the
+  keyboard behaviour, Ctrl+P / Ctrl+1 / Ctrl+3 not being swallowed by the
   compositor, document rendering.
 
 ## Files

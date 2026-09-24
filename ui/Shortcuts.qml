@@ -17,13 +17,15 @@ QtObject {
 
   // Shortcuts that work wherever the caret is. Returns true when it handled the
   // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
-  // move things underneath it.
+  // move things underneath it. The digit chords follow the order the sidebar
+  // lists its sections in (Board, Graph, Documents, Memories) -- renumbering
+  // one means renumbering the sidebar too.
   function handleGlobalKey(event) {
     if (!(event.modifiers & Qt.ControlModifier) || keys.app.deleter.deleteTarget || keys.app.memories.memoryDeleteOpen || keys.app.memories.newMemoryOpen) return false
     if (event.key === Qt.Key_P) { keys.navigator.toggleDropdown(); return true }
     if (event.key === Qt.Key_1) { keys.navigator.showSection("board"); return true }
-    if (event.key === Qt.Key_2) { keys.navigator.showSection("documents"); return true }
-    if (event.key === Qt.Key_3) { keys.navigator.showSection("graph"); return true }
+    if (event.key === Qt.Key_2) { keys.navigator.showSection("graph"); return true }
+    if (event.key === Qt.Key_3) { keys.navigator.showSection("documents"); return true }
     if (event.key === Qt.Key_4) { keys.navigator.showSection("memories"); return true }
     if (event.key === Qt.Key_N && keys.app.nav.viewMode === "memories") { keys.app.memories.openNewMemory(); return true }
     if (event.key === Qt.Key_E && keys.app.nav.viewMode === "memory") { keys.app.memories.startMemoryEdit(); return true }

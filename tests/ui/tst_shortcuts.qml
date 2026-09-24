@@ -70,6 +70,17 @@ TestCase {
 
   // ---- Ctrl chords
 
+  // The digits follow the sidebar's order: Board, Graph, Documents, Memories.
+  function test_the_ctrl_digits_follow_the_order_of_the_sidebar_sections() {
+    var s = make(); if (!s) return
+    var wanted = ["board", "graph", "documents", "memories"]
+    var digits = [Qt.Key_1, Qt.Key_2, Qt.Key_3, Qt.Key_4]
+    for (var i = 0; i < digits.length; i++) {
+      compare(s.handleGlobalKey(ctrl(digits[i])), true, wanted[i])
+      compare(s.app.nav.section, wanted[i])
+    }
+  }
+
   function test_ctrl_n_opens_the_new_memory_dialog_only_in_the_memories_list() {
     var s = inMemories(); if (!s) return
     s.navigator.showSection("board")

@@ -42,7 +42,11 @@ TestCase {
     compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_1)), true)
     compare(p.app.nav.viewMode, "board")
     compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_2)), true)
+    compare(p.app.nav.viewMode, "graph")
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_3)), true)
     compare(p.app.nav.viewMode, "documents")
+    compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_4)), true)
+    compare(p.app.nav.viewMode, "memories")
     compare(p.shortcuts.handleGlobalKey(ctrl(Qt.Key_1)), true)
     compare(p.app.nav.viewMode, "board")
   }

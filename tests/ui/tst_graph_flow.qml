@@ -49,9 +49,9 @@ TestCase {
     compare(p.app.graph.graph.nodes.length, 3)
   }
 
-  function test_ctrl_3_shows_the_graph() {
+  function test_ctrl_2_shows_the_graph() {
     var p = make(); if (!p) return
-    var event = { key: Qt.Key_3, modifiers: Qt.ControlModifier, accepted: false }
+    var event = { key: Qt.Key_2, modifiers: Qt.ControlModifier, accepted: false }
     compare(p.shortcuts.handleGlobalKey(event), true)
     compare(p.app.nav.viewMode, "graph")
   }

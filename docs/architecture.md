@@ -32,7 +32,8 @@ manifest entry point.
 - `MemoriesStore.qml` listing, type filter, open/edit/create/delete a note.
 
 Other `ui/` pieces: `Navigator.qml` (screen switching), `Shortcuts.qml` (key
-events to store calls), `theme/Theme.qml` (colours and fonts from the shell).
+events to store calls; Ctrl+1..4 follow the sidebar's order: Board, Graph,
+Documents, Memories), `theme/Theme.qml` (colours and fonts from the shell).
 
 Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `treeProc` (`brd tree`), `saveStateProc`, `resolveDbPathProc` and `deleteProc` stay plain `Process` objects because they run the `brd` CLI or are fire-and-forget/single-owner with their own exit handling. `HelperRunner.run()` SIGTERMs a previous run of the same helper instead of letting it finish and dropping its reply (reachable for list-docs/list-memories refetches, and a set-doc-tag started in another project mid-flight); helpers write atomically, so at worst a stray `docs/.tmp-*` remains.
 
