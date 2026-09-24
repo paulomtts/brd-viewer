@@ -8,8 +8,8 @@ import "../theme" as T
 
 // One card, opened from the Board or the Graph: its parent, its blockers and
 // its children as keyboard-navigable link rows (an issue blocker is shown with
-// its title and open/closed state, but there is no issue screen to open), plus the kind/status badges and
-// the description. It reads the board store and opens links through the
+// its title and open/closed state, but there is no issue screen to open), plus the kind/status badges,
+// the description and the card's brd comments. It reads the board store and opens links through the
 // navigator; it owns no state of its own.
 Column {
   id: detailCard
@@ -106,6 +106,15 @@ Column {
       rowIndex: detailCard.app.board.linkIndex("child", modelData.id)
       onActivated: detailCard.navigator.openCard(modelData.id)
     }
+  }
+
+  // The card's comments, from the export the extras store holds. Read-only,
+  // like everything else on this screen.
+  UI.CommentList {
+    objectName: "cardComments"
+    width: parent.width
+    theme: detailCard.theme
+    comments: detailCard.card ? detailCard.app.extras.commentsFor(detailCard.card.id) : []
   }
 
   // The card detail's own pill: bordered, translucent and wider than the shared

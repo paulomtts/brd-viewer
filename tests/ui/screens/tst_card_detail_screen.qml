@@ -1,10 +1,12 @@
 // tests/ui/screens/tst_card_detail_screen.qml
 // ui/screens/CardDetailScreen.qml on its own: the parent/blocker/child link
 // rows, the kind and status badges, the description fallback, a blocker that is
-// not in this board, and the click that opens a link through the navigator.
+// not in this board, the click that opens a link through the navigator, and the
+// card's comments as the extras store holds them.
 // REAL core/stores App and REAL ui/Navigator.qml -- no bespoke mocks.
 import QtQuick
 import QtTest
+import "../../helpers/find.js" as H
 
 TestCase {
   id: tc
@@ -176,5 +178,22 @@ TestCase {
     compare(rows[0].opacity, 1)
     mouseClick(open)
     compare(s.app.board.selectedCardId, "m1")
+  }
+
+  function test_the_card_detail_lists_the_cards_comments() {
+    var s = make(); if (!s) return          // s.app is the real App, s is the CardDetailScreen
+    s.app.extras.applyExportResult(JSON.stringify({ ok: true, data: { issues: [], refs: [],
+      comments: [{ id: "k1", entity_id: "m1", author: "paulo", body: "note", created_at: "2026-09-24T09:00:00+00:00" }] } }), 0)
+    s.app.nav.viewMode = "entry"
+    s.app.board.openCard("m1")
+    compare(H.find(s, "cardComments").comments.length, 1)
+    compare(H.find(s, "commentBody0").text, "note")
+  }
+
+  function test_a_card_without_comments_says_so() {
+    var s = make(); if (!s) return
+    s.app.nav.viewMode = "entry"
+    s.app.board.openCard("m1")
+    compare(H.find(s, "commentsEmpty").visible, true)
   }
 }
