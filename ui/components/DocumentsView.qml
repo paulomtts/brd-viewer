@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import "../../core/domain/board.js" as Board
 import "../../core/domain/documents.js" as Documents
 import "../components" as UI
 import "../theme" as T
@@ -62,6 +63,9 @@ Column {
     required index
     objectName: "docRow" + row.index
 
+    // A row brd has a backup of but disk does not: still listed, so the backup
+    // stays discoverable, but dimmed -- there is nothing to open.
+    opacity: row.modelData.missing === true ? 0.5 : 1
     width: view.width
     theme: view.theme
     cursorIndex: view.cursorIndex
@@ -76,7 +80,8 @@ Column {
 
       UI.ThemedText {
         theme: view.theme
-        width: Math.max(0, parent.width - (rowBadge.visible ? rowBadge.width + parent.spacing : 0))
+        width: Math.max(0, parent.width - (rowBadge.visible ? rowBadge.width + parent.spacing : 0)
+                                        - (brdBadge.visible ? brdBadge.width + parent.spacing : 0))
         text: row.modelData.title
         elide: Text.ElideRight
       }
@@ -89,6 +94,19 @@ Column {
         text: Documents.docCategoryLabel(row.modelData.category)
         tint: Documents.docCategoryColor(row.modelData.category, view.theme.dim)
       }
+
+      // brd knows this file: the badge warns when brd's copy no longer matches
+      // what is on disk, in the hue the board already uses for blocked.
+      UI.Badge {
+        id: brdBadge
+        theme: view.theme
+        objectName: "docRowBrdBadge" + row.index
+        textObjectName: "docRowBrd" + row.index
+        property color warnColor: Board.statusColor("blocked", view.theme.dim)
+        visible: !!row.modelData.brd
+        text: row.modelData.brd ? "brd" : ""
+        tint: (row.modelData.brd && row.modelData.brd.sourceState !== "ok") ? brdBadge.warnColor : view.theme.dim
+      }
     }
 
     UI.ThemedText {
@@ -97,6 +115,28 @@ Column {
       width: parent.width
       text: row.modelData.path
       elide: Text.ElideMiddle
+    }
+
+    // brd's own tags, kept apart from the plugin's category badge above.
+    UI.ThemedText {
+      objectName: "docRowBrdTags" + row.index
+      variant: "caption"
+      theme: view.theme
+      width: parent.width
+      visible: text !== ""
+      text: row.modelData.brd ? row.modelData.brd.tags.join(" · ") : ""
+      color: view.theme.dim
+      elide: Text.ElideRight
+    }
+
+    UI.ThemedText {
+      objectName: "docRowMissing" + row.index
+      variant: "caption"
+      theme: view.theme
+      visible: row.modelData.missing === true
+      width: parent.width
+      text: "missing on disk"
+      color: view.theme.dim
     }
   }
 }

@@ -47,6 +47,37 @@ function parseDocsResult(stdout, exitCode) {
   return { ok: false, docs: [], truncated: false, error: result.error }
 }
 
+// brd can register a project's Markdown files and keep a backup of each. The
+// listing and the registrations are matched on the path relative to the project
+// root -- the same string both sides use. A registration whose file the listing
+// does not have (deleted, or outside docs/) is still listed, dimmed, so its
+// backup stays discoverable.
+function mergeRegistered(docs, registered) {
+  var rows = (docs || []).map(function(d) {
+    var copy = {}
+    Object.keys(d).forEach(function(key) { copy[key] = d[key] })
+    copy.brd = null
+    return copy
+  })
+  var seen = {}
+  rows.forEach(function(row) { seen[row.path] = row })
+  ;(registered || []).forEach(function(entry) {
+    var brd = { id: entry.id, title: entry.title, sourceState: entry.sourceState, tags: entry.tags || [] }
+    if (seen[entry.sourcePath]) { seen[entry.sourcePath].brd = brd; return }
+    rows.push({ path: entry.sourcePath, title: entry.title !== "" ? entry.title : entry.sourcePath,
+                size: 0, category: "other", missing: true, brd: brd })
+  })
+  return rows
+}
+
+// What a row and the open document's header say about brd's backup: nothing at
+// all when brd does not know the file, and the state itself when brd's copy no
+// longer matches what is on disk.
+function brdStateLabel(entry) {
+  if (!entry || !entry.brd) return ""
+  return entry.brd.sourceState === "ok" ? "Registered in brd" : "Registered in brd · " + entry.brd.sourceState
+}
+
 function docAbsolutePath(rootPath, relPath) {
   return String(rootPath).replace(/\/+$/, "") + "/" + relPath
 }

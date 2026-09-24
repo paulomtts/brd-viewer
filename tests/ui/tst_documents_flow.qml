@@ -5,6 +5,7 @@
 // tests/core/stores/tst_documents_store.qml.
 import QtQuick
 import QtTest
+import "../helpers/find.js" as H
 TestCase {
   id: tc
   name: "DocumentsFlow"
@@ -171,5 +172,46 @@ TestCase {
     compare(picker.current, "specs")
     picker.tagChosen("standards")
     compare(p.app.docs.tagger.current.command[4], "standards")
+  }
+
+  // ---- brd's registered documents
+
+  property string brdDocs: JSON.stringify({ ok: true, data: [
+    { id: "d1", kind: "document", title: "Readme in brd", source_path: "README.md", source_state: "ok",
+      tags: ["design"], created_at: "", updated_at: "" },
+    { id: "d2", kind: "document", title: "Ghost", source_path: "notes/gone.md", source_state: "missing",
+      tags: [], created_at: "", updated_at: "" }] })
+
+  function test_opening_the_section_also_asks_brd_for_its_registered_documents() {
+    var p = make(); if (!p) return
+    compare(p.app.docs.brdDocsProc.running, false, "`brd doc list` writes: never before the section opens")
+    p.navigator.showSection("documents")
+    compare(p.app.docs.brdDocsProc.command.join(" "), "brd doc list")
+    compare(p.app.docs.brdDocsProc.workingDirectory, "/home/u/my proj")
+    compare(p.app.docs.brdDocsProc.running, true)
+  }
+
+  function test_a_registered_document_with_no_file_opens_saying_so() {
+    var p = make(); if (!p) return
+    p.navigator.showSection("documents")
+    p.app.docs.brdDocsProc.running = false
+    p.app.docs.applyDocsResult(docList, 0)
+    p.app.docs.applyRegisteredResult(brdDocs, 0)
+    compare(paths(p.navigator.currentList()),
+            "README.md,docs/specs/Design Doc.md,docs/huge.md,notes/gone.md")
+    p.app.nav.cursorIndex = 3
+    p.navigator.activateCursor()
+    compare(p.app.nav.viewMode, "document")
+    compare(p.app.docs.selectedDocMissing, true)
+    compare(p.app.docs.docFile.path, "")
+    wait(50)
+    var notice = H.find(p, "docNotice")
+    verify(notice, "the document screen's notice")
+    // (the panel's own visibility is not driven in this offscreen fixture, so
+    // only the notice's text is asserted here; tst_document_screen.qml checks
+    // that it is what the screen shows instead of the body.)
+    compare(String(notice.text), "This document is not on disk.")
+    p.navigator.goBack()
+    compare(p.app.docs.selectedDocMissing, false)
   }
 }

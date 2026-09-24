@@ -113,4 +113,41 @@ TestCase {
     v.activeCategory = ""
     compare(find(v, "docsMessage").text, "No Markdown documents found in this project.")
   }
+
+  // What brd knows about a row: the badge, brd's own tags (never the plugin's
+  // category), and the dimmed row of a registration with no file on disk.
+  function withDocs(list) {
+    var v = make()
+    v.docs = list
+    wait(20)
+    return v
+  }
+
+  function test_a_registered_document_shows_the_brd_badge_and_its_tags() {
+    var v = withDocs([{ path: "a.md", title: "A", size: 1, category: "specs",
+                        brd: { id: "d1", title: "A", sourceState: "ok", tags: ["design", "v2"] } }])
+    compare(find(v, "docRowBrd0").text, "brd")
+    compare(find(v, "docRowBrd0").visible, true)
+    compare(find(v, "docRowBrdTags0").text, "design · v2")
+    compare(find(v, "docRowMissing0").visible, false)
+    compare(find(v, "docRow0").opacity, 1)
+  }
+
+  function test_a_stale_registration_is_warned_about_and_a_missing_file_is_dimmed() {
+    var v = withDocs([{ path: "gone.md", title: "Ghost", size: 0, category: "other", missing: true,
+                        brd: { id: "d2", title: "Ghost", sourceState: "missing", tags: [] } }])
+    var label = find(v, "docRowBrd0")
+    compare(label.text, "brd")
+    compare(String(label.color), String(find(v, "docRowBrdBadge0").warnColor))
+    compare(find(v, "docRowBrdTags0").visible, false, "no brd tags, no tag line")
+    compare(find(v, "docRowMissing0").text, "missing on disk")
+    verify(find(v, "docRow0").opacity < 1)
+  }
+
+  function test_an_unregistered_document_shows_neither() {
+    var v = withDocs([{ path: "a.md", title: "A", size: 1, category: "specs", brd: null }])
+    compare(find(v, "docRowBrd0").visible, false)
+    compare(find(v, "docRowMissing0").visible, false)
+    compare(find(v, "docRow0").opacity, 1)
+  }
 }

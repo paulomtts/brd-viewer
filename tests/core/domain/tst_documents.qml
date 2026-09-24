@@ -138,4 +138,49 @@ TestCase {
     compare(Documents.parseTagResult("garbage", 0).ok, false)
     compare(Documents.parseTagResult('{"ok": true}', 1).ok, false)
   }
+
+  property var listed: [{ path: "docs/a.md", title: "A", size: 10, category: "specs" },
+                        { path: "docs/b.md", title: "B", size: 20, category: "other" }]
+  property var registered: [
+    { id: "d1", title: "A in brd", sourcePath: "docs/a.md", sourceState: "ok", tags: ["design", "v2"] },
+    { id: "d2", title: "Ghost", sourcePath: "notes/gone.md", sourceState: "missing", tags: [] }]
+
+  function test_registrations_are_matched_on_the_relative_source_path() {
+    var merged = Documents.mergeRegistered(listed, registered)
+    compare(merged.length, 3)
+    compare(merged[0].brd.id, "d1")
+    compare(merged[0].brd.tags.join(","), "design,v2")
+    compare(merged[0].title, "A", "the file's own title wins over brd's")
+    compare(merged[1].brd, null)
+    compare(merged[2].path, "notes/gone.md")
+    compare(merged[2].title, "Ghost")
+    compare(merged[2].missing, true)
+    compare(merged[2].category, "other")
+    compare(merged[2].size, 0)
+  }
+
+  function test_merging_without_registrations_changes_nothing() {
+    var merged = Documents.mergeRegistered(listed, [])
+    compare(merged.length, 2)
+    compare(merged[0].brd, null)
+    compare(merged[0].path, "docs/a.md")
+    compare(Documents.mergeRegistered([], registered).length, 2, "registrations alone still show up")
+    compare(Documents.mergeRegistered(null, null).length, 0)
+  }
+
+  // A registration with no title of its own falls back to its path, so the row
+  // is never a blank line.
+  function test_a_titleless_registration_falls_back_to_its_path() {
+    var merged = Documents.mergeRegistered([], [{ id: "d3", title: "", sourcePath: "notes/x.md", sourceState: "ok", tags: [] }])
+    compare(merged[0].title, "notes/x.md")
+    compare(merged[0].brd.tags.length, 0)
+  }
+
+  function test_the_backup_state_wording() {
+    var merged = Documents.mergeRegistered(listed, registered)
+    compare(Documents.brdStateLabel(merged[0]), "Registered in brd")
+    compare(Documents.brdStateLabel(merged[1]), "")
+    compare(Documents.brdStateLabel(merged[2]), "Registered in brd · missing")
+    compare(Documents.brdStateLabel(null), "")
+  }
 }

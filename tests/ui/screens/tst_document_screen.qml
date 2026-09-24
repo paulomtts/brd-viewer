@@ -111,4 +111,20 @@ TestCase {
     verify(t.indexOf("Loading…") < 0)
   }
 
+  // A document brd has a backup of but disk does not: nothing to read, so the
+  // screen says so instead of waiting forever on a body.
+  property string brdDocs: JSON.stringify({ ok: true, data: [
+    { id: "d2", kind: "document", title: "Ghost", source_path: "notes/gone.md", source_state: "missing",
+      tags: [], created_at: "", updated_at: "" }] })
+
+  function test_a_registered_document_with_no_file_says_so_instead_of_a_body() {
+    var s = make(); if (!s) return
+    s.app.docs.applyRegisteredResult(brdDocs, 0)
+    s.navigator.openDoc("notes/gone.md")
+    wait(50)
+    compare(s.app.docs.selectedDocMissing, true)
+    var t = texts(s)
+    verify(t.indexOf("This document is not on disk.") >= 0, t.join(" | "))
+    verify(t.indexOf("Loading…") < 0, "no body placeholder for a file that is not there")
+  }
 }

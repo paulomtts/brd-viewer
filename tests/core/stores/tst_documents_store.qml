@@ -379,4 +379,111 @@ TestCase {
     app.docs.restoreDocumentsList()
     compare(app.docs.docTagError, "")
   }
+
+  // ---- brd's registered documents -----------------------------------------
+
+  property string brdDocs: JSON.stringify({ ok: true, data: [
+    { id: "d1", kind: "document", title: "Readme in brd", source_path: "README.md", source_state: "ok",
+      tags: ["design"], created_at: "", updated_at: "" },
+    { id: "d2", kind: "document", title: "Ghost", source_path: "notes/gone.md", source_state: "missing",
+      tags: [], created_at: "", updated_at: "" }] })
+
+  function test_the_registrations_are_only_fetched_when_the_section_opens() {
+    var app = make(); if (!app) return
+    var proc = app.docs.brdDocsProc
+    verify(proc, "brdDocsProc exists")
+    compare(proc.running, false, "`brd doc list` writes brd's backups: never on its own")
+    app.docs.fetchRegisteredDocs()
+    compare(proc.command.join(" "), "brd doc list")
+    compare(proc.workingDirectory, "/home/u/my proj")
+    compare(proc.running, true)
+    proc.running = false
+    app.docs.fetchDocs()
+    compare(proc.running, false, "a plain re-listing must not sync backups")
+    app.board.dbFile.fileChanged()
+    compare(proc.running, false, "and neither must the database watch")
+  }
+
+  function test_the_listing_and_the_registrations_are_merged() {
+    var app = make(); if (!app) return
+    showDocuments(app)
+    app.docs.applyDocsResult(docList, 0)
+    app.docs.applyRegisteredResult(brdDocs, 0)
+    compare(paths(app.docs.filteredDocs),
+            "README.md,docs/specs/Design Doc.md,docs/huge.md,notes/gone.md")
+    compare(app.docs.filteredDocs[0].brd.tags.join(","), "design")
+    compare(app.docs.filteredDocs[1].brd, null)
+    compare(app.docs.filteredDocs[3].missing, true)
+  }
+
+  function test_a_failed_registration_listing_leaves_the_documents_alone() {
+    var app = make(); if (!app) return
+    showDocuments(app)
+    app.docs.applyDocsResult(docList, 0)
+    app.docs.applyRegisteredResult('{"ok": false, "error": {"type": "X", "message": "no such command"}}', 2)
+    compare(paths(app.docs.filteredDocs), "README.md,docs/specs/Design Doc.md,docs/huge.md")
+    compare(app.docs.docsError, "", "brd's documents are extra, never an error")
+  }
+
+  // A failure is no answer at all: what brd last said still stands, so a
+  // killed or crashed run never makes the badges flicker away.
+  function test_a_failed_listing_keeps_the_registrations_already_shown() {
+    var app = make(); if (!app) return
+    showDocuments(app)
+    app.docs.applyDocsResult(docList, 0)
+    app.docs.applyRegisteredResult(brdDocs, 0)
+    app.docs.applyRegisteredResult("", 1)
+    compare(app.docs.registeredDocs.length, 2)
+    compare(app.docs.filteredDocs.length, 4)
+  }
+
+  // The newest run decides: a reply from a run since superseded, or from a
+  // project the user has left, changes nothing.
+  function test_a_superseded_or_abandoned_doc_list_run_never_applies() {
+    var app = make(); if (!app) return
+    showDocuments(app)
+    app.docs.fetchRegisteredDocs()
+    var staleSeq = app.docs.brdDocsProc.launchSeq
+    app.docs.fetchRegisteredDocs()
+    app.docs.applyRegisteredResult(brdDocs, 0, "/home/u/my proj", staleSeq)
+    compare(app.docs.registeredDocs.length, 0, "the superseded run is ignored")
+    app.docs.applyRegisteredResult(brdDocs, 0, "/home/u/b", app.docs.brdDocsProc.launchSeq)
+    compare(app.docs.registeredDocs.length, 0, "another project's run is ignored")
+    app.docs.applyRegisteredResult(brdDocs, 0, "/home/u/my proj", app.docs.brdDocsProc.launchSeq)
+    compare(app.docs.registeredDocs.length, 2)
+  }
+
+  function test_a_missing_registered_document_opens_without_reading_a_file() {
+    var app = make(); if (!app) return
+    showDocuments(app)
+    app.docs.applyDocsResult(docList, 0)
+    app.docs.applyRegisteredResult(brdDocs, 0)
+    compare(app.docs.openDoc("notes/gone.md"), true)
+    app.nav.viewMode = "document"
+    compare(app.docs.selectedDocMissing, true)
+    compare(app.docs.docFile.path, "", "a file that is not on disk is never watched")
+    compare(app.docs.selectedDocBrd.sourceState, "missing")
+    compare(app.docs.openDoc("README.md"), true)
+    compare(app.docs.selectedDocMissing, false)
+    compare(app.docs.selectedDocBrd.id, "d1")
+  }
+
+  function test_leaving_the_document_forgets_that_it_was_missing() {
+    var app = make(); if (!app) return
+    showDocuments(app)
+    app.docs.applyRegisteredResult(brdDocs, 0)
+    compare(app.docs.openDoc("notes/gone.md"), true)
+    app.nav.viewMode = "document"
+    compare(app.docs.selectedDocMissing, true)
+    app.docs.restoreDocumentsList()
+    compare(app.docs.selectedDocMissing, false)
+  }
+
+  function test_a_project_change_clears_the_registrations() {
+    var app = make(); if (!app) return
+    showDocuments(app)
+    app.docs.applyRegisteredResult(brdDocs, 0)
+    app.projects.chooseProject(pB)
+    compare(app.docs.registeredDocs.length, 0)
+  }
 }

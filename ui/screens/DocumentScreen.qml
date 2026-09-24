@@ -17,19 +17,27 @@ Column {
   visible: docScreen.app.nav.viewMode === "document"
   spacing: Style.space(10)
 
+  // brd has a backup of this document but the file itself is gone: there is
+  // nothing to read, so the body gives way to the same kind of message the
+  // too-large one uses.
   UI.ThemedText {
+    objectName: "docNotice"
     variant: "dim"
     theme: docScreen.theme
-    visible: docScreen.app.docs.docTooLargeFlag || docScreen.app.docs.docError !== ""
+    visible: docScreen.app.docs.selectedDocMissing || docScreen.app.docs.docTooLargeFlag
+      || docScreen.app.docs.docError !== ""
     width: parent.width
-    text: docScreen.app.docs.docTooLargeFlag ? "This document is too large to display." : docScreen.app.docs.docError
+    text: docScreen.app.docs.selectedDocMissing ? "This document is not on disk."
+      : docScreen.app.docs.docTooLargeFlag ? "This document is too large to display."
+      : docScreen.app.docs.docError
     wrapMode: Text.WordWrap
   }
 
   UI.ThemedText {
     variant: "small"
     theme: docScreen.theme
-    visible: !docScreen.app.docs.docTooLargeFlag && docScreen.app.docs.docError === ""
+    visible: !docScreen.app.docs.selectedDocMissing && !docScreen.app.docs.docTooLargeFlag
+      && docScreen.app.docs.docError === ""
     width: parent.width
     text: docScreen.app.docs.docText !== "" ? docScreen.app.docs.docText : "Loading…"
     wrapMode: Text.WordWrap

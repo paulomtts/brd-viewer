@@ -166,7 +166,9 @@ QtObject {
     navi.app.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph"
       : name === "memories" ? "memories" : name === "issues" ? "issues" : "board"
     navi.app.memories.memoryEditing = false
-    if (name === "documents") navi.app.docs.fetchDocs()
+    // Only here: `brd doc list` syncs every backup as it lists, so it follows
+    // the section opening and nothing else.
+    if (name === "documents") { navi.app.docs.fetchDocs(); navi.app.docs.fetchRegisteredDocs() }
     if (name === "memories") navi.app.memories.fetchMemories()
     if (name === "graph" && navi.app.graph.graphCursor === "" && navi.app.graph.graph.nodes.length > 0) navi.app.graph.graphCursor = navi.app.graph.graph.nodes[0].id
     Qt.callLater(navi.actions.scrollToTop)

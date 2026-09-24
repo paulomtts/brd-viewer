@@ -157,4 +157,41 @@ TestCase {
     compare(t.app.docs.tagger.current.command[4], "audits")
     compare(t.app.docs.docTagBusy, true)
   }
+
+  // ---- what brd knows about the open document
+
+  property string brdDocs: JSON.stringify({ ok: true, data: [
+    { id: "d1", kind: "document", title: "Spec in brd", source_path: "docs/specs/s.md", source_state: "ok",
+      tags: ["design", "v2"], created_at: "", updated_at: "" },
+    { id: "d2", kind: "document", title: "Ghost", source_path: "notes/gone.md", source_state: "missing",
+      tags: [], created_at: "", updated_at: "" }] })
+
+  function test_the_open_documents_backup_state_is_in_the_header() {
+    var t = listed(); if (!t) return
+    t.app.docs.applyRegisteredResult(brdDocs, 0)
+    tc.navi.openDoc("docs/specs/s.md")
+    wait(20)
+    compare(H.find(t, "docBrdState").text, "Registered in brd")
+    compare(H.find(t, "docBrdTags").text, "design · v2")
+    t.app.docs.openDoc("notes/gone.md")
+    wait(20)
+    compare(H.find(t, "docBrdState").text, "Registered in brd · missing")
+    compare(H.find(t, "docBrdTags").visible, false, "no brd tags, no tag line")
+  }
+
+  function test_an_unregistered_document_says_nothing_about_brd() {
+    var t = listed(); if (!t) return
+    tc.navi.openDoc("docs/architecture/a.md")
+    wait(20)
+    compare(H.find(t, "docBrdState").visible, false)
+    compare(H.find(t, "docBrdTags").visible, false)
+  }
+
+  function test_the_backup_state_is_hidden_in_the_list() {
+    var t = listed(); if (!t) return
+    t.app.docs.applyRegisteredResult(brdDocs, 0)
+    wait(20)
+    compare(H.find(t, "docBrdState").visible, false)
+    compare(H.find(t, "docBrdTags").visible, false)
+  }
 }

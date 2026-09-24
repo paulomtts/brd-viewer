@@ -17,6 +17,8 @@ Column {
   readonly property bool listMode: bar.app.nav.viewMode === "documents"
   readonly property bool docMode: bar.app.nav.viewMode === "document"
   readonly property var categories: Documents.docCategoryCounts(bar.app.docs.docs)
+  // The merged entry of the open document: what says whether brd knows it.
+  readonly property var selectedEntry: ({ brd: bar.app.docs.selectedDocBrd })
 
   visible: bar.listMode || bar.docMode
   spacing: Style.space(6)
@@ -47,6 +49,29 @@ Column {
     width: parent.width
     text: bar.app.docs.selectedDocPath
     elide: Text.ElideMiddle
+  }
+
+  // brd's backup of the open document, and brd's own tags -- separate from the
+  // type picker below, which writes the document's own frontmatter tag.
+  UI.ThemedText {
+    objectName: "docBrdState"
+    variant: "caption"
+    theme: bar.theme
+    visible: bar.docMode && text !== ""
+    width: parent.width
+    text: Documents.brdStateLabel(bar.selectedEntry)
+    color: bar.theme.dim
+  }
+
+  UI.ThemedText {
+    objectName: "docBrdTags"
+    variant: "caption"
+    theme: bar.theme
+    visible: bar.docMode && text !== ""
+    width: parent.width
+    text: bar.app.docs.selectedDocBrd ? bar.app.docs.selectedDocBrd.tags.join(" · ") : ""
+    color: bar.theme.dim
+    elide: Text.ElideRight
   }
 
   UI.TagPicker {
