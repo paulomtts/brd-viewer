@@ -132,8 +132,12 @@ until it is next saved, and existing snapshots and backups are left in their
   files are not touched. **A snapshot is always saved first**, to
   `~/Snapshots/omarchy-project-manager/<name>-<timestamp>/` (override with
   `OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR`), and if a snapshot can't be saved the project is
-  not removed. Each snapshot holds `tree.json` and a `RESTORE.txt` with the
-  exact commands (`brd init`, then `brd import tree.json`).
+  not removed. Each snapshot holds `export.json` (`brd export`: the whole
+  board - cards, issues, documents, comments, tags and refs) and a
+  `RESTORE.txt` with the exact commands (`brd init`, then
+  `brd import export.json`). If `brd export` can't run (e.g. the project
+  directory is gone), the snapshot holds a raw copy of the project database
+  instead, plus its `.docs/` document backups when they exist.
 - No card or document is ever created or edited from the panel.
 
 The plugin runs `brd` (`brd projects`, `brd tree`), plus small helpers in its

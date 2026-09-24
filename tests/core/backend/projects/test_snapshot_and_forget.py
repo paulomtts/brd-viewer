@@ -16,13 +16,13 @@ SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".
 FAKE_BRD = """#!/bin/sh
 echo "brd $* (cwd=$(pwd))" >> "$CALLS"
 case "$1" in
-  tree)
-    if [ "$FAKE_TREE_FAIL" = 1 ]; then
+  export)
+    if [ "$FAKE_EXPORT_FAIL" = 1 ]; then
       echo '{"ok": false, "error": {"type": "ProjectNotFoundError", "message": "boom"}}'; exit 1
     fi
-    echo '{"ok": true, "data": [{"id": "a", "title": "T", "children": []}]}' ;;
+    echo '{"ok": true, "data": {"brd_export": 1, "cards": [{"id": "a", "title": "T"}], "issues": [], "documents": [], "comments": [], "tags": [], "refs": []}}' ;;
   forget)
-    echo "snapshot_files_at_forget=$(ls "$OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR"/*/tree.json "$OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR"/*/project.db 2>/dev/null | wc -l)" >> "$CALLS"
+    echo "snapshot_files_at_forget=$(ls "$OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR"/*/export.json "$OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR"/*/project.db 2>/dev/null | wc -l)" >> "$CALLS"
     if [ "$FAKE_FORGET_FAIL" = 1 ]; then
       echo '{"ok": false, "error": {"type": "ProjectNotFoundError", "message": "nope"}}'; exit 1
     fi
@@ -81,12 +81,14 @@ def test_snapshots_then_forgets(box):
     assert code == 0 and result["ok"] is True, (result, err)
     snap = Path(result["snapshot"])
     assert snap.is_dir() and str(snap).startswith(str(box["snaps"]))
-    assert json.loads((snap / "tree.json").read_text())["data"][0]["id"] == "a"
+    export = json.loads((snap / "export.json").read_text())
+    assert export["data"]["brd_export"] == 1 and export["data"]["cards"][0]["id"] == "a"
+    assert not (snap / "tree.json").exists()
     meta = json.loads((snap / "project.json").read_text())
     assert meta["name"] == "My Project" and meta["root_path"] == str(box["project"])
-    assert "brd import" in (snap / "RESTORE.txt").read_text()
+    assert 'brd import "%s"' % (snap / "export.json") in (snap / "RESTORE.txt").read_text()
     log = calls(box)
-    assert any(c.startswith("brd tree") and c.endswith("(cwd=%s)" % box["project"]) for c in log)
+    assert any(c.startswith("brd export") and c.endswith("(cwd=%s)" % box["project"]) for c in log)
     assert any(c.startswith("brd forget %s" % box["project"]) for c in log)
 
 
@@ -96,13 +98,17 @@ def test_snapshot_exists_before_forget_runs(box):
     assert "snapshot_files_at_forget=1" in calls(box)
 
 
-def test_falls_back_to_raw_db_copy_when_tree_fails(box):
+def test_falls_back_to_raw_db_copy_when_export_fails(box):
     db = project_db(box, box["project"])
-    code, result, err = run(box, str(box["project"]), "p", extra_env={"FAKE_TREE_FAIL": "1"})
+    code, result, err = run(box, str(box["project"]), "p", extra_env={"FAKE_EXPORT_FAIL": "1"})
     assert code == 0 and result["ok"] is True, (result, err)
     snap = Path(result["snapshot"])
     assert (snap / "project.db").read_bytes() == db.read_bytes()
-    assert not (snap / "tree.json").exists()
+    assert not (snap / "export.json").exists()
+    assert not (snap / "project.docs").exists()
+    restore = (snap / "RESTORE.txt").read_text()
+    assert 'cp "%s" "%s"' % (snap / "project.db", db) in restore
+    assert ".docs" not in restore
     assert any(c.startswith("brd forget") for c in calls(box))
 
 
@@ -112,11 +118,28 @@ def test_missing_project_dir_uses_the_db_copy(box):
     code, result, err = run(box, str(gone), "gone")
     assert code == 0 and result["ok"] is True, (result, err)
     assert (Path(result["snapshot"]) / "project.db").read_bytes() == db.read_bytes()
-    assert not any(c.startswith("brd tree") for c in calls(box))
+    assert not any(c.startswith("brd export") for c in calls(box))
+
+
+def test_the_fallback_also_copies_the_document_backups(box):
+    db = project_db(box, box["project"])
+    docs = db.with_suffix(".docs")
+    (docs / "nested").mkdir(parents=True)
+    (docs / "spec.md").write_text("# spec")
+    (docs / "nested" / "note.md").write_text("note")
+    code, result, err = run(box, str(box["project"]), "p", extra_env={"FAKE_EXPORT_FAIL": "1"})
+    assert code == 0 and result["ok"] is True, (result, err)
+    snap = Path(result["snapshot"])
+    assert (snap / "project.db").read_bytes() == db.read_bytes()
+    assert (snap / "project.docs" / "spec.md").read_text() == "# spec"
+    assert (snap / "project.docs" / "nested" / "note.md").read_text() == "note"
+    restore = (snap / "RESTORE.txt").read_text()
+    assert 'cp "%s" "%s"' % (snap / "project.db", db) in restore
+    assert 'cp -r "%s" "%s"' % (snap / "project.docs", docs) in restore
 
 
 def test_refuses_to_forget_when_nothing_can_be_snapshotted(box):
-    code, result, _ = run(box, str(box["project"]), "p", extra_env={"FAKE_TREE_FAIL": "1"})
+    code, result, _ = run(box, str(box["project"]), "p", extra_env={"FAKE_EXPORT_FAIL": "1"})
     assert code != 0 and result["ok"] is False
     assert not any(c.startswith("brd forget") for c in calls(box))
     assert not box["snaps"].exists() or not any(box["snaps"].iterdir())

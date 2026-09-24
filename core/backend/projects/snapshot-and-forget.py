@@ -7,9 +7,13 @@ The snapshot comes first and is mandatory: if nothing can be saved, the
 project is NOT forgotten. It lands in $OMARCHY_PROJECT_MANAGER_SNAPSHOT_DIR (default
 ~/Snapshots/omarchy-project-manager; the old BRD_VIEWER_SNAPSHOT_DIR still works) as <name>-<UTC timestamp>/ holding
 
-  tree.json      `brd tree` output, the format `brd import` restores from
-  project.db     a raw copy of the project's database, only when `brd tree`
+  export.json    `brd export` output -- the whole board (cards, issues,
+                 documents, comments, tags, refs) -- which `brd import`
+                 restores from
+  project.db     a raw copy of the project's database, only when `brd export`
                  could not run (e.g. the project directory is gone)
+  project.docs/  brd's document backups (the directory beside the database),
+                 copied with project.db when it exists
   project.json   name, path and time
   RESTORE.txt    how to bring it back
 
@@ -24,6 +28,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 TIMEOUT_SECONDS = 30
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -90,16 +95,23 @@ def make_snapshot_dir(name):
             suffix += 1
 
 
-def restore_text(root_path, snapshot, has_tree, db_dest):
+def restore_text(root_path, snapshot, has_export, db_dest, has_docs):
     lines = ["Restore the brd project %s" % root_path, ""]
     lines.append('  mkdir -p "%s"   # only if the directory no longer exists' % root_path)
     lines.append('  cd "%s"' % root_path)
     lines.append("  brd init")
-    if has_tree:
-        lines.append('  brd import "%s"' % os.path.join(snapshot, "tree.json"))
+    if has_export:
+        lines.append('  brd import "%s"' % os.path.join(snapshot, "export.json"))
     else:
         lines.append('  cp "%s" "%s"' % (os.path.join(snapshot, "project.db"), db_dest))
+        if has_docs:
+            lines.append('  cp -r "%s" "%s"' % (os.path.join(snapshot, "project.docs"), docs_dir(db_dest)))
     return "\n".join(lines) + "\n"
+
+
+def docs_dir(db_path):
+    """brd keeps a project's document backups beside its database."""
+    return Path(db_path).with_suffix(".docs")
 
 
 def main(argv):
@@ -108,34 +120,39 @@ def main(argv):
     root_path = argv[0]
     name = argv[1] if len(argv) > 1 and argv[1] else os.path.basename(os.path.normpath(root_path))
 
-    tree_text = None
+    export_text = None
     if os.path.isdir(root_path):
-        proc, _ = run_brd(["tree"], cwd=root_path)
+        proc, _ = run_brd(["export"], cwd=root_path)
         if brd_ok(proc):
-            tree_text = proc.stdout
+            export_text = proc.stdout
 
     db_source = None
-    if tree_text is None:
+    docs_source = None
+    if export_text is None:
         candidate = project_db_path(root_path)
         if candidate is not None and os.path.isfile(candidate):
             db_source = str(candidate)
+            if docs_dir(candidate).is_dir():
+                docs_source = str(docs_dir(candidate))
 
-    if tree_text is None and db_source is None:
+    if export_text is None and db_source is None:
         return fail("could not snapshot the project, so it was not removed")
 
     snapshot = make_snapshot_dir(name)
     try:
-        if tree_text is not None:
-            with open(os.path.join(snapshot, "tree.json"), "w", encoding="utf-8") as f:
-                f.write(tree_text)
+        if export_text is not None:
+            with open(os.path.join(snapshot, "export.json"), "w", encoding="utf-8") as f:
+                f.write(export_text)
         else:
             shutil.copyfile(db_source, os.path.join(snapshot, "project.db"))
+            if docs_source is not None:
+                shutil.copytree(docs_source, os.path.join(snapshot, "project.docs"))
         db_dest = project_db_path(root_path)
         with open(os.path.join(snapshot, "project.json"), "w", encoding="utf-8") as f:
             json.dump({"name": name, "root_path": root_path,
                        "saved_at": datetime.now(timezone.utc).isoformat()}, f, indent=2)
         with open(os.path.join(snapshot, "RESTORE.txt"), "w", encoding="utf-8") as f:
-            f.write(restore_text(root_path, snapshot, tree_text is not None, db_dest))
+            f.write(restore_text(root_path, snapshot, export_text is not None, db_dest, docs_source is not None))
     except OSError as e:
         shutil.rmtree(snapshot, ignore_errors=True)
         return fail("could not write the snapshot (%s), so the project was not removed" % e)
