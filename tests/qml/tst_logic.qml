@@ -391,4 +391,69 @@ TestCase {
     compare(Logic.docCategoryColor("weird", "#111111"), "#111111")
     compare(Logic.docCategoryColor(undefined, "#111111"), "#111111")
   }
+
+  function graphRoots() {
+    return [
+      makeCard("m1", "done", [makeCard("s1", "done", []), makeCard("s2", "todo", [])]),
+      makeCard("m2", "todo", [makeCard("s3", "todo", [])], ["m1"]),
+      makeCard("m3", "blocked", [], ["m2", "ghost"]),
+      makeCard("m4", "in_progress", [])
+    ]
+  }
+
+  function test_graph_model_has_a_node_per_milestone_with_progress() {
+    var g = Logic.graphModel(graphRoots())
+    compare(g.nodes.map(function(n) { return n.id }).join(","), "m1,m2,m3,m4")
+    compare(g.nodes[0].title, "m1")
+    compare(g.nodes[0].status, "done")
+    compare(g.nodes[0].done, 1)
+    compare(g.nodes[0].total, 2)
+    compare(g.nodes[2].status, "blocked")
+    compare(g.nodes[3].total, 0)
+  }
+
+  function test_graph_edges_run_from_blocker_to_blocked_and_skip_unknown_ids() {
+    var g = Logic.graphModel(graphRoots())
+    compare(g.edges.map(function(e) { return e.from + ">" + e.to }).join(","), "m1>m2,m2>m3")
+    compare(g.edges[0].id, "m1>m2")
+  }
+
+  function test_graph_nodes_are_positioned_and_sized_by_the_layout() {
+    var g = Logic.graphModel(graphRoots())
+    for (var i = 0; i < g.nodes.length; i++) {
+      verify(isFinite(g.nodes[i].x) && isFinite(g.nodes[i].y), "node " + i)
+      compare(g.nodes[i].w, Logic.GRAPH_NODE_W)
+      compare(g.nodes[i].h, Logic.GRAPH_NODE_H)
+    }
+    verify(g.nodes[1].x > g.nodes[0].x, "blocked milestone sits to the right of its blocker")
+    verify(g.nodes[2].x > g.nodes[1].x)
+  }
+
+  function test_graph_model_of_nothing_is_empty() {
+    compare(Logic.graphModel([]).nodes.length, 0)
+    compare(Logic.graphModel(undefined).edges.length, 0)
+  }
+
+  function test_graph_move_picks_the_nearest_node_in_the_direction() {
+    var nodes = [
+      { id: "a", x: 0, y: 0, w: 100, h: 50 },
+      { id: "b", x: 300, y: 0, w: 100, h: 50 },
+      { id: "c", x: 300, y: 200, w: 100, h: 50 },
+      { id: "d", x: 600, y: 10, w: 100, h: 50 }
+    ]
+    compare(Logic.graphMove(nodes, "a", "right"), "b")
+    compare(Logic.graphMove(nodes, "b", "right"), "d")
+    compare(Logic.graphMove(nodes, "b", "left"), "a")
+    compare(Logic.graphMove(nodes, "b", "down"), "c")
+    compare(Logic.graphMove(nodes, "c", "up"), "b")
+    compare(Logic.graphMove(nodes, "a", "left"), "a")
+    compare(Logic.graphMove(nodes, "d", "down"), "c")
+  }
+
+  function test_graph_move_starts_at_the_first_node_when_nothing_is_selected() {
+    var nodes = [{ id: "a", x: 0, y: 0 }, { id: "b", x: 300, y: 0 }]
+    compare(Logic.graphMove(nodes, "", "right"), "a")
+    compare(Logic.graphMove(nodes, "gone", "left"), "a")
+    compare(Logic.graphMove([], "", "right"), "")
+  }
 }

@@ -12,6 +12,7 @@ runner=$(command -v /usr/lib/qt6/bin/qmltestrunner || command -v qmltestrunner)
 cp -r "$here/stubs/." "$work/"
 mkdir "$work/t"
 cp "$repo"/*.qml "$repo/logic.js" "$work/t/"
+cp -r "$repo/canvas" "$work/t/canvas"
 cp "$here"/tst_*.qml "$work/t/"
 
 status=0

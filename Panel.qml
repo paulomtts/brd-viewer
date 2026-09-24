@@ -22,7 +22,7 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string pluginDir: Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
 
-  property string viewMode: "board"   // "board" | "entry" | "documents" | "document"
+  property string viewMode: "board"   // "board" | "entry" | "documents" | "document" | "graph"
   property bool dropdownOpen: false
   property string dropdownQuery: ""
   property int dropdownCursor: 0
@@ -30,8 +30,10 @@ Panel {
   property bool stateLoaded: false
   property bool stateReadOk: false
 
-  readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents" : "board"
-  readonly property string sectionTitle: section === "documents" ? "Documents" : "Board"
+  readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents"
+    : viewMode === "graph" ? "graph"
+    : (viewMode === "entry" && root.returnMode === "graph") ? "graph" : "board"
+  readonly property string sectionTitle: section === "documents" ? "Documents" : section === "graph" ? "Graph" : "Board"
   readonly property bool documentsEnabled: true
   property var projects: []            // [{ root_path, name }]
   property var selectedProject: null   // { root_path, name } | null
@@ -53,6 +55,8 @@ Panel {
   property string deleteError: ""
   property string lastSnapshot: ""
   property int returnCursor: 0
+  property string returnMode: "board"   // the list a card was opened from
+  property string graphCursor: ""
   property real returnScrollY: 0
 
   property var docs: []
@@ -89,7 +93,7 @@ Panel {
 
   readonly property Item focusItem: root.deleteTarget ? confirmField
     : root.dropdownOpen ? sidebar.filterItem
-    : (root.viewMode === "entry" || root.viewMode === "document" || !root.selectedProject) ? keyCatcher
+    : (root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "graph" || !root.selectedProject) ? keyCatcher
     : searchField
 
   function focusForView() {
@@ -102,6 +106,15 @@ Panel {
   function resetSearch() {
     searchQuery = ""
     cursorIndex = 0
+  }
+
+  readonly property var graph: Logic.graphModel(root.cardRoots)
+
+  function moveGraph(direction) {
+    var next = Logic.graphMove(root.graph.nodes, root.graphCursor, direction)
+    if (next === "") return
+    root.graphCursor = next
+    if (graphView) graphView.centerOn(next)
   }
 
   function moveCursor(delta) {
@@ -164,6 +177,10 @@ Panel {
     if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
     if (root.viewMode === "documents") root.openDoc(list[root.cursorIndex].path)
     else root.openCard(list[root.cursorIndex].id)
+  }
+
+  function activateGraphNode() {
+    if (root.graphCursor !== "") root.openCard(root.graphCursor)
   }
 
   function openDelete(project) {
@@ -239,14 +256,14 @@ Panel {
     root.watchedDbPath = ""
     root.applyTreeData([])
     root.viewMode = "board"
-    root.docs = []; root.docCategory = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.docs = []; root.docCategory = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
   }
 
   function selectProject(project) {
     selectedProject = project
     resetSearch()
     viewMode = "board"
-    root.docs = []; root.docCategory = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.docs = []; root.docCategory = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     root.watchedDbPath = ""
     resolveDbPathProc.command = ["python3", root.pluginDir + "resolve-db-path.py", project.root_path]
     resolveDbPathProc.running = false
@@ -322,6 +339,7 @@ Panel {
     if (event.key === Qt.Key_P) { root.toggleDropdown(); return true }
     if (event.key === Qt.Key_1) { root.showSection("board"); return true }
     if (event.key === Qt.Key_2) { root.showSection("documents"); return true }
+    if (event.key === Qt.Key_3) { root.showSection("graph"); return true }
     return false
   }
 
@@ -331,8 +349,9 @@ Panel {
     if (root.dropdownOpen) root.dropdownOpen = false
     root.resetSearch()
     root.scrollOnCursor = false
-    root.viewMode = name === "documents" ? "documents" : "board"
+    root.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : "board"
     if (name === "documents") root.fetchDocs()
+    if (name === "graph" && root.graphCursor === "" && root.graph.nodes.length > 0) root.graphCursor = root.graph.nodes[0].id
     Qt.callLater(root.scrollToTop)
     root.focusForView()
   }
@@ -402,7 +421,8 @@ Panel {
 
   function openCard(id) {
     if (!root.cardMap[id]) return
-    if (root.viewMode === "board") {
+    if (root.viewMode === "board" || root.viewMode === "graph") {
+      root.returnMode = root.viewMode
       root.returnCursor = root.cursorIndex
       root.returnScrollY = panelFlick ? panelFlick.contentY : 0
     }
@@ -417,7 +437,7 @@ Panel {
   // Leaving a card puts the Board back exactly as it was: same highlighted
   // card, same scroll position.
   function restoreListView() {
-    viewMode = "board"
+    viewMode = root.returnMode
     root.scrollOnCursor = false
     root.cursorIndex = root.returnCursor
     Qt.callLater(function() { if (panelFlick) root.scrollBy(root.returnScrollY - panelFlick.contentY) })
@@ -716,6 +736,11 @@ Panel {
       anchors.fill: parent
       onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
+        if (root.viewMode === "graph") {
+          if (dx !== 0) root.moveGraph(dx < 0 ? "left" : "right")
+          else if (dy !== 0) root.moveGraph(dy < 0 ? "up" : "down")
+          return
+        }
         if (dx < 0 && (root.viewMode === "entry" || root.viewMode === "document")) { root.goBack(); return }
         if (root.viewMode !== "entry" && root.viewMode !== "document") return
         if (dx > 0) { if (root.viewMode === "entry") root.activateCursor(); return }
@@ -725,7 +750,10 @@ Panel {
         if (root.viewMode === "entry" && root.detailLinkList.length > 0) root.moveCursor(dy)
         else root.scrollBy(dy * Style.space(56))
       }
-      onActivateRequested: if (root.viewMode === "entry") root.activateCursor()
+      onActivateRequested: {
+        if (root.viewMode === "entry") root.activateCursor()
+        else if (root.viewMode === "graph") root.activateGraphNode()
+      }
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
       Sidebar {
@@ -802,7 +830,7 @@ Panel {
             }
 
             Text {
-              visible: root.viewMode === "board"
+              visible: root.viewMode === "board" || root.viewMode === "graph"
               text: "⟳"
               color: root.foreground
               font.family: root.fontFamily
@@ -1014,6 +1042,20 @@ Panel {
                 }
               }
             }
+          }
+
+          GraphView {
+            id: graphView
+            visible: root.viewMode === "graph" && !!root.selectedProject && !root.deleteTarget
+            width: parent.width
+            height: Math.max(Style.space(240), panelFlick.height - y - Style.space(12))
+            nodes: root.graph.nodes
+            edges: root.graph.edges
+            cursorId: root.graphCursor
+            foreground: root.foreground
+            dim: root.dim
+            fontFamily: root.fontFamily
+            onNodeClicked: function(id) { root.graphCursor = id; root.openCard(id) }
           }
 
           DocumentsView {

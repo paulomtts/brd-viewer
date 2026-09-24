@@ -19,11 +19,18 @@ section on the right.
   also after a shell restart. It is stored in
   `~/.local/state/brd-viewer/state.json` (`$XDG_STATE_HOME` is respected). If
   that project is no longer registered, the first one is shown.
-- **Sections** - **Board** (**Ctrl+1**) and **Documents** (**Ctrl+2**), also
+- **Sections** - **Board** (**Ctrl+1**), **Documents** (**Ctrl+2**) and **Graph** (**Ctrl+3**), also
   reachable from the sidebar with the mouse.
 - **Board** - top-level cards in three status sections (Todo / In Progress /
   Done), each showing a done/total progress badge for its subtasks. A card
   reporting as blocked (derived status) appears in Todo, flagged in orange.
+- **Graph** (Ctrl+3) - a pan/zoom canvas with one node per milestone (title,
+  status colour, done/total progress) and an arrow for each `blocked_by` link
+  between milestones, laid out left to right. Arrow keys move the selection to
+  the nearest node in that direction and the view follows; Enter or a click
+  opens the milestone's card, and Back returns to the graph. The canvas also
+  has mouse pan/zoom, `+`/`-` and on-screen zoom/organize/fit buttons. Nodes can
+  be dragged for a look around, but the graph never creates or removes links.
 - **Card detail** - kind and status badges (Milestone / Story / Subtask by
   depth; Todo / In progress / Done / Blocked), full description, a parent link
   and clickable blocked-by/children lists, resolving ids to titles.

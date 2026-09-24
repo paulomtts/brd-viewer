@@ -127,4 +127,11 @@ TestCase {
     verify(hoverSpy.count >= 1)
     compare(hoverSpy.signalArguments[hoverSpy.count - 1][0], 2)
   }
+
+  function test_the_graph_row_emits_its_section() {
+    var sb = make()
+    click(find(sb, "navGraph"))
+    compare(sectionSpy.count, 1)
+    compare(sectionSpy.signalArguments[0][0], "graph")
+  }
 }

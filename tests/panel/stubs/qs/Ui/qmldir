@@ -8,3 +8,5 @@ Button 1.0 Button.qml
 TextField 1.0 TextField.qml
 PanelSeparator 1.0 PanelSeparator.qml
 PanelSectionHeader 1.0 PanelSectionHeader.qml
+ToggleSwitch 1.0 ToggleSwitch.qml
+PanelToolTip 1.0 PanelToolTip.qml
