@@ -34,7 +34,10 @@ Panel {
     fontFamily: root.fontFamily
   }
 
-  readonly property string pluginDir: Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
+  // The plugin ROOT, not this file's folder: every helper is addressed as
+  // pluginDir + "core/backend/...", and this file lives in <plugin>/ui/, so the
+  // "../" is load-bearing (tests/ui/tst_plugin_dir.qml guards it).
+  readonly property string pluginDir: Qt.resolvedUrl("../").toString().replace(/^file:\/\//, "")
 
   // All non-visual state lives in the stores; `app` is how the tests reach it.
   Core.App { id: appStores; backendDir: root.pluginDir + "core/backend/" }
