@@ -33,14 +33,25 @@ Scope {
   property string jobLog: ""
   property string jobError: ""
   property int cardsAtStart: 0
+  property int cardsFrozen: -1        // the count as it stood when the job ended
   property bool jobDismissed: false
+  property string createProject: ""   // the project root the create in flight is for
 
   // One create at a time, from its launch until the helper's own exit -- even
   // when the user has left the project meanwhile.
   readonly property bool dialogBusy: manualRunner.busy
 
+  // The agent check is on its way: the dialog says so rather than showing a
+  // verdict nobody has reached yet.
+  readonly property bool agentChecking: describeRunner.busy
   readonly property string agentMessage: Milestones.agentMessage(store.agentInfo)
-  readonly property int cardsCreated: Math.max(0, store.cardCount - store.cardsAtStart)
+  // An agent nobody has checked is not an agent to run on: an empty
+  // `agentMessage` is not enough on its own.
+  readonly property bool agentReady: store.agentInfo !== null && store.agentMessage === ""
+  // Live while the job runs, frozen at its end so later board changes cannot
+  // keep inflating the result.
+  readonly property int cardsCreated: store.cardsFrozen >= 0
+    ? store.cardsFrozen : Math.max(0, store.cardCount - store.cardsAtStart)
   // A job started for another project keeps running, but it is not this
   // project's business: only its own project's panel shows it.
   readonly property bool jobVisible: store.jobState !== "idle"
@@ -67,6 +78,7 @@ Scope {
     store.agentInfo = null
   }
 
+  // Manual mode needs no agent, so the dialog opens without asking about one.
   function openDialog() {
     store.dialogOpen = true
     store.mode = "manual"
@@ -74,6 +86,15 @@ Scope {
     store.description = ""
     store.selectedSpec = ""
     store.dialogError = ""
+  }
+
+  // Asked for once per project, the first time the user wants From-spec mode:
+  // the answer cannot change while they stay in the project, and `reset()`
+  // forgets it when they leave.
+  onModeChanged: if (store.mode === "spec" && store.agentInfo === null) store.checkAgent()
+
+  function checkAgent() {
+    if (describeRunner.busy) return
     describeRunner.run(["--describe"])
   }
 
@@ -97,13 +118,17 @@ Scope {
       return
     }
     store.dialogError = ""
+    store.createProject = store.project.root_path
     var args = [store.project.root_path, "--title", name]
     var desc = String(store.description).trim()
     if (desc !== "") args.push("--description", desc)
     manualRunner.run(args)
   }
 
-  function applyCreateResult(text, exitCode) {
+  function applyCreateResult(text, exitCode, launchedGuard) {
+    // Only the project the create was launched for: a card made in a project
+    // the user has left must not close the dialog they are in now.
+    if (launchedGuard !== store.createProject) return
     var result = Milestones.parseCreateResult(text, exitCode)
     if (!result.ok) {
       store.dialogError = result.error
@@ -120,12 +145,13 @@ Scope {
   // agent that can run unattended.
   function startFromSpec() {
     if (!store.project || store.jobState === "running") return
-    if (store.agentMessage !== "" || store.selectedSpec === "") return
+    if (!store.agentReady || store.selectedSpec === "") return
     store.jobState = "running"
     store.jobProject = store.project.root_path
     store.jobAgent = store.agentInfo ? String(store.agentInfo.agent || "") : ""
     store.jobStartedAt = Date.now()
     store.cardsAtStart = store.cardCount
+    store.cardsFrozen = -1
     store.jobLog = ""
     store.jobError = ""
     store.jobDismissed = false
@@ -144,7 +170,7 @@ Scope {
     if (result.log !== "") store.jobLog = result.log
     store.jobState = result.ok ? "done" : "failed"
     store.jobError = result.ok ? "" : result.error
-    store.boardRefreshRequested()
+    store.endJobBookkeeping()
   }
 
   // Cancel ends the job here and now: `cancel()` stops the helper (which kills
@@ -155,6 +181,16 @@ Scope {
     store.jobState = "failed"
     store.jobError = "Cancelled."
     specRunner.cancel()
+    store.endJobBookkeeping()
+  }
+
+  // What every ending has in common. The count is frozen -- and the board
+  // refreshed -- only when the job's own project is the selected one: the
+  // numbers on screen belong to another project otherwise, and the job stays
+  // readable for when the user comes back to it.
+  function endJobBookkeeping() {
+    if (!store.project || store.project.root_path !== store.jobProject) return
+    store.cardsFrozen = Math.max(0, store.cardCount - store.cardsAtStart)
     store.boardRefreshRequested()
   }
 
@@ -169,7 +205,7 @@ Scope {
     id: manualRunner
     script: store.backendDir + "milestones/create-milestone.py"
     guard: store.project ? store.project.root_path : ""
-    onFinished: function(stdout, exitCode, launchedGuard) { store.applyCreateResult(stdout, exitCode) }
+    onFinished: function(stdout, exitCode, launchedGuard) { store.applyCreateResult(stdout, exitCode, launchedGuard) }
   }
 
   HelperRunner {
@@ -179,22 +215,17 @@ Scope {
     onFinished: function(stdout, exitCode, launchedGuard) { store.applyDescribeResult(stdout, exitCode) }
   }
 
+  // The job's guard is the project the JOB is for, not the selected one: the
+  // run outlives a project switch on purpose, so its result must still reach
+  // the job it belongs to and be recorded truthfully. That also means the
+  // newest run's exit always emits `finished` -- the job can never be left
+  // "running" because the user wandered off. Which project's panel shows the
+  // result is `jobVisible`'s business, and refreshing a board is
+  // `endJobBookkeeping`'s.
   HelperRunner {
     id: specRunner
     script: store.backendDir + "milestones/run-setup-milestone.py"
-    guard: store.project ? store.project.root_path : ""
+    guard: store.jobProject
     onFinished: function(stdout, exitCode, launchedGuard) { store.applyRunResult(stdout, exitCode, launchedGuard) }
-    // The newest run's exit always releases `busy`, even when the guard has
-    // changed and its result is dropped. The job state has no such release of
-    // its own, so it is ended here instead of staying "running" forever: the
-    // guard differing from the job's project is exactly the case where no
-    // `finished` will follow.
-    onBusyChanged: {
-      if (specRunner.busy || store.jobState !== "running") return
-      if (specRunner.guard === store.jobProject) return
-      store.jobState = "failed"
-      store.jobError = "The run ended while another project was selected; its result was not read."
-      store.boardRefreshRequested()
-    }
   }
 }

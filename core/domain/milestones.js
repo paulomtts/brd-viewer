@@ -40,8 +40,15 @@ function parseDescribeResult(stdout, exitCode) {
 }
 
 // "" when the agent can run unattended, otherwise the reason it cannot.
+// Nothing checked yet (null/undefined) is not a reason: there is simply
+// nothing to say until an answer is in.
 function agentMessage(info) {
-  var i = info || {}
+  if (info === null || info === undefined) return ""
+  var i = info
+  // The check itself failed, or the helper named the problem: say that instead
+  // of blaming a default agent that may well be set.
+  var reported = String(i.error || "")
+  if (reported !== "") return reported
   var agent = String(i.agent || "")
   if (agent === "") return "No default agent is set."
   if (i.installed !== true) return agent + " is not installed."

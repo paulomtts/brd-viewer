@@ -53,8 +53,16 @@ TestCase {
     compare(Milestones.agentMessage({ agent: "", installed: false, supported: false }), "No default agent is set.")
     compare(Milestones.agentMessage({ agent: "codex", installed: false, supported: true }), "codex is not installed.")
     compare(Milestones.agentMessage({ agent: "codex", installed: true, supported: false }), "codex has no supported unattended mode.")
-    compare(Milestones.agentMessage(undefined), "No default agent is set.")
     compare(Milestones.agentMessage({}), "No default agent is set.")
+    // Nothing has been checked yet: there is nothing to say about the agent.
+    compare(Milestones.agentMessage(null), "")
+    compare(Milestones.agentMessage(undefined), "")
+    // The check itself failed (or the helper reported a reason): say that,
+    // rather than blaming a missing default agent.
+    compare(Milestones.agentMessage({ agent: "", installed: false, supported: false, error: "Could not check the default agent." }),
+      "Could not check the default agent.")
+    compare(Milestones.agentMessage({ agent: "claude", installed: true, supported: true, error: "omarchy-default-agent failed." }),
+      "omarchy-default-agent failed.")
   }
 
   function test_format_elapsed() {

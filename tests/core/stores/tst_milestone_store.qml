@@ -41,13 +41,13 @@ TestCase {
     return out
   }
 
-  // The dialog, with the default agent already checked and usable.
+  // The dialog in From-spec mode, with the default agent already checked and
+  // usable. The check is skipped when this project's answer is already known.
   function specFixture(app) {
     app.milestones.openDialog()
-    var d = app.milestones.describeRunner.current
-    d.outText = agentOk
-    d.exited(0)
     app.milestones.mode = "spec"
+    var d = app.milestones.describeRunner.current
+    if (d) { d.outText = agentOk; d.exited(0) }
     app.milestones.selectedSpec = "docs/specs/one.md"
     return app
   }
@@ -61,7 +61,9 @@ TestCase {
 
   // ---- the dialog and the agent check
 
-  function test_opening_the_dialog_clears_it_and_checks_the_default_agent() {
+  // Manual mode needs no agent, so opening the dialog must not go looking for
+  // one: nothing is said about the agent until the user asks for From-spec.
+  function test_opening_the_dialog_clears_it_and_checks_nothing_yet() {
     var app = make(); if (!app) return
     compare(app.milestones.dialogOpen, false)
     app.milestones.title = "left over"
@@ -73,32 +75,71 @@ TestCase {
     compare(app.milestones.description, "")
     compare(app.milestones.selectedSpec, "")
     compare(app.milestones.dialogError, "")
+    verify(!app.milestones.describeRunner.current, "no agent check yet")
+    compare(app.milestones.agentChecking, false)
+    compare(app.milestones.agentMessage, "", "and nothing to say about an agent nobody asked about")
+  }
+
+  function test_entering_spec_mode_checks_the_default_agent() {
+    var app = make(); if (!app) return
+    app.milestones.openDialog()
+    app.milestones.mode = "spec"
     var proc = app.milestones.describeRunner.current
     verify(proc, "the agent check runs")
     compare(proc.command[0], "python3")
     compare(proc.command[1], "/plugin/core/backend/milestones/run-setup-milestone.py")
     compare(proc.command[2], "--describe")
     compare(proc.command.length, 3)
+    compare(app.milestones.agentChecking, true)
+    compare(app.milestones.agentMessage, "", "no verdict while the check is still running")
+    proc.outText = agentOk
+    proc.exited(0)
+    compare(app.milestones.agentChecking, false)
+    compare(app.milestones.agentInfo.agent, "claude")
+    compare(app.milestones.agentMessage, "")
+  }
+
+  // The answer does not change while the user stays in the project: going back
+  // and forth between the modes must not re-run the check every time.
+  function test_the_agent_is_checked_once_per_project() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    specFixture(app)
+    compare(app.milestones.describeRunner.seq, 1)
+    app.milestones.mode = "manual"
+    app.milestones.mode = "spec"
+    compare(app.milestones.describeRunner.seq, 1, "the known answer is reused")
+    app.projects.chooseProject(pB)
+    app.milestones.openDialog()
+    app.milestones.mode = "spec"
+    compare(app.milestones.describeRunner.seq, 2, "the new project is checked again")
   }
 
   function test_the_agent_check_becomes_the_agent_message() {
     var app = make(); if (!app) return
-    app.milestones.openDialog()
-    var proc = app.milestones.describeRunner.current
-    proc.outText = agentOk
-    proc.exited(0)
-    compare(app.milestones.agentInfo.agent, "claude")
-    compare(app.milestones.agentMessage, "")
-    app.milestones.openDialog()
-    proc = app.milestones.describeRunner.current
-    proc.outText = agentNone
-    proc.exited(0)
+    app.milestones.applyDescribeResult(agentNone, 0)
     compare(app.milestones.agentMessage, "No default agent is set.")
-    app.milestones.openDialog()
-    proc = app.milestones.describeRunner.current
-    proc.outText = agentMissing
-    proc.exited(0)
+    app.milestones.applyDescribeResult(agentMissing, 0)
     compare(app.milestones.agentMessage, "codex is not installed.")
+    app.milestones.applyDescribeResult(agentOk, 0)
+    compare(app.milestones.agentMessage, "")
+  }
+
+  // A check that failed says so, instead of blaming a missing default agent.
+  function test_a_failed_agent_check_is_reported_and_blocks_the_run() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    app.milestones.openDialog()
+    app.milestones.mode = "spec"
+    var proc = app.milestones.describeRunner.current
+    proc.outText = "boom"
+    proc.exited(1)
+    compare(app.milestones.agentChecking, false)
+    verify(app.milestones.agentMessage !== "", "the reason is shown")
+    verify(app.milestones.agentMessage !== "No default agent is set.")
+    app.milestones.selectedSpec = "docs/specs/one.md"
+    app.milestones.startFromSpec()
+    verify(!app.milestones.specRunner.current, "nothing was run")
   }
 
   // The answer belongs to the project it was asked for: after a switch it must
@@ -108,16 +149,16 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
+    app.milestones.mode = "spec"
     var stale = app.milestones.describeRunner.current
     app.projects.chooseProject(pB)
     stale.outText = agentOk
     stale.exited(0)
     compare(app.milestones.agentInfo, null, "the old project's answer is dropped")
-    compare(app.milestones.agentMessage, "No default agent is set.")
-    app.milestones.mode = "spec"
+    compare(app.milestones.agentMessage, "")
     app.milestones.selectedSpec = "docs/specs/one.md"
     app.milestones.startFromSpec()
-    verify(!app.milestones.specRunner.current, "and it cannot start a run for the new project")
+    verify(!app.milestones.specRunner.current, "and an unchecked agent can never start a run")
   }
 
   // A check the user is still waiting for is not stale: coming back to the
@@ -126,12 +167,14 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
+    app.milestones.mode = "spec"
     var proc = app.milestones.describeRunner.current
     app.projects.chooseProject(pB)
     app.projects.chooseProject(pA)
     proc.outText = agentOk
     proc.exited(0)
     compare(app.milestones.agentMessage, "")
+    compare(app.milestones.agentInfo.agent, "claude")
   }
 
   // ---- manual mode
@@ -267,6 +310,24 @@ TestCase {
     compare(proc.command[4], "two")
   }
 
+  // A create answered for a project the user has left can never close the
+  // dialog of the one they are in now, nor refresh its board.
+  function test_a_create_result_for_another_project_is_ignored() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    var spy = spyOn(app.milestones, "boardRefreshRequested")
+    app.milestones.openDialog()
+    app.milestones.title = "Ship it"
+    app.milestones.createManual()
+    app.milestones.applyCreateResult('{"ok": true, "id": "42"}', 0, "/home/u/elsewhere")
+    compare(app.milestones.dialogOpen, true)
+    compare(app.milestones.title, "Ship it")
+    compare(spy.count, 0)
+    app.milestones.applyCreateResult('{"ok": true, "id": "42"}', 0, "/home/u/my proj")
+    compare(app.milestones.dialogOpen, false)
+    compare(spy.count, 1)
+  }
+
   // ---- starting the agent job
 
   function test_starting_from_a_spec_runs_the_runner_and_closes_the_dialog() {
@@ -296,15 +357,30 @@ TestCase {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     app.milestones.openDialog()
+    app.milestones.mode = "spec"
     var d = app.milestones.describeRunner.current
     d.outText = agentMissing
     d.exited(0)
-    app.milestones.mode = "spec"
+    compare(app.milestones.agentMessage, "codex is not installed.")
     app.milestones.selectedSpec = "docs/specs/one.md"
     app.milestones.startFromSpec()
     verify(!app.milestones.specRunner.current, "nothing was run")
     compare(app.milestones.jobState, "idle")
     compare(app.milestones.dialogOpen, true)
+  }
+
+  // A check that has not answered yet is not a green light.
+  function test_starting_from_a_spec_is_refused_while_the_agent_check_runs() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    app.milestones.openDialog()
+    app.milestones.mode = "spec"
+    app.milestones.selectedSpec = "docs/specs/one.md"
+    compare(app.milestones.agentChecking, true)
+    compare(app.milestones.agentMessage, "")
+    app.milestones.startFromSpec()
+    verify(!app.milestones.specRunner.current, "nothing was run")
+    compare(app.milestones.jobState, "idle")
   }
 
   function test_starting_from_a_spec_is_refused_without_a_selected_spec() {
@@ -349,6 +425,9 @@ TestCase {
     compare(app.milestones.cardsCreated, 7)
     compare(app.milestones.jobVisible, true)
     compare(spy.count, 1)
+    // The result is what the run created, not what the board does afterwards.
+    app.board.applyTreeData(cards(20))
+    compare(app.milestones.cardsCreated, 7, "the count is frozen when the job ends")
   }
 
   function test_a_failed_run_shows_the_reason_and_the_log() {
@@ -434,25 +513,62 @@ TestCase {
   }
 
   // The class of bug this store must never have: the newest run's exit always
-  // ends the job, even when its result is dropped because the project changed.
-  function test_a_run_that_ends_after_a_project_switch_never_leaves_the_job_stuck() {
+  // ends the job -- and it ends it with the truth, whatever project the user
+  // happens to be looking at. The board of a project the job is not about is
+  // never refreshed for it.
+  function test_a_run_that_ends_after_a_project_switch_is_recorded_truthfully() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    app.board.applyTreeData(cards(2))
+    specFixture(app)
+    app.milestones.startFromSpec()
+    var proc = app.milestones.specRunner.current
+    var spy = spyOn(app.milestones, "boardRefreshRequested")
+    app.projects.chooseProject(pB)
+    app.board.applyTreeData(cards(40))
+    proc.outText = '{"ok": true, "agent": "claude", "log": "/l/x.log", "exit_code": 0}'
+    proc.exited(0)
+    verify(app.milestones.jobState !== "running", "the job must not stay running")
+    compare(app.milestones.jobState, "done", "a run that succeeded is not a failure")
+    compare(app.milestones.jobError, "")
+    compare(app.milestones.jobLog, "/l/x.log")
+    compare(app.milestones.specRunner.busy, false)
+    compare(app.milestones.jobVisible, false, "but it is not this project's job")
+    compare(spy.count, 0, "and this project's board is not refreshed for it")
+    // Back at its own project, the result reads correctly against its own board.
+    app.projects.chooseProject(pA)
+    app.board.applyTreeData(cards(6))
+    compare(app.milestones.jobVisible, true)
+    compare(app.milestones.jobState, "done")
+    compare(app.milestones.cardsCreated, 4, "counted against the project it belongs to")
+  }
+
+  // Nothing is stuck afterwards either: the next project can start its own job.
+  function test_a_run_that_ended_elsewhere_does_not_block_the_next_job() {
     var app = make(); if (!app) return
     app.projects.chooseProject(pA)
     specFixture(app)
     app.milestones.startFromSpec()
     var proc = app.milestones.specRunner.current
     app.projects.chooseProject(pB)
-    proc.outText = '{"ok": true, "agent": "claude", "log": "/l/x.log", "exit_code": 0}'
     proc.exited(0)
-    verify(app.milestones.jobState !== "running", "the job must not stay running")
-    compare(app.milestones.jobState, "failed", "a lost result is not a success")
-    compare(app.milestones.specRunner.busy, false)
-    compare(app.milestones.jobVisible, false, "and it is still not this project's job")
-    // and the new project can start its own job right away
     specFixture(app)
     app.milestones.startFromSpec()
     compare(app.milestones.jobState, "running")
     compare(app.milestones.specRunner.current.command[2], "/home/u/b")
+    compare(app.milestones.jobVisible, true)
+  }
+
+  // A run cancelled from another project's panel is impossible (the indicator
+  // is not shown there), and the store refuses it all the same.
+  function test_the_job_refresh_is_scoped_to_its_own_project_on_cancel() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    specFixture(app)
+    app.milestones.startFromSpec()
+    var spy = spyOn(app.milestones, "boardRefreshRequested")
+    app.milestones.cancelJob()
+    compare(spy.count, 1, "its own project's board is refreshed")
   }
 
   // Coming back before the run ends is not staleness: the result is the job's
