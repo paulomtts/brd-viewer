@@ -137,4 +137,10 @@ TestCase {
     verify(panel, "mainPanel")
     verify(panel.contentHeight >= 0.8 * panel.screenH, "height " + panel.contentHeight)
   }
+
+  function test_the_popup_is_about_eighty_percent_of_the_screen_wide() {
+    var p = make(); if (!p) return
+    var panel = named(p, "mainPanel")
+    verify(panel.contentWidth >= 0.8 * panel.screenW - 1, "width " + panel.contentWidth)
+  }
 }

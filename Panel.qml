@@ -722,7 +722,7 @@ Panel {
     // Centered under the bar rather than under the icon, and wide enough for
     // the sidebar.
     centerOnBar: true
-    contentWidth: panel.fittedContentWidth(Style.space(840))
+    contentWidth: panel.fittedContentWidth(Math.max(Style.space(840), 0.8 * panel.screenW))
     // At least 80% of the screen tall, whatever the section holds, so the
     // popup does not jump in size between sections; long content still scrolls.
     readonly property real minContentHeight: 0.8 * panel.screenH - panel.verticalContentInset
