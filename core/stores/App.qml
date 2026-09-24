@@ -17,6 +17,7 @@ QtObject {
       app.nav.viewMode = "board"
       app.nav.resetSearch()
       app.graph.graphCursor = ""
+      app.extras.reset()
       app.board.fetchBoard()
       app.docs.reset()
       app.memories.resetMemories()
@@ -27,6 +28,7 @@ QtObject {
       app.board.applyTreeData([])
       app.board.applyIssueData([])
       app.graph.graphCursor = ""
+      app.extras.reset()
       app.docs.reset()
       app.memories.resetMemories()
       app.milestones.reset()
@@ -45,6 +47,22 @@ QtObject {
     viewMode: app.nav.viewMode
     searchQuery: app.nav.searchQuery
     onErrored: function(message) { app.projects.loadError = message }
+    onRefetched: app.extras.fetchExtras()
+  }
+
+  // The extras follow the board: same triggers, one extra read-only brd call.
+  // They never feed the board back -- the blocker rows and the graph keep
+  // reading BoardStore's own issue map.
+  readonly property ExtrasStore extras: ExtrasStore {
+    project: app.projects.selectedProject
+    cardMap: app.board.cardMap
+    issueMap: app.board.issueMap
+    viewMode: app.nav.viewMode
+    searchQuery: app.nav.searchQuery
+    onStatusToggled: {
+      app.nav.cursorIndex = 0
+      app.nav.scrollOnCursor = false
+    }
   }
 
   readonly property DocumentsStore docs: DocumentsStore {

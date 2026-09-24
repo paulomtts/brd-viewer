@@ -31,6 +31,9 @@ Scope {
   signal errored(string message)
   // The open card is gone from the tree: the panel puts its list back.
   signal listViewRequested()
+  // The board was (re)fetched: whatever else follows the board -- the extras --
+  // is refetched on the same triggers, without this store reaching for it.
+  signal refetched()
 
   function fetchBoard() {
     if (!board.project) return
@@ -41,6 +44,7 @@ Scope {
     issueProc.workingDirectory = board.project.root_path
     issueProc.running = false
     issueProc.running = true
+    board.refetched()
   }
 
   function applyTreeData(roots) {
