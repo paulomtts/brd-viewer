@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
-import "logic.js" as Logic
+import "core/domain/documents.js" as Documents
+import "core/domain/memories.js" as Memories
 
 // One memory note: rendered text with Edit / Delete, or a raw-text editor with
 // Save / Cancel. Renders and emits only; Panel.qml owns the text, the draft and
@@ -60,8 +61,8 @@ Column {
         id: noteBadgeText
         objectName: "memoryNoteBadge"
         anchors.centerIn: parent
-        text: Logic.memoryTypeLabel(view.entry.type)
-        color: Logic.memoryTypeColor(view.entry.type, view.dim)
+        text: Memories.memoryTypeLabel(view.entry.type)
+        color: Memories.memoryTypeColor(view.entry.type, view.dim)
         font.family: view.fontFamily
         font.pixelSize: Style.font.caption
       }
@@ -172,7 +173,7 @@ Column {
     objectName: "memoryNoteBody"
     visible: !view.editing && view.readError === ""
     width: parent.width
-    text: view.text !== "" ? Logic.stripFrontmatter(view.text) : "Loading…"
+    text: view.text !== "" ? Documents.stripFrontmatter(view.text) : "Loading…"
     color: view.foreground
     font.family: view.fontFamily
     font.pixelSize: Style.font.bodySmall

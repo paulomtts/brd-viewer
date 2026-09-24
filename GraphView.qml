@@ -1,10 +1,11 @@
 import QtQuick
 import qs.Commons
-import "canvas" as Local
-import "logic.js" as Logic
+import "vendor/canvas" as Local
+import "core/domain/board.js" as Board
+import "core/domain/graph.js" as Graph
 
 // The Graph section: one node per milestone on a pan/zoom canvas. It renders
-// and emits only; Panel.qml owns the model (Logic.graphModel) and the cursor.
+// and emits only; Panel.qml owns the model (Graph.graphModel) and the cursor.
 Item {
   id: view
   objectName: "graphView"
@@ -63,10 +64,10 @@ Item {
       // The canvas's Loader clears modelData while it tears a node down.
       readonly property var entry: modelData ? modelData : ({ id: "", title: "", status: "", done: 0, total: 0 })
       readonly property bool current: entry.id !== "" && view.cursorId === entry.id
-      readonly property color tint: Logic.statusColor(entry.status, view.dim)
+      readonly property color tint: Board.statusColor(entry.status, view.dim)
       objectName: "graphNode" + entry.id
-      implicitWidth: Logic.GRAPH_NODE_W
-      implicitHeight: Logic.GRAPH_NODE_H
+      implicitWidth: Graph.GRAPH_NODE_W
+      implicitHeight: Graph.GRAPH_NODE_H
       radius: 8
       color: Qt.alpha(view.foreground, current ? 0.14 : 0.06)
       border.width: current ? 2 : 1

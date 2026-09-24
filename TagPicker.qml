@@ -1,6 +1,6 @@
 import QtQuick
 import qs.Commons
-import "logic.js" as Logic
+import "core/domain/documents.js" as Documents
 
 // Chooses the open document's type. Renders and emits only; Panel.qml runs
 // set-doc-tag.py and owns busy/error.
@@ -47,7 +47,7 @@ Column {
           id: chip
           required property var modelData
           readonly property bool active: picker.current === modelData.id
-          readonly property color tint: Logic.docCategoryColor(modelData.id, picker.dim)
+          readonly property color tint: Documents.docCategoryColor(modelData.id, picker.dim)
           property alias text: chipText.text
           objectName: "tagChip" + modelData.id
           opacity: picker.busy ? 0.5 : 1

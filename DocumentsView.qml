@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
-import "logic.js" as Logic
+import "core/domain/documents.js" as Documents
 
 // The Documents section's list: one row per Markdown file (title, dim path).
 // It renders and emits only; Panel.qml owns the list, the cursor and the query.
@@ -48,7 +48,7 @@ Column {
     text: view.loading ? "Loading documents…"
       : view.error !== "" ? view.error
       : view.docs.length === 0 ? (view.query !== "" ? "No documents match “" + view.query + "”."
-        : view.activeCategory !== "" ? "No " + Logic.docCategoryLabel(view.activeCategory) + " documents."
+        : view.activeCategory !== "" ? "No " + Documents.docCategoryLabel(view.activeCategory) + " documents."
         : "No Markdown documents found in this project.")
       : ""
     color: view.dim
@@ -118,8 +118,8 @@ Column {
             id: badgeText
             objectName: "docRowBadge" + row.index
             anchors.centerIn: parent
-            text: Logic.docCategoryLabel(row.modelData.category)
-            color: Logic.docCategoryColor(row.modelData.category, view.dim)
+            text: Documents.docCategoryLabel(row.modelData.category)
+            color: Documents.docCategoryColor(row.modelData.category, view.dim)
             font.family: view.fontFamily
             font.pixelSize: Style.font.caption
           }
@@ -158,7 +158,7 @@ Column {
     color: active ? Qt.alpha(tint, 0.35) : Qt.alpha(tint, 0.12)
     border.width: 1
     border.color: active ? tint : Qt.alpha(tint, 0.4)
-    readonly property color tint: Logic.docCategoryColor(modelData.id, view.dim)
+    readonly property color tint: Documents.docCategoryColor(modelData.id, view.dim)
 
     Text {
       id: chipText

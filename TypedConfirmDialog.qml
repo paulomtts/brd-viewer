@@ -1,7 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "logic.js" as Logic
+import "core/domain/projects.js" as Projects
 
 // A modal card over a dimmed backdrop that asks for a typed word before a
 // destructive action. Renders and emits only.
@@ -21,7 +21,7 @@ Item {
   property color dim: Qt.darker(foreground, 1.55)
   property string fontFamily: Style.font.family
   readonly property Item focusItem: field
-  readonly property bool confirmed: Logic.isDeleteConfirmed(field.text)
+  readonly property bool confirmed: Projects.isDeleteConfirmed(field.text)
 
   signal confirmRequested()
   signal cancelRequested()

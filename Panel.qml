@@ -5,7 +5,11 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
-import "logic.js" as Logic
+import "core/domain/board.js" as Board
+import "core/domain/documents.js" as Documents
+import "core/domain/graph.js" as Graph
+import "core/domain/memories.js" as Memories
+import "core/domain/projects.js" as Projects
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
 // project: pick a project, then view its cards as a Board.
@@ -95,14 +99,14 @@ Panel {
   }
 
   function applyDocTagResult(text, exitCode) {
-    var result = Logic.parseTagResult(text, exitCode)
+    var result = Documents.parseTagResult(text, exitCode)
     root.docTagBusy = false
     var sameProject = root.selectedProject && root.selectedProject.root_path === setDocTagProc.forRoot
     if (!sameProject) return
     if (result.ok) root.fetchDocs()
     else root.docTagError = result.error
   }
-  readonly property var filteredDocs: Logic.filterDocs(Logic.filterDocsByCategory(root.docs, root.docCategory), root.searchQuery)
+  readonly property var filteredDocs: Documents.filterDocs(Documents.filterDocsByCategory(root.docs, root.docCategory), root.searchQuery)
 
   function toggleDocCategory(id) {
     root.docCategory = root.docCategory === id ? "" : id
@@ -113,7 +117,7 @@ Panel {
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
-  readonly property var filteredProjects: Logic.filterProjects(root.projects, root.dropdownQuery)
+  readonly property var filteredProjects: Projects.filterProjects(root.projects, root.dropdownQuery)
 
   function currentList() {
     if (root.viewMode === "board") return root.boardCards
@@ -143,10 +147,10 @@ Panel {
     cursorIndex = 0
   }
 
-  readonly property var graph: Logic.graphModel(root.cardRoots)
+  readonly property var graph: Graph.graphModel(root.cardRoots)
 
   function moveGraph(direction) {
-    var next = Logic.graphMove(root.graph.nodes, root.graphCursor, direction)
+    var next = Graph.graphMove(root.graph.nodes, root.graphCursor, direction)
     if (next === "") return
     root.graphCursor = next
     if (graphView) graphView.centerOn(next)
@@ -239,7 +243,7 @@ Panel {
 
   function performDelete() {
     if (root.deleting || !root.deleteTarget) return
-    if (!Logic.isDeleteConfirmed(root.confirmText)) return
+    if (!Projects.isDeleteConfirmed(root.confirmText)) return
     root.deleteError = ""
     root.deleting = true
     deleteProc.command = ["python3", root.pluginDir + "core/backend/projects/snapshot-and-forget.py",
@@ -258,7 +262,7 @@ Panel {
   }
 
   property var cardRoots: []   // top-level cards from the last brd tree fetch
-  property var cardMap: ({})   // id -> card, from Logic.indexTree
+  property var cardMap: ({})   // id -> card, from Board.indexTree
   readonly property var statuses: ["todo", "in_progress", "done"]
 
   // The panel was just opened: refresh the registry and drop any half-finished
@@ -280,7 +284,7 @@ Panel {
   function maybeSelectInitial() {
     if (!root.stateLoaded) return
     var current = root.selectedProject ? root.selectedProject.root_path : ""
-    var chosen = Logic.chooseProject(root.projects, current, root.storedProject)
+    var chosen = Projects.chooseProject(root.projects, current, root.storedProject)
     if (!chosen) { root.clearSelection(); return }
     if (root.stateReadOk && chosen.root_path !== root.storedProject) root.persistLastProject(chosen.root_path)
     if (chosen.root_path !== current) root.selectProject(chosen)
@@ -328,7 +332,7 @@ Panel {
 
   function applyStoredState(text, exitCode) {
     if (root.stateLoaded) return
-    root.storedProject = Logic.parseStateResult(text, exitCode) || ""
+    root.storedProject = Projects.parseStateResult(text, exitCode) || ""
     root.stateReadOk = (exitCode === 0 && String(text || "").trim() !== "")
     root.stateLoaded = true
     root.maybeSelectInitial()
@@ -413,7 +417,7 @@ Panel {
 
   function applyTreeData(roots) {
     root.cardRoots = roots
-    var indexed = Logic.indexTree(roots)
+    var indexed = Board.indexTree(roots)
     root.cardMap = indexed.cardMap
     if (root.viewMode === "entry" && !root.cardMap[root.selectedCardId]) root.restoreListView()
   }
@@ -421,22 +425,22 @@ Panel {
   property string watchedDbPath: ""
 
   readonly property var visibleBoardRoots: root.cardRoots.filter(function(c) {
-    return Logic.subtreeMatches(c, root.searchQuery)
+    return Board.subtreeMatches(c, root.searchQuery)
   })
 
   function boardColumn(status) {
     return root.visibleBoardRoots.filter(function(c) {
-      return Logic.effectiveStatus(c) === status
+      return Board.effectiveStatus(c) === status
     })
   }
 
   // All visible Board cards as one list, section by section: the order the
   // keyboard cursor walks them in.
-  readonly property var boardCards: Logic.boardOrder(root.visibleBoardRoots, root.statuses)
+  readonly property var boardCards: Board.boardOrder(root.visibleBoardRoots, root.statuses)
 
   // The clickable rows of the card being viewed, in display order.
   readonly property var detailLinkList: root.viewMode === "entry"
-    ? Logic.detailLinks(root.cardMap[root.selectedCardId], root.cardMap) : []
+    ? Board.detailLinks(root.cardMap[root.selectedCardId], root.cardMap) : []
 
   function boardIndexOf(id) {
     for (var i = 0; i < root.boardCards.length; i++)
@@ -508,7 +512,7 @@ Panel {
   }
 
   function applyDocsResult(text, exitCode) {
-    var result = Logic.parseDocsResult(text, exitCode)
+    var result = Documents.parseDocsResult(text, exitCode)
     root.docsLoading = false
     root.docs = result.docs
     root.docsTruncated = result.truncated
@@ -525,7 +529,7 @@ Panel {
     root.docTagError = ""
     root.docText = ""
     root.docError = ""
-    root.docTooLargeFlag = Logic.docTooLarge(entry.size)
+    root.docTooLargeFlag = Documents.docTooLarge(entry.size)
     root.viewMode = "document"
     root.scrollOnCursor = false
     root.cursorIndex = 0
@@ -570,8 +574,8 @@ Panel {
   property int memoriesSeq: 0
   property var memoriesProc: null
 
-  readonly property var memoryTypes: Logic.memoryTypeCounts(root.memories)
-  readonly property var filteredMemories: Logic.filterMemories(Logic.filterMemoriesByType(root.memories, root.memoryType), root.searchQuery)
+  readonly property var memoryTypes: Memories.memoryTypeCounts(root.memories)
+  readonly property var filteredMemories: Memories.filterMemories(Memories.filterMemoriesByType(root.memories, root.memoryType), root.searchQuery)
   readonly property bool canCreateMemory: root.memoryDir !== ""
   readonly property var selectedMemoryEntry: {
     for (var i = 0; i < root.memories.length; i++)
@@ -603,7 +607,7 @@ Panel {
   }
 
   function applyMemoriesResult(text, exitCode) {
-    var result = Logic.parseMemoriesResult(text, exitCode)
+    var result = Memories.parseMemoriesResult(text, exitCode)
     root.memoriesLoading = false
     root.memories = result.notes
     root.memoriesFound = result.found
@@ -720,9 +724,9 @@ Panel {
 
   function createMemory(name, type, description, body) {
     if (root.memoryBusy || root.memoryDir === "" || String(name).trim() === "") return
-    var file = Logic.newMemoryFile(type, name, root.memories.map(function(n) { return n.file }))
+    var file = Memories.newMemoryFile(type, name, root.memories.map(function(n) { return n.file }))
     root.newMemoryError = ""
-    root.runMemoryOp("create", file, Logic.composeMemory(name, description, type, body))
+    root.runMemoryOp("create", file, Memories.composeMemory(name, description, type, body))
   }
 
   function requestMemoryDelete() {
@@ -745,7 +749,7 @@ Panel {
   }
 
   function applyMemoryOpResult(text, exitCode) {
-    var result = Logic.parseMemoryOpResult(text, exitCode)
+    var result = Memories.parseMemoryOpResult(text, exitCode)
     var op = memoryOpProc.op
     var sameProject = root.selectedProject && root.selectedProject.root_path === memoryOpProc.forRoot
     root.memoryBusy = false
@@ -914,14 +918,14 @@ Panel {
     id: docFile
     objectName: "docFile"
     path: root.viewMode === "document" && !root.docTooLargeFlag && root.selectedProject && root.selectedDocPath !== ""
-      ? Logic.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath) : ""
+      ? Documents.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath) : ""
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: { root.docError = ""; root.docText = Logic.stripFrontmatter(docFile.text()) }
+    onLoaded: { root.docError = ""; root.docText = Documents.stripFrontmatter(docFile.text()) }
     onLoadFailed: {
       if (docFile.path === "" || !root.selectedProject || root.selectedDocPath === "") return
-      if (docFile.path === Logic.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath))
+      if (docFile.path === Documents.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath))
         root.docError = "Could not read this document."
     }
   }
@@ -961,7 +965,7 @@ Panel {
   }
 
   // snapshot-and-forget.py prints one JSON line and exits 0/1; nothing here
-  // assumes success until Logic.parseDeleteResult says so.
+  // assumes success until Projects.parseDeleteResult says so.
   Component {
     id: memoriesProcC
     Process {
@@ -1006,7 +1010,7 @@ Panel {
     id: memoryFile
     objectName: "memoryFile"
     path: root.viewMode === "memory" && root.memoryDir !== "" && root.selectedMemory !== ""
-      ? Logic.memoryAbsolutePath(root.memoryDir, root.selectedMemory) : ""
+      ? Memories.memoryAbsolutePath(root.memoryDir, root.selectedMemory) : ""
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
@@ -1041,7 +1045,7 @@ Panel {
     }
     stderr: StdioCollector { waitForEnd: true }
     onExited: function(exitCode) {
-      var result = Logic.parseDeleteResult(deleteProc.outText, exitCode)
+      var result = Projects.parseDeleteResult(deleteProc.outText, exitCode)
       deleteProc.outText = ""
       root.deleting = false
       if (result.ok) {
@@ -1318,7 +1322,7 @@ Panel {
 
                 PanelSectionHeader {
                   text: root.statusLabel(modelData) + " (" + root.boardColumn(modelData).length + ")"
-                  foreground: Logic.statusColor(modelData, root.foreground)
+                  foreground: Board.statusColor(modelData, root.foreground)
                   fontFamily: root.fontFamily
                 }
 
@@ -1331,7 +1335,7 @@ Panel {
                     cardIndex: root.boardIndexOf(modelData.id)
                     title: modelData.title
                     status: modelData.status
-                    progress: Logic.subtreeCounts(modelData)
+                    progress: Board.subtreeCounts(modelData)
                     onActivated: root.openCard(modelData.id)
                   }
                 }
@@ -1402,7 +1406,7 @@ Panel {
             width: parent.width
             docs: root.filteredDocs
             query: root.searchQuery
-            categories: Logic.docCategoryCounts(root.docs)
+            categories: Documents.docCategoryCounts(root.docs)
             activeCategory: root.docCategory
             cursorIndex: root.cursorIndex
             loading: root.docsLoading
@@ -1497,13 +1501,13 @@ Panel {
               spacing: Style.space(6)
 
               Badge {
-                text: detailCard.card ? Logic.kindLabel(detailCard.card.depth) : ""
+                text: detailCard.card ? Board.kindLabel(detailCard.card.depth) : ""
                 tone: root.foreground
               }
 
               Badge {
                 text: detailCard.card ? root.statusText(detailCard.card.status) : ""
-                tone: detailCard.card ? Logic.statusColor(detailCard.card.status, root.dim) : root.dim
+                tone: detailCard.card ? Board.statusColor(detailCard.card.status, root.dim) : root.dim
               }
             }
 
@@ -1661,7 +1665,7 @@ Panel {
 
               Button {
                 text: root.deleting ? "Deleting…" : "Confirm delete"
-                enabled: !root.deleting && Logic.isDeleteConfirmed(root.confirmText)
+                enabled: !root.deleting && Projects.isDeleteConfirmed(root.confirmText)
                 opacity: enabled ? 1 : 0.5
                 bordered: true
                 foreground: root.urgent
@@ -1763,7 +1767,7 @@ Panel {
       Text {
         visible: detailLink.resolved.inBoard
         text: "[" + detailLink.resolved.status + "]"
-        color: Logic.statusColor(detailLink.resolved.status, root.dim)
+        color: Board.statusColor(detailLink.resolved.status, root.dim)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
       }
@@ -1799,7 +1803,7 @@ Panel {
       anchors.margins: Style.space(4)
       width: Style.space(3)
       radius: width / 2
-      color: Logic.statusColor(boardCard.status, root.dim)
+      color: Board.statusColor(boardCard.status, root.dim)
     }
 
     ColumnLayout {
@@ -1821,7 +1825,7 @@ Panel {
       Text {
         visible: boardCard.status === "blocked"
         text: "Blocked"
-        color: Logic.statusColor("blocked", root.dim)
+        color: Board.statusColor("blocked", root.dim)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         font.bold: true

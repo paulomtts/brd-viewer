@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
-import "logic.js" as Logic
+import "core/domain/memories.js" as Memories
 
 // A modal form for a new memory note. Keeps its own field state, reset each
 // time it opens; emits createRequested(name, type, description, body).
@@ -92,12 +92,12 @@ Item {
         spacing: Style.space(6)
 
         Repeater {
-          model: Logic.MEMORY_TYPES.filter(function(t) { return t.id !== "other" })
+          model: Memories.MEMORY_TYPES.filter(function(t) { return t.id !== "other" })
           delegate: Rectangle {
             id: chip
             required property var modelData
             readonly property bool active: dialog.type === modelData.id
-            readonly property color tint: Logic.memoryTypeColor(modelData.id, dialog.dim)
+            readonly property color tint: Memories.memoryTypeColor(modelData.id, dialog.dim)
             objectName: "newMemoryType" + modelData.id
             width: chipText.implicitWidth + Style.space(20)
             height: chipText.implicitHeight + Style.space(8)

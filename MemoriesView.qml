@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
-import "logic.js" as Logic
+import "core/domain/memories.js" as Memories
 
 // The Memories section's list: one row per memory note (name, description,
 // type badge) under type filter chips. Renders and emits only; Panel.qml owns
@@ -50,7 +50,7 @@ Column {
       : view.error !== "" ? view.error
       : !view.found ? "Claude Code has no memory for this project yet."
       : view.notes.length === 0 ? (view.query !== "" ? "No memories match “" + view.query + "”."
-        : view.activeType !== "" ? "No " + Logic.memoryTypeLabel(view.activeType) + " memories."
+        : view.activeType !== "" ? "No " + Memories.memoryTypeLabel(view.activeType) + " memories."
         : "No memories yet. Use ＋ New to add one.")
       : ""
     color: view.dim
@@ -110,8 +110,8 @@ Column {
             id: badgeText
             objectName: "memoryRowBadge" + row.index
             anchors.centerIn: parent
-            text: Logic.memoryTypeLabel(row.modelData.type)
-            color: Logic.memoryTypeColor(row.modelData.type, view.dim)
+            text: Memories.memoryTypeLabel(row.modelData.type)
+            color: Memories.memoryTypeColor(row.modelData.type, view.dim)
             font.family: view.fontFamily
             font.pixelSize: Style.font.caption
           }
@@ -143,7 +143,7 @@ Column {
     id: chip
     required property var modelData
     readonly property bool active: view.activeType === modelData.id
-    readonly property color tint: Logic.memoryTypeColor(modelData.id, view.dim)
+    readonly property color tint: Memories.memoryTypeColor(modelData.id, view.dim)
     property alias text: chipText.text
     objectName: "memoryChip" + modelData.id
 
