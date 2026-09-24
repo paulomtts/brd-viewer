@@ -41,7 +41,7 @@ TestCase {
   function test_current_project_is_kept_when_the_list_refreshes() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB, pC])
-    p.chooseProject(pB)
+    p.navigator.chooseProject(pB)
     p.app.projects.applyProjectsList([pA, pB, pC])
     compare(p.app.projects.selectedProject.root_path, "/home/u/b")
   }
@@ -49,7 +49,7 @@ TestCase {
   function test_vanished_current_project_falls_back() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB, pC])
-    p.chooseProject(pB)
+    p.navigator.chooseProject(pB)
     p.app.projects.applyProjectsList([pA, pC])
     compare(p.app.projects.selectedProject.root_path, "/home/u/a")
   }
@@ -62,16 +62,16 @@ TestCase {
     compare(p.app.projects.selectedProject, null)
     compare(p.app.board.cardRoots.length, 0)
     compare(p.app.nav.viewMode, "board")
-    p.showSection("board")
+    p.navigator.showSection("board")
     compare(p.app.nav.viewMode, "board")
   }
 
   function test_choose_project_switches_persists_and_closes_the_dropdown() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB, pC])
-    p.toggleDropdown()
+    p.navigator.toggleDropdown()
     compare(p.app.nav.dropdownOpen, true)
-    p.chooseProject(pC)
+    p.navigator.chooseProject(pC)
     compare(p.app.nav.dropdownOpen, false)
     compare(p.app.projects.selectedProject.root_path, "/home/u/c")
     compare(p.app.projects.storedProject, "/home/u/c")
@@ -81,15 +81,15 @@ TestCase {
   function test_dropdown_keyboard() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB, pC])
-    p.toggleDropdown()
+    p.navigator.toggleDropdown()
     compare(p.app.nav.dropdownCursor, 0)              // starts on the current project
-    p.moveDropdown(1); compare(p.app.nav.dropdownCursor, 1)
-    p.moveDropdown(9); compare(p.app.nav.dropdownCursor, 2)
-    p.moveDropdown(-9); compare(p.app.nav.dropdownCursor, 0)
+    p.navigator.moveDropdown(1); compare(p.app.nav.dropdownCursor, 1)
+    p.navigator.moveDropdown(9); compare(p.app.nav.dropdownCursor, 2)
+    p.navigator.moveDropdown(-9); compare(p.app.nav.dropdownCursor, 0)
     p.app.nav.dropdownQuery = "gam"
     compare(names(p.app.projects.filteredProjects), "gamma")
     p.app.nav.dropdownCursor = 0
-    p.acceptDropdown()
+    p.navigator.acceptDropdown()
     compare(p.app.projects.selectedProject.root_path, "/home/u/c")
     compare(p.app.nav.dropdownOpen, false)
     compare(p.app.nav.dropdownQuery, "")
@@ -98,10 +98,10 @@ TestCase {
   function test_dropdown_opens_on_the_current_project_and_toggles_closed() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB, pC])
-    p.chooseProject(pB)
-    p.toggleDropdown()
+    p.navigator.chooseProject(pB)
+    p.navigator.toggleDropdown()
     compare(p.app.nav.dropdownCursor, 1)
-    p.toggleDropdown()
+    p.navigator.toggleDropdown()
     compare(p.app.nav.dropdownOpen, false)
   }
 
@@ -109,7 +109,7 @@ TestCase {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB])
     p.app.deleter.openDelete(p.app.projects.selectedProject)
-    p.toggleDropdown()
+    p.navigator.toggleDropdown()
     compare(p.app.nav.dropdownOpen, false)
   }
 
@@ -117,18 +117,18 @@ TestCase {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA])
     p.app.board.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
-    p.goBack()
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "board")
-    p.app.nav.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.navigator.activateCursor()
     compare(p.app.nav.viewMode, "entry")
-    p.goBack()
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "board")
   }
 
   function test_opening_the_panel_resets_transient_state() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB])
-    p.toggleDropdown(); p.app.nav.dropdownQuery = "x"
+    p.navigator.toggleDropdown(); p.app.nav.dropdownQuery = "x"
     p.opened = false; p.opened = true
     compare(p.app.nav.dropdownOpen, false); compare(p.app.nav.dropdownQuery, "")
   }
@@ -138,15 +138,15 @@ TestCase {
     compare(p.focusItem.objectName, "keyCatcher")
     p.app.projects.applyProjectsList([pA])
     compare(p.focusItem.objectName, "searchField")
-    p.toggleDropdown()
+    p.navigator.toggleDropdown()
     compare(p.focusItem.objectName, "filterField")
-    p.closeDropdown()
+    p.navigator.closeDropdown()
     p.app.deleter.openDelete(p.app.projects.selectedProject)
     compare(p.focusItem.objectName, "confirmField")
     p.app.deleter.cancelDelete()
     compare(p.focusItem.objectName, "searchField")
     p.app.board.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
-    p.app.nav.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.navigator.activateCursor()
     compare(p.focusItem.objectName, "keyCatcher")
   }
 

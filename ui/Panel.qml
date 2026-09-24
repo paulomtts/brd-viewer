@@ -67,15 +67,15 @@ Panel {
   Connections {
     target: appStores.memories
     function onTypeToggled() { Qt.callLater(root.scrollToTop) }
-    function onNoteOpenRequested(file) { root.openMemory(file) }
-    function onListRestoreRequested() { root.restoreMemoriesList() }
+    function onNoteOpenRequested(file) { navi.openMemory(file) }
+    function onListRestoreRequested() { navi.restoreMemoriesList() }
     function onFocusRequested() { root.focusForView() }
   }
 
   // The open card left the board (a refetch dropped it): back to the list.
   Connections {
     target: appStores.board
-    function onListViewRequested() { root.restoreListView() }
+    function onListViewRequested() { navi.restoreListView() }
   }
 
   Connections {
@@ -87,13 +87,21 @@ Panel {
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
-  function currentList() {
-    if (appStores.nav.viewMode === "board") return appStores.board.boardCards
-    if (appStores.nav.viewMode === "entry") return appStores.board.detailLinkList
-    if (appStores.nav.viewMode === "documents") return appStores.docs.filteredDocs
-    if (appStores.nav.viewMode === "memories") return appStores.memories.filteredMemories
-    return []
+  // Where the panel is and how it gets there. The navigator owns no Items: the
+  // Flickable and the four UI-only effects below are all it is given.
+  Navigator {
+    id: navi
+    app: appStores
+    flick: panelFlick
+    documentsEnabled: root.documentsEnabled
+    actions: ({
+      focusForView: root.focusForView,
+      scrollToTop: root.scrollToTop,
+      scrollBy: root.scrollBy,
+      centerOnGraphNode: function(id) { if (graphView) graphView.centerOn(id) }
+    })
   }
+  readonly property var navigator: navi
 
   readonly property Item focusItem: appStores.deleter.deleteTarget ? deleteModal.focusItem
     : appStores.memories.memoryDeleteOpen ? memoryConfirm.focusItem
@@ -108,29 +116,6 @@ Panel {
       if (!root.opened) return
       if (root.focusItem) root.focusItem.forceActiveFocus()
     })
-  }
-
-  function resetSearch() {
-    appStores.nav.resetSearch()
-  }
-
-  function moveGraph(direction) {
-    var next = appStores.graph.moveGraph(direction)
-    if (next === "") return
-    if (graphView) graphView.centerOn(next)
-  }
-
-  function moveCursor(delta) {
-    var list = root.currentList()
-    if (list.length === 0) return
-    appStores.nav.moveCursor(delta, list.length)
-    // Reaching the first row of a list shows whatever sits above it in the
-    // scrolling content (e.g. the Documents type badges).
-    if (appStores.nav.cursorIndex === 0 && appStores.nav.viewMode !== "entry") Qt.callLater(root.scrollToTop)
-  }
-
-  function hoverCursor(index) {
-    appStores.nav.hoverCursor(index)
   }
 
   function scrollToTop() {
@@ -167,168 +152,27 @@ Panel {
     panelFlick.contentY = root.clamp(panelFlick.contentY + pixels, 0, Math.max(0, panelFlick.contentHeight - panelFlick.height))
   }
 
-  function activateCursor() {
-    var list = root.currentList()
-    if (appStores.nav.cursorIndex < 0 || appStores.nav.cursorIndex >= list.length) return
-    if (appStores.nav.viewMode === "documents") root.openDoc(list[appStores.nav.cursorIndex].path)
-    else if (appStores.nav.viewMode === "memories") root.openMemory(list[appStores.nav.cursorIndex].file)
-    else root.openCard(list[appStores.nav.cursorIndex].id)
-  }
-
-  function activateGraphNode() {
-    var id = appStores.graph.activateGraphNode()
-    if (id !== "") root.openCard(id)
-  }
-
   function displayPath(path) {
     return String(path || "").replace(/^\/home\/[^\/]+/, "~")
   }
 
   onOpenedChanged: if (opened) { appStores.projects.onPanelOpened(); root.focusForView() }
 
-  // The user picked a project in the dropdown. A dirty memory draft blocks the
-  // switch.
-  function chooseProject(project) {
-    if (appStores.memories.memoryEditing && appStores.memories.memoryDraft !== appStores.memories.memoryText) {
-      root.closeDropdown()
-      appStores.memories.memoryOpError = "You have unsaved changes. Save them, or choose Cancel to discard, before switching project."
-      return
-    }
-    root.closeDropdown()
-    if (!project) return
-    appStores.projects.chooseProject(project)
-    root.focusForView()
-  }
-
-  function toggleDropdown() {
-    if (appStores.deleter.deleteTarget) return
-    if (appStores.nav.dropdownOpen) { root.closeDropdown(); return }
-    var index = 0
-    for (var i = 0; i < appStores.projects.projects.length; i++)
-      if (appStores.projects.selectedProject && appStores.projects.projects[i].root_path === appStores.projects.selectedProject.root_path) index = i
-    appStores.nav.toggleDropdown(index)
-    root.focusForView()
-  }
-
-  function closeDropdown() {
-    if (!appStores.nav.dropdownOpen) return
-    appStores.nav.closeDropdown()
-    root.focusForView()
-  }
-
-  function moveDropdown(delta) {
-    appStores.nav.moveDropdown(delta, appStores.projects.filteredProjects.length)
-  }
-
-  function acceptDropdown() {
-    var list = appStores.projects.filteredProjects
-    if (appStores.nav.dropdownCursor < 0 || appStores.nav.dropdownCursor >= list.length) return
-    root.chooseProject(list[appStores.nav.dropdownCursor])
-  }
-
   // Shortcuts that work wherever the caret is. Returns true when it handled the
   // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
   // move things underneath it.
   function handleGlobalKey(event) {
     if (!(event.modifiers & Qt.ControlModifier) || appStores.deleter.deleteTarget || appStores.memories.memoryDeleteOpen || appStores.memories.newMemoryOpen) return false
-    if (event.key === Qt.Key_P) { root.toggleDropdown(); return true }
-    if (event.key === Qt.Key_1) { root.showSection("board"); return true }
-    if (event.key === Qt.Key_2) { root.showSection("documents"); return true }
-    if (event.key === Qt.Key_3) { root.showSection("graph"); return true }
-    if (event.key === Qt.Key_4) { root.showSection("memories"); return true }
+    if (event.key === Qt.Key_P) { navi.toggleDropdown(); return true }
+    if (event.key === Qt.Key_1) { navi.showSection("board"); return true }
+    if (event.key === Qt.Key_2) { navi.showSection("documents"); return true }
+    if (event.key === Qt.Key_3) { navi.showSection("graph"); return true }
+    if (event.key === Qt.Key_4) { navi.showSection("memories"); return true }
     if (event.key === Qt.Key_N && appStores.nav.viewMode === "memories") { appStores.memories.openNewMemory(); return true }
     if (event.key === Qt.Key_E && appStores.nav.viewMode === "memory") { appStores.memories.startMemoryEdit(); return true }
     return false
   }
 
-  function showSection(name) {
-    if (!appStores.projects.selectedProject || appStores.deleter.deleteTarget || appStores.memories.memoryDeleteOpen || appStores.memories.newMemoryOpen) return
-    if (appStores.memories.memoryEditing && appStores.memories.memoryDraft !== appStores.memories.memoryText) return
-    if (name === "documents" && !root.documentsEnabled) return
-    if (appStores.nav.dropdownOpen) appStores.nav.dropdownOpen = false
-    root.resetSearch()
-    appStores.nav.scrollOnCursor = false
-    appStores.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : name === "memories" ? "memories" : "board"
-    appStores.memories.memoryEditing = false
-    if (name === "documents") appStores.docs.fetchDocs()
-    if (name === "memories") appStores.memories.fetchMemories()
-    if (name === "graph" && appStores.graph.graphCursor === "" && appStores.graph.graph.nodes.length > 0) appStores.graph.graphCursor = appStores.graph.graph.nodes[0].id
-    Qt.callLater(root.scrollToTop)
-    root.focusForView()
-  }
-
-  function openCard(id) {
-    var from = appStores.nav.viewMode
-    if (!appStores.board.openCard(id)) return
-    if (from === "board" || from === "graph")
-      appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0, from)
-    appStores.nav.viewMode = "entry"
-    appStores.nav.scrollOnCursor = false
-    appStores.nav.cursorIndex = 0
-    Qt.callLater(root.scrollToTop)
-    focusForView()
-  }
-
-  // Leaving a card puts the Board back exactly as it was: same highlighted
-  // card, same scroll position.
-  function restoreListView() {
-    var back = appStores.nav.popReturn()
-    appStores.nav.viewMode = back.mode
-    appStores.nav.scrollOnCursor = false
-    appStores.nav.cursorIndex = back.cursor
-    Qt.callLater(function() { if (panelFlick) root.scrollBy(back.scrollY - panelFlick.contentY) })
-    focusForView()
-  }
-
-  function openDoc(path) {
-    if (!appStores.docs.openDoc(path)) return
-    appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
-    appStores.nav.viewMode = "document"
-    appStores.nav.scrollOnCursor = false
-    appStores.nav.cursorIndex = 0
-    Qt.callLater(root.scrollToTop)
-    root.focusForView()
-  }
-
-  function restoreDocumentsList() {
-    appStores.docs.restoreDocumentsList()
-    var back = appStores.nav.popReturn()
-    appStores.nav.viewMode = "documents"
-    appStores.nav.scrollOnCursor = false
-    appStores.nav.cursorIndex = back.cursor
-    Qt.callLater(function() { if (panelFlick) root.scrollBy(back.scrollY - panelFlick.contentY) })
-    root.focusForView()
-  }
-
-  // ---- Memories: the notes themselves live in MemoriesStore; what stays here
-  // is the navigation and focus work around them.
-  function openMemory(file) {
-    if (!appStores.memories.openMemory(file)) return
-    if (appStores.nav.viewMode === "memories")
-      appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
-    appStores.nav.viewMode = "memory"
-    appStores.nav.scrollOnCursor = false
-    appStores.nav.cursorIndex = 0
-    Qt.callLater(root.scrollToTop)
-    root.focusForView()
-  }
-
-  function restoreMemoriesList() {
-    appStores.memories.restoreMemoriesList()
-    var back = appStores.nav.popReturn()
-    appStores.nav.viewMode = "memories"
-    appStores.nav.scrollOnCursor = false
-    appStores.nav.cursorIndex = back.cursor
-    Qt.callLater(function() { if (panelFlick) root.scrollBy(back.scrollY - panelFlick.contentY) })
-    root.focusForView()
-  }
-
-
-  function goBack() {
-    if (appStores.nav.viewMode === "memory") { if (appStores.memories.memoryEditing) appStores.memories.memoryEscape(); else root.restoreMemoriesList(); return }
-    if (appStores.nav.viewMode === "entry") { restoreListView(); return }
-    if (appStores.nav.viewMode === "document") { restoreDocumentsList(); return }
-  }
 
   visible: true
   implicitWidth: button.implicitWidth
@@ -380,25 +224,25 @@ Panel {
       objectName: "keyCatcher"
       Keys.forwardTo: [globalKeys]
       anchors.fill: parent
-      onCloseRequested: appStores.deleter.deleteTarget ? appStores.deleter.cancelDelete() : appStores.memories.memoryDeleteOpen ? appStores.memories.cancelMemoryDelete() : appStores.memories.newMemoryOpen ? appStores.memories.cancelNewMemory() : (appStores.nav.dropdownOpen ? root.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? root.goBack() : root.close()))
+      onCloseRequested: appStores.deleter.deleteTarget ? appStores.deleter.cancelDelete() : appStores.memories.memoryDeleteOpen ? appStores.memories.cancelMemoryDelete() : appStores.memories.newMemoryOpen ? appStores.memories.cancelNewMemory() : (appStores.nav.dropdownOpen ? navi.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? navi.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
         if (appStores.nav.viewMode === "graph") {
-          if (dx !== 0) root.moveGraph(dx < 0 ? "left" : "right")
-          else if (dy !== 0) root.moveGraph(dy < 0 ? "up" : "down")
+          if (dx !== 0) navi.moveGraph(dx < 0 ? "left" : "right")
+          else if (dy !== 0) navi.moveGraph(dy < 0 ? "up" : "down")
           return
         }
-        if (dx < 0 && (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory")) { root.goBack(); return }
+        if (dx < 0 && (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory")) { navi.goBack(); return }
         if (appStores.nav.viewMode !== "entry" && appStores.nav.viewMode !== "document" && appStores.nav.viewMode !== "memory") return
-        if (dx > 0) { if (appStores.nav.viewMode === "entry") root.activateCursor(); return }
+        if (dx > 0) { if (appStores.nav.viewMode === "entry") navi.activateCursor(); return }
         if (dy === 0) return
         // Links are the cursor's targets; a card without any is just text,
         // so the arrows scroll it instead.
-        if (appStores.nav.viewMode === "entry" && appStores.board.detailLinkList.length > 0) root.moveCursor(dy)
+        if (appStores.nav.viewMode === "entry" && appStores.board.detailLinkList.length > 0) navi.moveCursor(dy)
         else root.scrollBy(dy * Style.space(56))
       }
       onActivateRequested: {
-        if (appStores.nav.viewMode === "entry") root.activateCursor()
-        else if (appStores.nav.viewMode === "graph") root.activateGraphNode()
+        if (appStores.nav.viewMode === "entry") navi.activateCursor()
+        else if (appStores.nav.viewMode === "graph") navi.activateGraphNode()
       }
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
@@ -417,15 +261,15 @@ Panel {
         canDelete: !!appStores.projects.selectedProject && !appStores.deleter.deleting && !appStores.deleter.deleteTarget
         documentsEnabled: root.documentsEnabled
         theme: panelTheme
-        onDropdownToggled: root.toggleDropdown()
-        onProjectChosen: function(project) { root.chooseProject(project) }
+        onDropdownToggled: navi.toggleDropdown()
+        onProjectChosen: function(project) { navi.chooseProject(project) }
         onQueryEdited: function(text) { appStores.nav.dropdownQuery = text; appStores.nav.dropdownCursor = 0 }
-        onSectionChosen: function(name) { root.showSection(name) }
+        onSectionChosen: function(name) { navi.showSection(name) }
         onDeleteRequested: appStores.deleter.openDelete(appStores.projects.selectedProject)
         onCursorHovered: function(index) { appStores.nav.dropdownCursor = index }
-        onDropdownMove: function(delta) { root.moveDropdown(delta) }
-        onDropdownAccept: root.acceptDropdown()
-        onDropdownCancel: root.closeDropdown()
+        onDropdownMove: function(delta) { navi.moveDropdown(delta) }
+        onDropdownAccept: navi.acceptDropdown()
+        onDropdownCancel: navi.closeDropdown()
         onFilterKey: function(event) { if (root.handleGlobalKey(event)) event.accepted = true }
       }
 
@@ -448,7 +292,7 @@ Panel {
             theme: panelTheme
             visible: appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory"
             text: "‹ Back"
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.goBack() }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: navi.goBack() }
           }
 
           UI.ThemedText {
@@ -500,12 +344,12 @@ Panel {
               return
             }
             if (event.key === Qt.Key_Right && searchField.cursorPosition === searchField.text.length) {
-              root.activateCursor(); event.accepted = true; return
+              navi.activateCursor(); event.accepted = true; return
             }
-            if (event.key === Qt.Key_Down) { root.moveCursor(1); event.accepted = true; return }
-            if (event.key === Qt.Key_Up) { root.moveCursor(-1); event.accepted = true; return }
+            if (event.key === Qt.Key_Down) { navi.moveCursor(1); event.accepted = true; return }
+            if (event.key === Qt.Key_Up) { navi.moveCursor(-1); event.accepted = true; return }
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-              root.activateCursor(); event.accepted = true; return
+              navi.activateCursor(); event.accepted = true; return
             }
             if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
               root.switchPanel((event.modifiers & Qt.ShiftModifier) || event.key === Qt.Key_Backtab ? -1 : 1)
@@ -612,7 +456,7 @@ Panel {
                     title: modelData.title
                     status: modelData.status
                     progress: Board.subtreeCounts(modelData)
-                    onActivated: root.openCard(modelData.id)
+                    onActivated: navi.openCard(modelData.id)
                   }
                 }
               }
@@ -628,7 +472,7 @@ Panel {
             edges: appStores.graph.graph.edges
             cursorId: appStores.graph.graphCursor
             theme: panelTheme
-            onNodeClicked: function(id) { appStores.graph.graphCursor = id; root.openCard(id) }
+            onNodeClicked: function(id) { appStores.graph.graphCursor = id; navi.openCard(id) }
           }
 
           MemoriesView {
@@ -644,8 +488,8 @@ Panel {
             error: appStores.memories.memoriesError
             scrollOnCursor: appStores.nav.scrollOnCursor
             theme: panelTheme
-            onNoteChosen: function(file) { root.openMemory(file) }
-            onHovered: function(index) { root.hoverCursor(index) }
+            onNoteChosen: function(file) { navi.openMemory(file) }
+            onHovered: function(index) { navi.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
             onTypeToggled: function(id) { appStores.memories.toggleMemoryType(id) }
           }
@@ -684,8 +528,8 @@ Panel {
             scrollOnCursor: appStores.nav.scrollOnCursor
             theme: panelTheme
             onCategoryToggled: function(id) { appStores.docs.toggleDocCategory(id) }
-            onDocChosen: function(path) { root.openDoc(path) }
-            onHovered: function(index) { root.hoverCursor(index) }
+            onDocChosen: function(path) { navi.openDoc(path) }
+            onHovered: function(index) { navi.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
           }
 
@@ -746,7 +590,7 @@ Panel {
               resolved: detailCard.card && detailCard.card.parentId
                 ? appStores.board.resolvedCard(detailCard.card.parentId) : ({ title: "", status: "", inBoard: false })
               rowIndex: detailCard.card && detailCard.card.parentId ? appStores.board.linkIndex("parent", detailCard.card.parentId) : -1
-              onActivated: if (resolved.inBoard) root.openCard(detailCard.card.parentId)
+              onActivated: if (resolved.inBoard) navi.openCard(detailCard.card.parentId)
             }
 
             UI.ThemedText {
@@ -798,7 +642,7 @@ Panel {
                 width: parent.width
                 resolved: appStores.board.resolvedCard(modelData)
                 rowIndex: appStores.board.linkIndex("blocker", modelData)
-                onActivated: if (resolved.inBoard) root.openCard(modelData)
+                onActivated: if (resolved.inBoard) navi.openCard(modelData)
               }
             }
 
@@ -817,7 +661,7 @@ Panel {
                 width: parent.width
                 resolved: appStores.board.resolvedCard(modelData.id)
                 rowIndex: appStores.board.linkIndex("child", modelData.id)
-                onActivated: root.openCard(modelData.id)
+                onActivated: navi.openCard(modelData.id)
               }
             }
           }
@@ -910,7 +754,7 @@ Panel {
     scrollOnCursor: appStores.nav.scrollOnCursor
     contentMargin: Style.space(6)
     hoverCursorShape: detailLink.resolved.inBoard ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onHovered: function(index) { root.hoverCursor(index) }
+    onHovered: function(index) { navi.hoverCursor(index) }
     onRevealRequested: function(item) { root.scrollItemIntoView(item) }
 
     RowLayout {
@@ -995,7 +839,7 @@ Panel {
       anchors.fill: parent
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
-      onEntered: if (boardCard.cardIndex >= 0) root.hoverCursor(boardCard.cardIndex)
+      onEntered: if (boardCard.cardIndex >= 0) navi.hoverCursor(boardCard.cardIndex)
       onClicked: boardCard.activated()
     }
   }

@@ -41,7 +41,7 @@ TestCase {
 
   function test_the_graph_section_shows_and_selects_the_first_milestone() {
     var p = make(); if (!p) return
-    p.showSection("graph")
+    p.navigator.showSection("graph")
     compare(p.app.nav.viewMode, "graph")
     compare(p.app.nav.section, "graph")
     compare(p.app.nav.sectionTitle, "Graph")
@@ -58,7 +58,7 @@ TestCase {
 
   function test_key_catcher_moves_and_activates_in_the_graph() {
     var p = make(); if (!p) return
-    p.showSection("graph")
+    p.navigator.showSection("graph")
     var kc = p.focusItem
     compare(kc.objectName, "keyCatcher")
     kc.moveRequested(1, 0)
@@ -73,25 +73,25 @@ TestCase {
 
   function test_back_from_a_card_returns_to_the_graph_with_the_selection() {
     var p = make(); if (!p) return
-    p.showSection("graph")
-    p.moveGraph("right")
-    p.activateGraphNode()
+    p.navigator.showSection("graph")
+    p.navigator.moveGraph("right")
+    p.navigator.activateGraphNode()
     compare(p.app.nav.viewMode, "entry")
-    p.goBack()
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "graph")
     compare(p.app.graph.graphCursor, "m2")
   }
 
   function test_back_from_a_board_card_still_returns_to_the_board() {
     var p = make(); if (!p) return
-    p.openCard("m2")
-    p.goBack()
+    p.navigator.openCard("m2")
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "board")
   }
 
   function test_the_graph_view_receives_the_model_and_clicks_open_the_card() {
     var p = make(); if (!p) return
-    p.showSection("graph")
+    p.navigator.showSection("graph")
     var gv = find(p, "graphView")
     verify(gv, "graphView")
     compare(gv.nodes.length, 3)

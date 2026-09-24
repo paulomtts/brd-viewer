@@ -38,7 +38,7 @@ TestCase {
 
   function test_ctrl_digits_switch_sections() {
     var p = make(); if (!p) return
-    p.chooseProject(pB)
+    p.navigator.chooseProject(pB)
     compare(p.handleGlobalKey(ctrl(Qt.Key_1)), true)
     compare(p.app.nav.viewMode, "board")
     compare(p.handleGlobalKey(ctrl(Qt.Key_2)), true)
@@ -65,7 +65,7 @@ TestCase {
 
   function test_escape_with_the_dropdown_open_closes_only_the_dropdown() {
     var p = make(); if (!p) return
-    p.toggleDropdown()
+    p.navigator.toggleDropdown()
     var sb = find(p, "sidebar")
     verify(sb, "sidebar found")
     sb.dropdownCancel()
@@ -75,7 +75,7 @@ TestCase {
 
   function test_the_sidebar_delete_button_starts_the_confirmation_for_the_selected_project() {
     var p = make(); if (!p) return
-    p.chooseProject(pB)
+    p.navigator.chooseProject(pB)
     var sb = find(p, "sidebar")
     compare(sb.canDelete, true)
     sb.deleteRequested()

@@ -32,7 +32,7 @@ TestCase {
   }
   function loaded() {
     var p = make(); if (!p) return null
-    p.showSection("memories")
+    p.navigator.showSection("memories")
     p.app.memories.applyMemoriesResult(memList, 0)
     return p
   }
@@ -53,7 +53,7 @@ TestCase {
   function test_opening_a_note_points_the_file_view_at_it_and_back_restores_the_list() {
     var p = loaded(); if (!p) return
     p.app.nav.cursorIndex = 1
-    p.activateCursor()
+    p.navigator.activateCursor()
     compare(p.app.nav.viewMode, "memory")
     compare(p.app.nav.section, "memories")
     compare(p.app.memories.selectedMemory, "feedback_a.md")
@@ -64,7 +64,7 @@ TestCase {
     fv.stubText = "---\nname: Terse\n---\nbody"
     fv.loaded()
     compare(p.app.memories.memoryText, "---\nname: Terse\n---\nbody")
-    p.goBack()
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "memories")
     compare(p.app.nav.cursorIndex, 1)
     compare(p.app.memories.memoryFile.path, "")
@@ -72,7 +72,7 @@ TestCase {
 
   function test_modals_block_global_shortcuts_and_take_focus() {
     var p = loaded(); if (!p) return
-    p.openMemory("user_role.md")
+    p.navigator.openMemory("user_role.md")
     p.app.memories.requestMemoryDelete()
     compare(p.handleGlobalKey({ key: Qt.Key_1, modifiers: Qt.ControlModifier, accepted: false }), false)
     compare(p.app.nav.viewMode, "memory")
@@ -82,7 +82,7 @@ TestCase {
     p.app.memories.startMemoryEdit()
     compare(p.focusItem.objectName, "memoryEditor")
     p.app.memories.cancelMemoryEdit()
-    p.goBack()
+    p.navigator.goBack()
     p.app.memories.openNewMemory()
     compare(p.focusItem.objectName, "newMemoryName")
   }
@@ -113,16 +113,16 @@ TestCase {
 
   function test_switching_project_is_blocked_while_an_edit_has_unsaved_changes() {
     var p = loaded(); if (!p) return
-    p.openMemory("feedback_a.md")
+    p.navigator.openMemory("feedback_a.md")
     p.app.memories.setMemoryText("t")
     p.app.memories.startMemoryEdit()
     p.app.memories.memoryDraft = "unsaved"
-    p.chooseProject(pB)
+    p.navigator.chooseProject(pB)
     compare(p.app.projects.selectedProject.root_path, pA.root_path)
     compare(p.app.memories.memoryDraft, "unsaved")
     verify(p.app.memories.memoryOpError !== "")
     p.app.memories.cancelMemoryEdit()
-    p.chooseProject(pB)
+    p.navigator.chooseProject(pB)
     compare(p.app.projects.selectedProject.root_path, pB.root_path)
   }
 
@@ -130,14 +130,14 @@ TestCase {
   // by hopping to another section.
   function test_switching_section_is_blocked_while_an_edit_has_unsaved_changes() {
     var p = loaded(); if (!p) return
-    p.openMemory("feedback_a.md")
+    p.navigator.openMemory("feedback_a.md")
     p.app.memories.setMemoryText("t")
     p.app.memories.startMemoryEdit()
     p.app.memories.memoryDraft = "unsaved"
-    p.showSection("board")
+    p.navigator.showSection("board")
     compare(p.app.nav.viewMode, "memory")
     p.app.memories.cancelMemoryEdit()
-    p.showSection("board")
+    p.navigator.showSection("board")
     compare(p.app.nav.viewMode, "board")
   }
 }

@@ -35,7 +35,7 @@ TestCase {
     var p = make(); if (!p) return
     compare(p.documentsEnabled, true)
     verify(!p.app.docs.lister.current, "no listing before the section opens")
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     var proc = p.app.docs.lister.current
     verify(proc, "a listing process")
     compare(p.app.nav.viewMode, "documents")
@@ -49,42 +49,42 @@ TestCase {
 
   function test_a_failed_listing_shows_the_error_and_keeps_the_board_usable() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult('{"ok": false, "error": "nope"}', 1)
     compare(p.app.docs.docsError, "nope")
     compare(p.app.docs.docs.length, 0)
-    p.showSection("board")
+    p.navigator.showSection("board")
     compare(p.app.nav.viewMode, "board")
   }
 
   // The keyboard list the panel walks is the filtered one the store computes.
   function test_the_current_list_follows_the_filtered_documents() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(docList, 0)
-    compare(paths(p.currentList()), "README.md,docs/specs/Design Doc.md,docs/huge.md")
+    compare(paths(p.navigator.currentList()), "README.md,docs/specs/Design Doc.md,docs/huge.md")
     p.app.nav.searchQuery = "design"
-    compare(paths(p.currentList()), "docs/specs/Design Doc.md")
+    compare(paths(p.navigator.currentList()), "docs/specs/Design Doc.md")
   }
 
   function test_a_read_failure_is_shown_with_back_available() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(docList, 0)
-    p.app.nav.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.navigator.activateCursor()
     p.app.docs.docFile.loadFailed(1)
     compare(p.app.docs.docError, "Could not read this document.")
-    p.goBack()
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "documents")
   }
 
   function test_back_restores_the_list_position() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(docList, 0)
     p.app.nav.cursorIndex = 1
-    p.activateCursor()
-    p.goBack()
+    p.navigator.activateCursor()
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "documents")
     compare(p.app.nav.cursorIndex, 1)
     compare(p.app.docs.selectedDocPath, "")
@@ -92,18 +92,18 @@ TestCase {
 
   function test_escape_from_the_documents_list_is_left_to_the_close_handler() {
     var p = make(); if (!p) return
-    p.showSection("documents")
-    p.goBack()
+    p.navigator.showSection("documents")
+    p.navigator.goBack()
     compare(p.app.nav.viewMode, "documents")
   }
 
   function test_switching_project_reloads_the_documents_list() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(docList, 0)
-    p.chooseProject(pB)
+    p.navigator.chooseProject(pB)
     compare(p.app.nav.viewMode, "board")
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     compare(p.app.docs.lister.current.command[2], "/home/u/b")
     compare(p.app.docs.docs.length, 0)
     compare(p.app.docs.docsLoading, true)
@@ -111,9 +111,9 @@ TestCase {
 
   function test_ctrl_1_leaves_an_open_document() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(docList, 0)
-    p.app.nav.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.navigator.activateCursor()
     compare(p.handleGlobalKey({ modifiers: Qt.ControlModifier, key: Qt.Key_1 }), true)
     compare(p.app.nav.viewMode, "board")
   }
@@ -126,33 +126,33 @@ TestCase {
 
   function test_toggling_a_category_resets_the_cursor_to_the_first_row() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(catList, 0)
     p.app.nav.cursorIndex = 3
     p.app.docs.toggleDocCategory("specs")
     compare(p.app.nav.cursorIndex, 0)
-    compare(paths(p.currentList()), "docs/specs/s.md,docs/superpowers/specs/t.md")
+    compare(paths(p.navigator.currentList()), "docs/specs/s.md,docs/superpowers/specs/t.md")
   }
 
   function test_hover_caused_by_keyboard_scrolling_does_not_steal_the_cursor() {
     var p = make(); if (!p) return
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(catList, 0)
-    p.moveCursor(1)
+    p.navigator.moveCursor(1)
     compare(p.app.nav.cursorIndex, 1)
-    p.hoverCursor(0)
+    p.navigator.hoverCursor(0)
     compare(p.app.nav.cursorIndex, 1)
     wait(400)
-    p.hoverCursor(0)
+    p.navigator.hoverCursor(0)
     compare(p.app.nav.cursorIndex, 0)
   }
 
   function tagFixture() {
     var p = make(); if (!p) return null
-    p.showSection("documents")
+    p.navigator.showSection("documents")
     p.app.docs.applyDocsResult(catList, 0)
     p.app.nav.cursorIndex = 1
-    p.activateCursor()
+    p.navigator.activateCursor()
     return p
   }
 
