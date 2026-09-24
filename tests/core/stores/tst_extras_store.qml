@@ -178,8 +178,6 @@ TestCase {
             "blocks:m1,ref:m1")
     compare(app.extras.linkIndex("ref", "m1"), 1)
     compare(app.extras.linkIndex("blocks", "nope"), -1)
-    compare(app.extras.issueIndexOf("i2"), 1)
-    compare(app.extras.issueIndexOf("nope"), -1)
     compare(app.extras.resolvedTarget("m1").inBoard, true)
     compare(app.extras.resolvedTarget("i2").kind, "issue")
     compare(app.extras.resolvedTarget("ghost").title, "ghost")

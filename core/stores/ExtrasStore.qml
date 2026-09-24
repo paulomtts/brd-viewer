@@ -116,12 +116,6 @@ Scope {
     extras.selectedIssueId = ""
   }
 
-  function issueIndexOf(id) {
-    for (var i = 0; i < extras.filteredIssues.length; i++)
-      if (extras.filteredIssues[i].id === id) return i
-    return -1
-  }
-
   function linkIndex(section, id) {
     for (var i = 0; i < extras.detailLinkList.length; i++)
       if (extras.detailLinkList[i].section === section && extras.detailLinkList[i].id === id) return i

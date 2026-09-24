@@ -3,11 +3,13 @@
 An [Omarchy](https://omarchy.org/) shell plugin for working across your
 [`brd`](https://github.com/paulomtts/brd) projects, right from the bar. Pick a
 project in the sidebar, then browse its kanban **Board**, its milestone
-**Graph**, its Markdown **Documents** (with typed badges you can assign), and
-the **Memories** Claude Code keeps for it, which you can read, edit, create and
-delete. Cards are read-only; the plugin's writes are limited to a document's
-frontmatter `tag:`, a project's Claude memory notes, and removing a whole
-project from brd (each described below, each with a backup or snapshot).
+**Graph**, its Markdown **Documents** (with typed badges you can assign), the
+**Memories** Claude Code keeps for it, which you can read, edit, create and
+delete, and its brd **Issues**. Cards and issues are read-only; the plugin's
+writes are limited to a document's frontmatter `tag:`, a project's Claude memory
+notes, the **New milestone** run (a coding agent writes cards to brd on your
+behalf) and removing a whole project from brd (each described below, each with a
+backup or snapshot).
 
 The panel is a centered popup (about 80% of the screen), with a sidebar on the
 left (project dropdown, section navigation, Delete project...) and, on the
@@ -27,12 +29,15 @@ until it is next saved, and existing snapshots and backups are left in their
   also after a shell restart. It is stored in
   `~/.local/state/omarchy-project-manager/state.json` (`$XDG_STATE_HOME` is respected). If
   that project is no longer registered, the first one is shown.
-- **Sections** - **Board** (**Ctrl+1**), **Graph** (**Ctrl+2**), **Documents** (**Ctrl+3**) and **Memories** (**Ctrl+4**), also
+- **Sections** - **Board** (**Ctrl+1**), **Graph** (**Ctrl+2**), **Documents**
+  (**Ctrl+3**), **Memories** (**Ctrl+4**) and **Issues** (**Ctrl+5**), also
   reachable from the sidebar with the mouse, where each one carries its own
   icon. The digits follow the order the sidebar lists the sections in.
 - **Board** - top-level cards in three status sections (Todo / In Progress /
   Done), each showing a done/total progress badge for its subtasks. A card
-  reporting as blocked (derived status) appears in Todo, flagged in orange.
+  reporting as blocked (derived status) appears in Todo, flagged in orange, and
+  when open brd issues are what block it the flag is followed by "N open
+  issue(s)".
 - **Graph** (Ctrl+2) - a pan/zoom canvas with one node per milestone (title,
   status colour, done/total progress, and a flag with the count when open brd
   issues block it) and an arrow for each `blocked_by` link between
@@ -90,7 +95,19 @@ until it is next saved, and existing snapshots and backups are left in their
   depth; Todo / In progress / Done / Blocked), full description, a parent link
   and clickable blocked-by/children lists, resolving ids to titles. A blocker
   that is a brd issue shows its title and `Issue · open` / `Issue · closed`
-  (closed ones dimmed); there is no issue screen, so it does not open.
+  (closed ones dimmed) and opens in the Issues section. A blocked card also
+  carries an "N open issues" badge next to Blocked. Below everything, the card's
+  brd comments (author, relative time, body, oldest first), or "No comments."
+  They are read-only: the panel never writes a comment.
+- **Issues** (Ctrl+5) - brd's issues, open first and then closed, each group
+  newest-updated first. A row shows a status badge, the title, how many cards
+  the issue blocks and how many comments it has. **Open**/**Closed** filter
+  chips carry their counts; clicking the active one shows everything again, and
+  the search box matches an issue's title, body and id. Enter or a click opens
+  the issue: its status and close reason, its body as Markdown, the cards it
+  blocks, its references and what references it - each navigable when the target
+  is a card of this board or another issue - and its comments. Read-only: the
+  panel never opens, closes or comments on an issue.
 - **Documents** - lists every `.md` file under `docs/` (at most 500; a note says
   when the list was cut off). Each document has one type: Architecture, Specs,
   Standards, Audits, or Other. Set it with a `tag:` line in the file's YAML
@@ -103,6 +120,16 @@ until it is next saved, and existing snapshots and backups are left in their
   the document body scrolls. The filter
   combines with the search box, and each row carries its badge. The frontmatter
   block is not shown when a document is opened.
+  A file that brd has registered also carries a **brd** badge, in the warning
+  colour when brd's copy is out of step with the file on disk, and brd's own
+  tags on a separate line - **brd tags are not the document type the picker
+  edits**; the two are never merged. An open document's header says
+  "Registered in brd", plus brd's state for it when its backup no longer matches
+  the file. A registration whose file is gone is still listed, dimmed, as
+  "missing on disk" so its backup stays discoverable; opening it shows "This
+  document is not on disk." instead of a body. Opening the Documents section
+  runs `brd doc list`, which syncs (writes) brd's backups - the one thing in the
+  panel that is not a pure read of brd besides New milestone.
   Documents over 1 MB (1048576 bytes) are not displayed. A document is
   rendered as Markdown and reloads live when the file changes; links are not
   clickable, and a document that references remote images may cause them to be
@@ -116,17 +143,20 @@ until it is next saved, and existing snapshots and backups are left in their
   button.
 - **Breadcrumbs** - the toolbar always leads with the trail to where you are:
   `Board`, or `Board › Milestone › Story › Subtask` inside a card (`Graph ›` …
-  when the card was opened from the graph), `Documents › <title>` and
-  `Memories › <note>`. Click the section crumb to go back the way the old
+  when the card was opened from the graph, `Issues ›` when it was opened from an
+  issue), `Documents › <title>`, `Memories › <note>` and
+  `Issues › <issue title>`. Click the section crumb to go back the way the old
   "Back" did, or an ancestor crumb to open that card; the last crumb is where
   you are.
 - **Keyboard navigation** - Up/Down moves the highlight (the panel scrolls to
-  keep it visible) through Board cards or documents and, inside a card, its
-  parent/blocked-by/children links; Enter or Right-at-end opens the
-  highlighted item. A card or document without links scrolls with Up/Down.
-  Tab switches bar panels. Left goes Back from a card or document.
-- **Escape** closes the project dropdown first; otherwise, from a card or
-  document, goes Back; from a section list, closes the panel. If you have
+  keep it visible) through Board cards, documents or issues and, inside a card
+  or an issue, its links (a card's parent/blocked-by/children, an issue's
+  blocked cards/references/referenced-by); Enter or Right-at-end opens the
+  highlighted item. A card, document or issue without links scrolls with
+  Up/Down. Tab switches bar panels. Left goes Back from a card, document or
+  issue.
+- **Escape** closes the project dropdown first; otherwise, from a card,
+  document or issue, goes Back; from a section list, closes the panel. If you have
   typed a search, Escape clears it first. Going Back restores the list
   highlight and scroll position you left.
 - **Delete a project** - click **Delete project...** in the sidebar footer,
@@ -141,10 +171,15 @@ until it is next saved, and existing snapshots and backups are left in their
   `brd import export.json`). If `brd export` can't run (e.g. the project
   directory is gone), the snapshot holds a raw copy of the project database
   instead, plus its `.docs/` document backups when they exist.
-- No card or document is ever created or edited from the panel.
+- No card, issue or comment is ever created or edited from the panel (the
+  New-milestone agent is the one exception, and it writes through `brd` itself).
 
 The plugin runs `brd` (`brd projects`, `brd tree`, `brd issue list` - an older
-brd without issues simply shows none), plus small helpers in its
+brd without issues simply shows none - plus one `brd export` with each board
+refresh, for the issue bodies, comments and refs, and `brd doc list` when the
+Documents section opens, which is the only one of these that writes: it syncs
+brd's document backups. A brd too old for `export` or `doc list` simply shows no
+comments, no issue details and no brd badges), plus small helpers in its
 `core/backend/<domain>/` folders: `projects/resolve-db-path.py`,
 `projects/viewer-state.py` (remembers the last project),
 `documents/list-docs.py` (lists a project's documents),
@@ -163,8 +198,9 @@ cd omarchy-project-manager
 ./install.sh --with-brd   # ...and installs the brd CLI first if it is missing
 ```
 
-The plugin only reads from `brd`, and the two are separate projects, so
-installing `brd` is optional: without `--with-brd` (or `--no-brd`) you are
+The plugin reads from `brd` (`brd doc list`, which syncs brd's own document
+backups, and the New-milestone agent are the only things that write), and the
+two are separate projects, so installing `brd` is optional: without `--with-brd` (or `--no-brd`) you are
 asked when it is missing, and a non-interactive run skips it. `--with-brd` uses
 `uv tool install` (or `pipx`) on `git+https://github.com/paulomtts/brd.git`, so
 it needs access to that repository; if the install fails the plugin is still
@@ -205,7 +241,7 @@ core/backend/<domain>/ Python helpers (one JSON line each) + common/
 core/stores/           non-visual QML state and workflows (App composes them)
 ui/                    Panel, Shortcuts, Navigator, screens/, components/, theme/
 vendor/canvas/         vendored canvas plugin (see VENDORED.md)
-tests/                 core/, ui/, architecture/, helpers/, stubs/
+tests/                 core/, ui/, architecture/, contract/, helpers/, stubs/
 ```
 
 Data flow: `Panel` creates one `App`; stores run `brd` and the helpers and
@@ -217,8 +253,14 @@ never the reverse.
 ```bash
 bash tests/run.sh [filter]   # pytest, then every QML test (optional path filter)
 ./run-tests.sh               # thin delegate to tests/run.sh
+python3 -m pytest tests/contract -q   # brd's JSON shapes, against the installed brd
 bash tests/live-check.sh     # restarts the real shell; needs the desktop session
 ```
+
+`tests/contract` runs the installed `brd` in a throwaway project with its own
+`HOME`/`XDG_DATA_HOME`/`XDG_STATE_HOME`, so your real boards are never touched;
+it fails when brd's JSON drifts from what the plugin parses, and is skipped when
+`brd` is not installed. `tests/run.sh` already includes it.
 
 See `docs/architecture.md` and the specs in `docs/superpowers/specs/`
 (board viewer, sidebar and documents, core/ui architecture) for the design.

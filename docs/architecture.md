@@ -28,7 +28,20 @@ manifest entry point.
 - `ProjectDeleteStore.qml` delete-project confirm/snapshot flow.
 - `BoardStore.qml` cards, index, selection, board order, the issue map (`brd issue list`; an old brd without issues is just an empty map); owns the DB `FileView`.
 - `GraphStore.qml` graph model from the board (card roots and issue map, for each milestone's open-issue count), graph cursor and movement.
-- `DocumentsStore.qml` listing, category filter, open document, tagging.
+- `DocumentsStore.qml` listing, category filter, open document, tagging, plus
+  brd's registered documents (`brd doc list`, fetched only when the section
+  opens because it syncs -- writes -- every backup). `mergedDocs` matches the
+  listing and the registrations on the path relative to the project root; a
+  registration whose file is gone stays in the list as `missing: true`. A failed
+  listing leaves the registrations already shown in place.
+- `ExtrasStore.qml` the read-only extras from one `brd export`: comments by
+  entity, refs both ways, and the rich issue list (body, close reason, comment
+  count, and the cards an issue blocks, derived from the export's nested card
+  tree because an exported issue carries no `blocks` of its own). Fetched with
+  the board through `BoardStore.refetched()`, and any failure -- an old brd
+  without `export`, a crash, garbage -- is simply empty extras, never an error.
+  It never feeds the board: the blocker rows and the graph keep reading
+  `BoardStore.issueMap` (`brd issue list`).
 - `MemoriesStore.qml` listing, type filter, open/edit/create/delete a note.
 - `MilestoneStore.qml` the New-milestone dialog and the one agent job
   (`idle -> running -> done|failed`): two `HelperRunner`s, both
@@ -40,10 +53,10 @@ manifest entry point.
   decides whose panel shows it.
 
 Other `ui/` pieces: `Navigator.qml` (screen switching), `Shortcuts.qml` (key
-events to store calls; Ctrl+1..4 follow the sidebar's order: Board, Graph,
-Documents, Memories), `theme/Theme.qml` (colours and fonts from the shell).
+events to store calls; Ctrl+1..5 follow the sidebar's order: Board, Graph,
+Documents, Memories, Issues), `theme/Theme.qml` (colours and fonts from the shell).
 
-Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `treeProc` (`brd tree`), `issueProc` (`brd issue list`), `saveStateProc`, `resolveDbPathProc` and `deleteProc` stay plain `Process` objects because they run the `brd` CLI or are fire-and-forget/single-owner with their own exit handling. `HelperRunner.run()` SIGTERMs a previous run of the same helper instead of letting it finish and dropping its reply (reachable for list-docs/list-memories refetches, and a set-doc-tag started in another project mid-flight); helpers write atomically, so at worst a stray `docs/.tmp-*` remains.
+Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `treeProc` (`brd tree`), `issueProc` (`brd issue list`), `exportProc` (`brd export`), `brdDocsProc` (`brd doc list`), `saveStateProc`, `resolveDbPathProc` and `deleteProc` stay plain `Process` objects because they run the `brd` CLI or are fire-and-forget/single-owner with their own exit handling. `HelperRunner.run()` SIGTERMs a previous run of the same helper instead of letting it finish and dropping its reply (reachable for list-docs/list-memories refetches, and a set-doc-tag started in another project mid-flight); helpers write atomically, so at worst a stray `docs/.tmp-*` remains.
 
 ## Shared components (`ui/components`) - reuse before writing a second copy
 
@@ -51,14 +64,16 @@ Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `tre
 `Breadcrumbs` (the toolbar's location trail; `Navigator.crumbs` builds the list
 and `Navigator.activateCrumb(index)` acts on a click, so the component stays
 presentational),
-`Chip` and `ChipRow` (filter chips), `ModalCard` (dimmed backdrop and card),
+`Chip` and `ChipRow` (filter chips), `CommentList` (the read-only brd comments
+of one entity, used by the card detail and the issue detail),
+`ModalCard` (dimmed backdrop and card),
 `TypedConfirmDialog`, `ListRow` (hover / keyboard cursor / reveal),
 `ListStatus` (loading/error/empty), `FilterableList`, `TextAreaBox`,
 `TagPicker`, `NewMemoryDialog`, `NewMilestoneDialog` (the from-spec modal),
 `MilestoneJobIndicator` (the toolbar strip while a milestone job runs, and its
 result), `Sidebar`, and the views
 `DocumentsView`, `MemoriesView`, `MemoryNoteView`, `GraphView`.
-`Sidebar`'s four nav rows (Board, Graph, Documents, Memories) each lead with an
+`Sidebar`'s five nav rows (Board, Graph, Documents, Memories, Issues) each lead with an
 icon glyph drawn in the theme's font; `tests/architecture/test_icon_glyphs.py`
 checks every glyph literal in `ui/` and `vendor/` against the installed Nerd
 Fonts, because a glyph the font does not have renders as an empty box.
@@ -67,7 +82,12 @@ toolbar - the category chips of the list, and the path and type picker of an
 open document - so only the document body scrolls.
 Domain helpers: `taxonomy.js` (typed labels), `results.js` (one JSON line +
 exit code), `text.js` (`matchesQuery`), `milestones.js` (the two helper
-parsers, `agentMessage`, `formatElapsed`, the spec-list ordering and filter);
+parsers, `agentMessage`, `formatElapsed`, the spec-list ordering and filter),
+`brd-extras.js` (the `brd export` and `brd doc list` parsers, the issue
+ordering/filtering and its wording, and `relativeTime` for a comment's age; the
+export's `documents[]` carry every registered file's full content and are
+dropped unread), and `documents.js`'s `mergeRegistered` / `brdStateLabel` for
+brd's registrations;
 Python: `core/backend/common`
 (`json_line`, `safe_paths`, `atomic_write`, `frontmatter`).
 `core/backend/milestones/` is the New-milestone backend:
@@ -107,6 +127,10 @@ would load its own type instead of ours.
 
 - `bash tests/run.sh [filter]` - pytest, then every QML test against a mirror of the repo (`./run-tests.sh` delegates to it).
 - `python3 -m pytest tests/architecture -q` - layer and duplication rules only.
+- `python3 -m pytest tests/contract -q` - runs the installed `brd` in a throwaway
+  project (its own `HOME`/`XDG_DATA_HOME`/`XDG_STATE_HOME` under a tmp dir, so no
+  real board is read or written) and fails when brd's JSON shape drifts from what
+  `core/domain/brd-extras.js` parses; skipped when `brd` is absent.
 - `bash tests/live-check.sh` - restarts the real shell and fails on plugin load errors in the journal (needs the desktop session).
 
 ## Documented exceptions
