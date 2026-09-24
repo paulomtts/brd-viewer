@@ -123,7 +123,7 @@ TestCase {
   function test_open_issues_from_the_board_mark_the_milestone_they_block() {
     var s = make(); if (!s) return
     s.navigator.showSection("graph")
-    var m2 = card("m2", "Second", "todo")
+    var m2 = card("m2", "Second", "blocked")
     m2.blocked_by = ["i1", "i2"]
     s.app.board.applyTreeData([card("m1", "First", "done", [card("s1", "Story", "done")]), m2])
     s.app.board.issueProc.stdout.text = JSON.stringify({ ok: true, data: [

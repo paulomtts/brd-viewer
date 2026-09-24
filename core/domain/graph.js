@@ -27,7 +27,8 @@ function openIssueLabel(count) {
 // One node per milestone (top-level card), one edge per blocked_by link between
 // two milestones (blocker -> blocked; links to sub-cards, issues or unknown ids
 // are not milestone dependencies and are skipped). Each node also carries how
-// many open issues block it. Positions come from the canvas's own layered
+// many open issues block it -- only when brd reports it blocked, since the
+// count is there to explain that status. Positions come from the canvas's own layered
 // layout so the panel can navigate by geometry.
 function graphModel(roots, issueMap) {
   var cards = roots || []
@@ -38,7 +39,7 @@ function graphModel(roots, issueMap) {
     var counts = Board.subtreeCounts(card)
     return { id: card.id, title: card.title, status: card.status,
              done: counts.done, total: counts.total,
-             openIssues: openIssueCount(card, issueMap),
+             openIssues: card.status === "blocked" ? openIssueCount(card, issueMap) : 0,
              w: GRAPH_NODE_W, h: GRAPH_NODE_H }
   })
   var edges = []

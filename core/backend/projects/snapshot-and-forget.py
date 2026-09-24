@@ -105,7 +105,9 @@ def restore_text(root_path, snapshot, has_export, db_dest, has_docs):
     else:
         lines.append('  cp "%s" "%s"' % (os.path.join(snapshot, "project.db"), db_dest))
         if has_docs:
-            lines.append('  cp -r "%s" "%s"' % (os.path.join(snapshot, "project.docs"), docs_dir(db_dest)))
+            # Copy the contents: `cp -r dir dest` would nest into an existing dest.
+            lines.append('  mkdir -p "%s"' % docs_dir(db_dest))
+            lines.append('  cp -r "%s/." "%s/"' % (os.path.join(snapshot, "project.docs"), docs_dir(db_dest)))
     return "\n".join(lines) + "\n"
 
 

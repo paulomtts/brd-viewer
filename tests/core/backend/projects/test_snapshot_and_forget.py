@@ -135,7 +135,10 @@ def test_the_fallback_also_copies_the_document_backups(box):
     assert (snap / "project.docs" / "nested" / "note.md").read_text() == "note"
     restore = (snap / "RESTORE.txt").read_text()
     assert 'cp "%s" "%s"' % (snap / "project.db", db) in restore
-    assert 'cp -r "%s" "%s"' % (snap / "project.docs", docs) in restore
+    # Copies the contents, so an existing docs dir is filled, not nested into.
+    assert 'mkdir -p "%s"' % docs in restore
+    assert 'cp -r "%s/." "%s/"' % (snap / "project.docs", docs) in restore
+    assert 'cp -r "%s" ' % (snap / "project.docs") not in restore
 
 
 def test_refuses_to_forget_when_nothing_can_be_snapshotted(box):

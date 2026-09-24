@@ -101,10 +101,18 @@ TestCase {
     var issues = { i1: { id: "i1", title: "A", status: "open" },
                    i2: { id: "i2", title: "B", status: "closed" } }
     var roots = graphRoots()
-    roots[3].blocked_by = ["i1", "i2"]
+    roots[2].blocked_by = ["m2", "ghost", "i1", "i2"]
     var g = Graph.graphModel(roots, issues)
-    compare(g.nodes.map(function(n) { return n.openIssues }).join(","), "0,0,0,1")
+    compare(g.nodes.map(function(n) { return n.openIssues }).join(","), "0,0,1,0")
     compare(g.edges.map(function(e) { return e.from + ">" + e.to }).join(","), "m1>m2,m2>m3")
     compare(Graph.graphModel(graphRoots()).nodes[0].openIssues, 0, "no issue map: nothing open")
+  }
+
+  function test_open_issues_mark_only_a_milestone_brd_reports_as_blocked() {
+    var issues = { i1: { id: "i1", title: "A", status: "open" } }
+    var roots = [makeCard("m1", "in_progress", [], ["i1"]), makeCard("m2", "done", [], ["i1"]),
+                 makeCard("m3", "todo", [], ["i1"]), makeCard("m4", "blocked", [], ["i1"])]
+    var g = Graph.graphModel(roots, issues)
+    compare(g.nodes.map(function(n) { return n.openIssues }).join(","), "0,0,0,1")
   }
 }
