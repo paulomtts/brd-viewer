@@ -91,4 +91,71 @@ TestCase {
     verify(heading.width <= bc.width, "the heading stays inside the row")
     verify(H.find(bc, "crumbText0").width > 0, "the section crumb keeps its width")
   }
+  // ---- a long trail in a narrow row
+
+  property var longTrail: [
+    { label: "Board", clickable: true },
+    { label: "Milestone 4 - core/ui architecture and the panel split", clickable: true },
+    { label: "Story: move the documents toolbar out of the content", clickable: true },
+    { label: "Subtask: breadcrumbs everywhere", clickable: false }
+  ]
+
+  function rightEdge(item, root) { return item.mapToItem(root, 0, 0).x + item.width }
+
+  function test_a_long_trail_keeps_the_current_crumb_readable() {
+    var bc = make(longTrail)
+    bc.width = 620
+    wait(50)
+    var heading = H.find(bc, "projectHeading")
+    verify(heading.width > 80, "the current crumb keeps room, got " + heading.width)
+    verify(heading.width >= H.find(bc, "crumbText1").width,
+      "the current crumb gets at least as much room as an ancestor")
+  }
+
+  function test_no_crumb_of_a_long_trail_paints_past_the_row() {
+    var bc = make(longTrail)
+    bc.width = 620
+    wait(50)
+    var names = ["crumb0", "crumb1", "crumb2", "crumb3"]
+    for (var i = 0; i < names.length; i++) {
+      var item = H.find(bc, names[i])
+      verify(rightEdge(item, bc) <= bc.width + 1, names[i] + " ends at " + rightEdge(item, bc) + " of " + bc.width)
+    }
+  }
+
+  function test_the_ancestors_of_a_long_trail_are_elided() {
+    var bc = make(longTrail)
+    bc.width = 620
+    wait(50)
+    var ancestor = H.find(bc, "crumbText2")
+    compare(ancestor.elide, Text.ElideRight)
+    verify(ancestor.width < ancestor.implicitWidth, "the ancestor is truncated, not laid out in full")
+    verify(ancestor.truncated, "and Text says so")
+  }
+
+  function test_a_short_trail_in_a_wide_row_is_not_squeezed() {
+    var bc = make(trail)
+    bc.width = 460
+    wait(50)
+    var names = ["crumbText0", "crumbText1", "projectHeading"]
+    for (var i = 0; i < names.length; i++) {
+      var label = H.find(bc, names[i])
+      compare(label.truncated, false, names[i] + " is drawn in full")
+    }
+    compare(rightEdge(H.find(bc, "crumb2"), bc) <= bc.width + 1, true)
+  }
+
+  function test_the_separator_has_the_same_gap_on_both_sides() {
+    var bc = make(trail)
+    bc.width = 460
+    wait(50)
+    var before = H.find(bc, "crumbText0")
+    var sep = H.find(bc, "crumbSeparator1")
+    var after = H.find(bc, "crumbText1")
+    var left = sep.mapToItem(bc, 0, 0).x - rightEdge(before, bc)
+    var right = after.mapToItem(bc, 0, 0).x - rightEdge(sep, bc)
+    verify(left > 0, "there is room before the chevron, got " + left)
+    verify(right > 0, "there is room after the chevron, got " + right)
+    verify(Math.abs(left - right) <= 1, "the gaps match: " + left + " vs " + right)
+  }
 }

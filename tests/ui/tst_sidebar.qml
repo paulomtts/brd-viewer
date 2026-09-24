@@ -159,4 +159,14 @@ TestCase {
     compare(icon.color, row.foreground)
     verify(icon.mapToItem(row, 0, 0).x < find(sb, "navBoard").width / 2, "the icon leads the row")
   }
+  function test_each_section_carries_its_own_glyph() {
+    var sb = make()
+    var wanted = {
+      navIconBoard: "\uf0db",        // columns
+      navIconGraph: "\uf0e8",        // sitemap
+      navIconDocuments: "\uf15c",    // file-lines
+      navIconMemories: "\udb82\uddd1" // brain (U+F09D1)
+    }
+    for (var name in wanted) compare(String(find(sb, name).text), wanted[name], name)
+  }
 }

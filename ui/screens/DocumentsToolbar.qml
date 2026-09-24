@@ -12,7 +12,6 @@ Column {
   id: bar
 
   property var app
-  property var navigator
   property var theme: T.Theme {}
 
   readonly property bool listMode: bar.app.nav.viewMode === "documents"

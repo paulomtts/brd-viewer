@@ -17,6 +17,7 @@ TestCase {
   Component { id: hostC; Item { width: 500; height: 300 } }
   Component { id: flickC; Flickable { width: 500; height: 300; contentWidth: 500; contentHeight: 2000 } }
 
+  property var navi: null
   property var pA: ({ root_path: "/home/u/a", name: "alpha" })
   property string docList: '{"ok": true, "docs": [' +
     '{"path": "docs/architecture/a.md", "title": "Arch", "size": 1, "category": "architecture"},' +
@@ -39,7 +40,8 @@ TestCase {
     }) })
     var tC = Qt.createComponent("../../../ui/screens/DocumentsToolbar.qml")
     if (tC.status !== Component.Ready) { fail(tC.errorString()); return null }
-    var t = tC.createObject(host, { app: app, navigator: nav, width: 500 })
+    var t = tC.createObject(host, { app: app, width: 500 })
+    tc.navi = nav
     app.projects.stateLoaded = true
     app.projects.stateReadOk = true
     app.projects.applyProjectsList([pA])
@@ -48,7 +50,7 @@ TestCase {
 
   function listed() {
     var t = make(); if (!t) return null
-    t.navigator.showSection("documents")
+    tc.navi.showSection("documents")
     t.app.docs.applyDocsResult(docList, 0)
     wait(20)
     return t
@@ -56,7 +58,7 @@ TestCase {
 
   function opened() {
     var t = listed(); if (!t) return null
-    t.navigator.openDoc("docs/specs/s.md")
+    tc.navi.openDoc("docs/specs/s.md")
     wait(20)
     return t
   }
@@ -64,13 +66,13 @@ TestCase {
   function test_the_toolbar_shows_only_in_the_documents_and_document_views() {
     var t = make(); if (!t) return
     compare(t.visible, false)
-    t.navigator.showSection("documents")
+    tc.navi.showSection("documents")
     t.app.docs.applyDocsResult(docList, 0)
     compare(t.visible, true)
-    t.navigator.openDoc("docs/specs/s.md")
+    tc.navi.openDoc("docs/specs/s.md")
     compare(t.app.nav.viewMode, "document")
     compare(t.visible, true)
-    t.navigator.showSection("board")
+    tc.navi.showSection("board")
     compare(t.visible, false)
   }
 
@@ -107,7 +109,7 @@ TestCase {
 
   function test_the_chips_are_hidden_without_documents_and_while_loading_or_failed() {
     var t = make(); if (!t) return
-    t.navigator.showSection("documents")
+    tc.navi.showSection("documents")
     wait(20)
     compare(H.find(t, "docChips").visible, false, "nothing listed yet")
     t.app.docs.applyDocsResult(docList, 0)

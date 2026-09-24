@@ -324,7 +324,6 @@ Panel {
         DocumentsToolbar {
           width: parent.width
           app: appStores
-          navigator: navi
           theme: panelTheme
         }
 
