@@ -53,4 +53,23 @@ TestCase {
     v.nodes = nodes
     compare(find(v, "graphEmpty").visible, false)
   }
+
+  function test_a_milestone_blocked_by_open_issues_shows_a_marker() {
+    var v = createTemporaryObject(viewC, tc)
+    var withIssues = nodes.map(function(n) { return Object.assign({}, n) })
+    withIssues[0].openIssues = 2
+    withIssues[1].openIssues = 0
+    v.nodes = withIssues
+    v.edges = edges
+    wait(100)
+    var marker = find(find(v, "graphNodem1"), "graphNodeIssues")
+    verify(marker, "the open-issue marker")
+    compare(marker.visible, true)
+    compare(marker.text, "\uF024 2 open issues")
+    compare(find(find(v, "graphNodem1"), "graphNodeProgress").text, "1/2 done")
+    compare(find(find(v, "graphNodem2"), "graphNodeIssues").visible, false)
+    v.nodes = nodes.map(function(n) { return Object.assign({}, n, { openIssues: n.id === "m1" ? 1 : 0 }) })
+    wait(50)
+    compare(find(find(v, "graphNodem1"), "graphNodeIssues").text, "\uF024 1 open issue")
+  }
 }

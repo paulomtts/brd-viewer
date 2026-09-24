@@ -34,8 +34,9 @@ until it is next saved, and existing snapshots and backups are left in their
   Done), each showing a done/total progress badge for its subtasks. A card
   reporting as blocked (derived status) appears in Todo, flagged in orange.
 - **Graph** (Ctrl+2) - a pan/zoom canvas with one node per milestone (title,
-  status colour, done/total progress) and an arrow for each `blocked_by` link
-  between milestones, laid out left to right. Arrow keys move the selection to
+  status colour, done/total progress, and a flag with the count when open brd
+  issues block it) and an arrow for each `blocked_by` link between
+  milestones, laid out left to right. Arrow keys move the selection to
   the nearest node in that direction and the view follows; Enter or a click
   opens the milestone's card, and Back returns to the graph. The canvas also
   has mouse pan/zoom, `+`/`-` and on-screen zoom/organize/fit buttons. Nodes can
@@ -87,7 +88,9 @@ until it is next saved, and existing snapshots and backups are left in their
     is reviewed by the plugin - it writes cards to `brd` on your behalf.
 - **Card detail** - kind and status badges (Milestone / Story / Subtask by
   depth; Todo / In progress / Done / Blocked), full description, a parent link
-  and clickable blocked-by/children lists, resolving ids to titles.
+  and clickable blocked-by/children lists, resolving ids to titles. A blocker
+  that is a brd issue shows its title and `Issue · open` / `Issue · closed`
+  (closed ones dimmed); there is no issue screen, so it does not open.
 - **Documents** - lists every `.md` file under `docs/` (at most 500; a note says
   when the list was cut off). Each document has one type: Architecture, Specs,
   Standards, Audits, or Other. Set it with a `tag:` line in the file's YAML
@@ -140,7 +143,8 @@ until it is next saved, and existing snapshots and backups are left in their
   instead, plus its `.docs/` document backups when they exist.
 - No card or document is ever created or edited from the panel.
 
-The plugin runs `brd` (`brd projects`, `brd tree`), plus small helpers in its
+The plugin runs `brd` (`brd projects`, `brd tree`, `brd issue list` - an older
+brd without issues simply shows none), plus small helpers in its
 `core/backend/<domain>/` folders: `projects/resolve-db-path.py`,
 `projects/viewer-state.py` (remembers the last project),
 `documents/list-docs.py` (lists a project's documents),

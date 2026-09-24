@@ -148,4 +148,33 @@ TestCase {
     mouseClick(rows[0])
     compare(s.app.board.selectedCardId, "m1")
   }
+
+  function test_an_issue_blocker_shows_its_title_and_state_and_is_not_openable() {
+    var s = make(); if (!s) return
+    s.app.board.applyTreeData([
+      card("m1", "Milestone one", "todo", "m desc", [], ["x1", "i1", "i2", "ghost"]),
+      card("x1", "Other milestone", "in_progress", "x desc")])
+    s.app.board.applyIssueData([
+      { id: "i1", kind: "issue", title: "Broken build", status: "open" },
+      { id: "i2", kind: "issue", title: "Old bug", status: "closed" }])
+    s.navigator.openCard("m1")
+    wait(50)
+    var rows = links(s)
+    compare(rows.map(function(r) { return r.resolved.title }).join(","), "Other milestone,Broken build,Old bug,ghost")
+    var open = rows[1]
+    var closed = rows[2]
+    compare(open.rowIndex, -1, "an issue is kept out of the keyboard links")
+    compare(closed.rowIndex, -1)
+    compare(s.app.board.detailLinkList.map(function(l) { return l.id }).join(","), "x1")
+    var openText = texts(open).join(" | ")
+    verify(openText.indexOf("Broken build") >= 0, openText)
+    verify(openText.indexOf("Issue · open") >= 0, openText)
+    verify(openText.indexOf("not in this board") < 0, openText)
+    verify(texts(closed).join(" | ").indexOf("Issue · closed") >= 0, texts(closed).join(" | "))
+    verify(closed.opacity < 1, "a closed issue is dimmed")
+    compare(open.opacity, 1)
+    compare(rows[0].opacity, 1)
+    mouseClick(open)
+    compare(s.app.board.selectedCardId, "m1")
+  }
 }

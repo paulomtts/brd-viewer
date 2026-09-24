@@ -119,4 +119,21 @@ TestCase {
     compare(s.height, 240, "never smaller than the floor")
     compare(find(s, "graphView").height, s.height)
   }
+
+  function test_open_issues_from_the_board_mark_the_milestone_they_block() {
+    var s = make(); if (!s) return
+    s.navigator.showSection("graph")
+    var m2 = card("m2", "Second", "todo")
+    m2.blocked_by = ["i1", "i2"]
+    s.app.board.applyTreeData([card("m1", "First", "done", [card("s1", "Story", "done")]), m2])
+    s.app.board.issueProc.stdout.text = JSON.stringify({ ok: true, data: [
+      { id: "i1", kind: "issue", title: "Broken build", status: "open" },
+      { id: "i2", kind: "issue", title: "Old bug", status: "closed" }] })
+    s.app.board.issueProc.stdout.streamFinished()
+    wait(100)
+    var marker = find(find(s, "graphNodem2"), "graphNodeIssues")
+    compare(marker.visible, true)
+    compare(marker.text, "\uF024 1 open issue")
+    compare(find(find(s, "graphNodem1"), "graphNodeIssues").visible, false)
+  }
 }

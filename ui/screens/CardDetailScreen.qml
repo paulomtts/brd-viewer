@@ -7,7 +7,8 @@ import "../components" as UI
 import "../theme" as T
 
 // One card, opened from the Board or the Graph: its parent, its blockers and
-// its children as keyboard-navigable link rows, plus the kind/status badges and
+// its children as keyboard-navigable link rows (an issue blocker is shown with
+// its title and open/closed state, but there is no issue screen to open), plus the kind/status badges and
 // the description. It reads the board store and opens links through the
 // navigator; it owns no state of its own.
 Column {
@@ -141,8 +142,11 @@ Column {
     property var resolved: ({ title: "", status: "", inBoard: true })
     property alias rowIndex: detailLink.index
     property string prefix: ""
+    readonly property bool isIssue: detailLink.resolved.kind === "issue"
 
     theme: detailCard.theme
+    // A closed issue stays in blocked_by but no longer blocks.
+    opacity: detailLink.isIssue && detailLink.resolved.status === "closed" ? 0.5 : 1
     cursorIndex: detailCard.app.nav.cursorIndex
     scrollOnCursor: detailCard.app.nav.scrollOnCursor
     contentMargin: Style.space(6)
@@ -158,17 +162,21 @@ Column {
         variant: "small"
         theme: detailCard.theme
         Layout.fillWidth: true
-        text: detailLink.prefix + detailLink.resolved.title + (detailLink.resolved.inBoard ? "" : " (not in this board)")
-        color: detailLink.resolved.inBoard ? detailCard.theme.foreground : detailCard.theme.dim
+        text: detailLink.prefix + detailLink.resolved.title
+          + (detailLink.resolved.inBoard || detailLink.isIssue ? "" : " (not in this board)")
+        color: detailLink.resolved.inBoard || detailLink.isIssue ? detailCard.theme.foreground : detailCard.theme.dim
         elide: Text.ElideRight
       }
 
       UI.ThemedText {
         variant: "caption"
         theme: detailCard.theme
-        visible: detailLink.resolved.inBoard
-        text: "[" + detailLink.resolved.status + "]"
-        color: Board.statusColor(detailLink.resolved.status, detailCard.theme.dim)
+        visible: detailLink.resolved.inBoard || detailLink.isIssue
+        text: detailLink.isIssue ? Board.issueBlockerLabel(detailLink.resolved.status)
+                                 : "[" + detailLink.resolved.status + "]"
+        color: detailLink.isIssue
+          ? (detailLink.resolved.status === "open" ? Board.statusColor("blocked", detailCard.theme.dim) : detailCard.theme.dim)
+          : Board.statusColor(detailLink.resolved.status, detailCard.theme.dim)
       }
     }
   }

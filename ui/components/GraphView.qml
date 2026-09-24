@@ -63,7 +63,7 @@ Item {
     Rectangle {
       id: node
       // The canvas's Loader clears modelData while it tears a node down.
-      readonly property var entry: modelData ? modelData : ({ id: "", title: "", status: "", done: 0, total: 0 })
+      readonly property var entry: modelData ? modelData : ({ id: "", title: "", status: "", done: 0, total: 0, openIssues: 0 })
       readonly property bool current: entry.id !== "" && view.cursorId === entry.id
       readonly property color tint: Board.statusColor(entry.status, view.theme.dim)
       objectName: "graphNode" + entry.id
@@ -101,12 +101,33 @@ Item {
           elide: Text.ElideRight
         }
 
-        UI.ThemedText {
-          objectName: "graphNodeProgress"
-          variant: "caption"
-          theme: view.theme
+        Item {
           width: parent.width
-          text: node.entry.total > 0 ? node.entry.done + "/" + node.entry.total + " done" : "No stories"
+          height: progress.implicitHeight
+
+          UI.ThemedText {
+            id: progress
+            objectName: "graphNodeProgress"
+            variant: "caption"
+            theme: view.theme
+            anchors.left: parent.left
+            anchors.right: issues.visible ? issues.left : parent.right
+            anchors.rightMargin: issues.visible ? 6 : 0
+            text: node.entry.total > 0 ? node.entry.done + "/" + node.entry.total + " done" : "No stories"
+            elide: Text.ElideRight
+          }
+
+          // Open issues blocking this milestone; closed ones add nothing.
+          UI.ThemedText {
+            id: issues
+            objectName: "graphNodeIssues"
+            variant: "caption"
+            theme: view.theme
+            anchors.right: parent.right
+            visible: (node.entry.openIssues || 0) > 0
+            text: "\uF024 " + Graph.openIssueLabel(node.entry.openIssues || 0)
+            color: Board.statusColor("blocked", view.theme.dim)
+          }
         }
       }
     }
