@@ -333,6 +333,43 @@ TestCase {
     proc.outText = '{"ok": false, "error": "old"}'
     proc.exited(1)
     compare(app.docs.docTagError, "")
+    compare(app.docs.docTagBusy, false, "the abandoned change must not hold the lock")
+  }
+
+  // Leaving a project while a change is in flight must not lock the picker for
+  // the rest of the session: the next project can still change a type.
+  function test_a_tag_change_abandoned_by_a_project_switch_does_not_lock_the_picker() {
+    var app = tagFixture(); if (!app) return
+    app.docs.setDocTag("audits")
+    var abandoned = app.docs.tagger.current
+    app.projects.selectProject(pB)
+    abandoned.outText = '{"ok": true, "changed": true}'
+    abandoned.exited(0)
+    compare(app.docs.docTagBusy, false)
+    showDocuments(app)
+    app.docs.applyDocsResult(catList, 0)
+    open(app, "docs/specs/s.md")
+    app.docs.setDocTag("audits")
+    compare(app.docs.docTagBusy, true)
+    var proc = app.docs.tagger.current
+    verify(proc, "a tagging process for the new project")
+    compare(proc.command[2], "/home/u/b")
+    compare(proc.command[3], "docs/specs/s.md")
+    compare(proc.command[4], "audits")
+  }
+
+  // Staying in the project and only leaving the document: the helper's own exit
+  // still releases the lock.
+  function test_leaving_the_document_still_releases_the_lock_when_the_helper_exits() {
+    var app = tagFixture(); if (!app) return
+    app.docs.setDocTag("audits")
+    var proc = app.docs.tagger.current
+    app.docs.restoreDocumentsList()
+    app.nav.viewMode = "documents"
+    compare(app.docs.docTagBusy, true, "the change is still in flight")
+    proc.outText = '{"ok": true, "changed": true}'
+    proc.exited(0)
+    compare(app.docs.docTagBusy, false)
   }
 
   function test_leaving_the_document_clears_the_tag_error() {

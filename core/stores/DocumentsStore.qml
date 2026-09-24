@@ -105,10 +105,14 @@ Scope {
     else store.docTagError = result.error
   }
 
-  // Everything the old project left behind, on a project change.
+  // Everything the old project left behind, on a project change. A type change
+  // still in flight belongs to the project the user has left: its reply will be
+  // dropped by the tagger's guard, so the lock is released here -- nothing else
+  // would ever clear it again.
   function reset() {
     store.docs = []
     category.clear()
+    store.docTagBusy = false
     store.docTagError = ""
     store.docsError = ""
     store.docsLoading = false
