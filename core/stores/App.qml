@@ -20,6 +20,7 @@ QtObject {
       app.board.fetchBoard()
       app.docs.reset()
       app.memories.resetMemories()
+      app.milestones.reset()
     }
     onCleared: {
       app.nav.viewMode = "board"
@@ -27,6 +28,7 @@ QtObject {
       app.graph.graphCursor = ""
       app.docs.reset()
       app.memories.resetMemories()
+      app.milestones.reset()
     }
     onChosen: app.deleter.lastSnapshot = ""
     onOpened: {
@@ -64,6 +66,15 @@ QtObject {
       app.nav.cursorIndex = 0
       app.nav.scrollOnCursor = false
     }
+  }
+
+  // The milestone store never imports the board store: the number of cards the
+  // board knows about is handed in, and its refresh request is routed here.
+  readonly property MilestoneStore milestones: MilestoneStore {
+    backendDir: app.backendDir
+    project: app.projects.selectedProject
+    cardCount: Object.keys(app.board.cardMap).length
+    onBoardRefreshRequested: app.board.fetchBoard()
   }
 
   readonly property GraphStore graph: GraphStore {
