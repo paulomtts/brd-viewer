@@ -3,7 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "../domain/board.js" as Board
 
-// The kanban board: the card tree from `brd tree`, what is visible once the
+// The kanban board: the card tree from `brd tree`, the issues from
+// `brd issue list` (a card's blocked_by may name one), what is visible once the
 // search has been applied, and which card is open. The project, the watched
 // database and the navigation values it needs are handed to it by App -- it
 // never reaches for another store. Scrolling and focus stay in the panel.
@@ -17,10 +18,12 @@ Scope {
 
   property var cardRoots: []   // top-level cards from the last brd tree fetch
   property var cardMap: ({})   // id -> card, from Board.indexTree
+  property var issueMap: ({})  // id -> {id, title, status}, from Board.indexIssues
   readonly property var statuses: ["todo", "in_progress", "done"]
   property string selectedCardId: ""
 
   readonly property alias treeProc: treeProc
+  readonly property alias issueProc: issueProc
   readonly property alias dbFile: dbFile
 
   // The board could not be read, or was read again: the message the panel
@@ -35,6 +38,9 @@ Scope {
     treeProc.workingDirectory = board.project.root_path
     treeProc.running = false
     treeProc.running = true
+    issueProc.workingDirectory = board.project.root_path
+    issueProc.running = false
+    issueProc.running = true
   }
 
   function applyTreeData(roots) {
@@ -42,6 +48,10 @@ Scope {
     var indexed = Board.indexTree(roots)
     board.cardMap = indexed.cardMap
     if (board.viewMode === "entry" && !board.cardMap[board.selectedCardId]) board.listViewRequested()
+  }
+
+  function applyIssueData(issues) {
+    board.issueMap = Board.indexIssues(issues)
   }
 
   readonly property var visibleBoardRoots: board.cardRoots.filter(function(c) {
@@ -97,9 +107,7 @@ Scope {
   }
 
   function resolvedCard(id) {
-    var card = board.cardMap[id]
-    return card ? { id: id, title: card.title, status: card.status, inBoard: true }
-                : { id: id, title: id, status: "", inBoard: false }
+    return Board.resolvedCard(id, board.cardMap, board.issueMap)
   }
 
   FileView {
@@ -134,6 +142,29 @@ Scope {
         board.applyTreeData([])
         board.errored("Could not load the board for this project.")
       }
+    }
+  }
+
+  // Issues are extra: a brd too old to have them (or any other failure) just
+  // means no issues, never a board error.
+  Process {
+    id: issueProc
+    objectName: "issueProc"
+    command: ["brd", "issue", "list"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var parsed = JSON.parse(text || "{}")
+          board.applyIssueData(parsed.ok === true && Array.isArray(parsed.data) ? parsed.data : [])
+        } catch (e) {
+          board.applyIssueData([])
+        }
+      }
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) board.applyIssueData([])
     }
   }
 }

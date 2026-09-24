@@ -188,4 +188,63 @@ TestCase {
     compare(missing.status, "")
     compare(missing.inBoard, false)
   }
+
+  function test_the_issues_are_fetched_with_the_tree_in_the_projects_directory() {
+    var app = make(); if (!app) return
+    var proc = app.board.issueProc
+    verify(proc, "issueProc exists")
+    compare(proc.command.join(" "), "brd issue list")
+    compare(proc.workingDirectory, "/home/u/a")
+    compare(proc.running, true)
+    proc.running = false
+    app.board.dbFile.fileChanged()
+    compare(proc.running, true, "a database change refetches the issues too")
+    proc.running = false
+    app.projects.chooseProject(pB)
+    compare(proc.workingDirectory, "/home/u/b")
+    compare(proc.running, true)
+  }
+
+  function test_the_issue_list_fills_the_issue_map_and_resolves_issue_blockers() {
+    var app = make(); if (!app) return
+    app.board.applyTreeData(roots())
+    app.board.issueProc.stdout.text = JSON.stringify({ ok: true, data: [
+      { id: "i1", kind: "issue", title: "Broken build", body: "", status: "open", blocks: ["t1"] },
+      { id: "i2", kind: "issue", title: "Old bug", body: "", status: "closed", blocks: [] }] })
+    app.board.issueProc.stdout.streamFinished()
+    compare(Object.keys(app.board.issueMap).sort().join(","), "i1,i2")
+    compare(app.board.issueMap.i1.title, "Broken build")
+    var open = app.board.resolvedCard("i1")
+    compare(open.title, "Broken build")
+    compare(open.status, "open")
+    compare(open.kind, "issue")
+    compare(open.inBoard, false)
+    compare(app.board.resolvedCard("i2").status, "closed")
+    compare(app.board.resolvedCard("s1").inBoard, true)
+    compare(app.board.resolvedCard("nope").title, "nope")
+    compare(app.projects.loadError, "")
+  }
+
+  function test_an_old_brd_without_issues_leaves_an_empty_map_and_no_error() {
+    var app = make(); if (!app) return
+    app.board.applyIssueData([{ id: "i1", title: "Stale", status: "open" }])
+    app.board.issueProc.stdout.text = '{"ok": false, "error": {"type": "UsageError", "message": "no such command"}}'
+    app.board.issueProc.stdout.streamFinished()
+    compare(Object.keys(app.board.issueMap).length, 0)
+    app.board.applyIssueData([{ id: "i1", title: "Stale", status: "open" }])
+    app.board.issueProc.stdout.text = "Usage: brd [OPTIONS] COMMAND"
+    app.board.issueProc.stdout.streamFinished()
+    compare(Object.keys(app.board.issueMap).length, 0)
+    app.board.applyIssueData([{ id: "i1", title: "Stale", status: "open" }])
+    app.board.issueProc.exited(2)
+    compare(Object.keys(app.board.issueMap).length, 0)
+    compare(app.projects.loadError, "")
+  }
+
+  function test_an_empty_registry_empties_the_issues() {
+    var app = make(); if (!app) return
+    app.board.applyIssueData([{ id: "i1", title: "Stale", status: "open" }])
+    app.projects.applyProjectsList([])
+    compare(Object.keys(app.board.issueMap).length, 0)
+  }
 }

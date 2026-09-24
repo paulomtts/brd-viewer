@@ -2,14 +2,15 @@ import QtQml
 import "../domain/graph.js" as Graph
 
 // The milestone dependency graph and the keyboard selection that walks it.
-// The model follows the board's card roots, which App hands over. Centring the
+// The model follows the board's card roots and issues, which App hands over. Centring the
 // view on the selection needs an Item, so that stays in the UI.
 QtObject {
   id: graphStore
 
   property var cardRoots: []   // set by App from BoardStore.cardRoots
+  property var issueMap: ({})  // set by App from BoardStore.issueMap
 
-  readonly property var graph: Graph.graphModel(graphStore.cardRoots)
+  readonly property var graph: Graph.graphModel(graphStore.cardRoots, graphStore.issueMap)
 
   property string graphCursor: ""
 

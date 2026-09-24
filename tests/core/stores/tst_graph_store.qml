@@ -82,4 +82,13 @@ TestCase {
     app.graph.graphCursor = ""
     compare(app.graph.activateGraphNode(), "")
   }
+
+  function test_the_model_counts_open_issues_from_the_board() {
+    var app = make(); if (!app) return
+    app.board.applyTreeData([card("m1", "todo", [], ["i1", "i2"]), card("m2", "todo")])
+    compare(app.graph.graph.nodes[0].openIssues, 0, "no issues known yet")
+    app.board.applyIssueData([{ id: "i1", title: "A", status: "open" }, { id: "i2", title: "B", status: "closed" }])
+    compare(app.graph.graph.nodes[0].openIssues, 1)
+    compare(app.graph.graph.nodes[1].openIssues, 0)
+  }
 }

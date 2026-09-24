@@ -25,6 +25,7 @@ QtObject {
     onCleared: {
       app.nav.viewMode = "board"
       app.board.applyTreeData([])
+      app.board.applyIssueData([])
       app.graph.graphCursor = ""
       app.docs.reset()
       app.memories.resetMemories()
@@ -79,6 +80,7 @@ QtObject {
 
   readonly property GraphStore graph: GraphStore {
     cardRoots: app.board.cardRoots
+    issueMap: app.board.issueMap
   }
 
   readonly property ProjectDeleteStore deleter: ProjectDeleteStore {

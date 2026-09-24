@@ -26,8 +26,8 @@ manifest entry point.
 - `NavigationStore.qml` view mode, section, push/pop return positions, cursor, search, dropdown.
 - `ProjectStore.qml` registry, selection, remembered project, DB watch path.
 - `ProjectDeleteStore.qml` delete-project confirm/snapshot flow.
-- `BoardStore.qml` cards, index, selection, board order; owns the DB `FileView`.
-- `GraphStore.qml` graph model from the board, graph cursor and movement.
+- `BoardStore.qml` cards, index, selection, board order, the issue map (`brd issue list`; an old brd without issues is just an empty map); owns the DB `FileView`.
+- `GraphStore.qml` graph model from the board (card roots and issue map, for each milestone's open-issue count), graph cursor and movement.
 - `DocumentsStore.qml` listing, category filter, open document, tagging.
 - `MemoriesStore.qml` listing, type filter, open/edit/create/delete a note.
 - `MilestoneStore.qml` the New-milestone dialog and the one agent job
@@ -43,7 +43,7 @@ Other `ui/` pieces: `Navigator.qml` (screen switching), `Shortcuts.qml` (key
 events to store calls; Ctrl+1..4 follow the sidebar's order: Board, Graph,
 Documents, Memories), `theme/Theme.qml` (colours and fonts from the shell).
 
-Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `treeProc` (`brd tree`), `saveStateProc`, `resolveDbPathProc` and `deleteProc` stay plain `Process` objects because they run the `brd` CLI or are fire-and-forget/single-owner with their own exit handling. `HelperRunner.run()` SIGTERMs a previous run of the same helper instead of letting it finish and dropping its reply (reachable for list-docs/list-memories refetches, and a set-doc-tag started in another project mid-flight); helpers write atomically, so at worst a stray `docs/.tmp-*` remains.
+Not every process goes through `HelperRunner`: `listProc` (`brd projects`), `treeProc` (`brd tree`), `issueProc` (`brd issue list`), `saveStateProc`, `resolveDbPathProc` and `deleteProc` stay plain `Process` objects because they run the `brd` CLI or are fire-and-forget/single-owner with their own exit handling. `HelperRunner.run()` SIGTERMs a previous run of the same helper instead of letting it finish and dropping its reply (reachable for list-docs/list-memories refetches, and a set-doc-tag started in another project mid-flight); helpers write atomically, so at worst a stray `docs/.tmp-*` remains.
 
 ## Shared components (`ui/components`) - reuse before writing a second copy
 
