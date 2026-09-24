@@ -39,16 +39,22 @@ Column {
   signal revealRequested(var item)
   signal typeToggled(string id)
 
-  Flow {
+  UI.ChipRow {
     objectName: "memoryChips"
     visible: view.types.length > 0 && !view.loading && view.error === ""
     width: parent.width
-    spacing: Style.space(6)
-
-    Repeater {
-      model: view.types
-      delegate: TypeChip {}
-    }
+    theme: view.theme
+    chipPrefix: "memoryChip"
+    active: view.activeType
+    model: view.types.map(function(type) {
+      return {
+        id: type.id,
+        label: type.label,
+        count: type.count,
+        tint: Memories.memoryTypeColor(type.id, view.dim)
+      }
+    })
+    onChosen: function(id) { view.typeToggled(id) }
   }
 
   Text {
@@ -135,38 +141,6 @@ Column {
       cursorShape: Qt.PointingHandCursor
       onEntered: view.hovered(row.index)
       onClicked: view.noteChosen(row.modelData.file)
-    }
-  }
-
-  component TypeChip: Rectangle {
-    id: chip
-    required property var modelData
-    readonly property bool active: view.activeType === modelData.id
-    readonly property color tint: Memories.memoryTypeColor(modelData.id, view.dim)
-    property alias text: chipText.text
-    objectName: "memoryChip" + modelData.id
-
-    width: chipText.implicitWidth + Style.space(20)
-    height: chipText.implicitHeight + Style.space(8)
-    radius: height / 2
-    color: active ? Qt.alpha(tint, 0.35) : Qt.alpha(tint, 0.12)
-    border.width: 1
-    border.color: active ? tint : Qt.alpha(tint, 0.4)
-
-    Text {
-      id: chipText
-      anchors.centerIn: parent
-      text: chip.modelData.label + " " + chip.modelData.count
-      color: view.foreground
-      font.family: view.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: chip.active
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      cursorShape: Qt.PointingHandCursor
-      onClicked: view.typeToggled(chip.modelData.id)
     }
   }
 }

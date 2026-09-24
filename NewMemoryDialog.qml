@@ -3,6 +3,8 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
 import "core/domain/memories.js" as Memories
+import "ui/components" as UI
+import "ui/theme" as T
 
 // A modal form for a new memory note. Keeps its own field state, reset each
 // time it opens; emits createRequested(name, type, description, body).
@@ -19,6 +21,14 @@ Item {
   property color dim: Qt.darker(foreground, 1.55)
   property string fontFamily: Style.font.family
   property string type: "feedback"
+  // What the shared components draw with; Panel still passes the colours one
+  // by one, so the theme follows them.
+  property var theme: T.Theme {
+    foreground: dialog.foreground
+    dim: dialog.dim
+    urgent: dialog.urgent
+    fontFamily: dialog.fontFamily
+  }
   readonly property Item focusItem: nameField
   readonly property bool valid: nameField.text.trim() !== ""
 
@@ -87,42 +97,16 @@ Item {
         }
       }
 
-      Flow {
+      UI.ChipRow {
         width: parent.width
-        spacing: Style.space(6)
-
-        Repeater {
-          model: Memories.MEMORY_TYPES.filter(function(t) { return t.id !== "other" })
-          delegate: Rectangle {
-            id: chip
-            required property var modelData
-            readonly property bool active: dialog.type === modelData.id
-            readonly property color tint: Memories.memoryTypeColor(modelData.id, dialog.dim)
-            objectName: "newMemoryType" + modelData.id
-            width: chipText.implicitWidth + Style.space(20)
-            height: chipText.implicitHeight + Style.space(8)
-            radius: height / 2
-            color: active ? Qt.alpha(tint, 0.35) : Qt.alpha(tint, 0.12)
-            border.width: 1
-            border.color: active ? tint : Qt.alpha(tint, 0.4)
-
-            Text {
-              id: chipText
-              anchors.centerIn: parent
-              text: chip.modelData.label
-              color: dialog.foreground
-              font.family: dialog.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: chip.active
-            }
-
-            MouseArea {
-              anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
-              onClicked: dialog.type = chip.modelData.id
-            }
-          }
-        }
+        theme: dialog.theme
+        chipPrefix: "newMemoryType"
+        active: dialog.type
+        model: Memories.MEMORY_TYPES.filter(function(t) { return t.id !== "other" })
+          .map(function(t) {
+            return { id: t.id, label: t.label, tint: Memories.memoryTypeColor(t.id, dialog.dim) }
+          })
+        onChosen: function(id) { dialog.type = id }
       }
 
       TextField {

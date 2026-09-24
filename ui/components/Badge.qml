@@ -6,12 +6,18 @@ import "../theme" as T
 Rectangle {
   id: badge
 
-  property var theme: T.Theme {}
+  // The owner's Theme, or none: `palette` then falls back to the badge's own.
+  // Both are objects, and tearing a view down nulls them while the bindings
+  // below still run once, so every read of `palette` is guarded; the guard's
+  // value is never painted.
+  property var theme: null
   property string text: ""
-  property color tint: badge.theme.dim
+  property color tint: badge.palette ? badge.palette.dim : Color.foreground
   // The badges in the lists are tighter than the one in a memory's header.
   property real paddingY: Style.space(2)
   property alias textObjectName: label.objectName
+
+  readonly property var palette: badge.theme || badgeTheme
 
   width: label.implicitWidth + Style.space(12)
   height: label.implicitHeight + badge.paddingY
@@ -23,7 +29,9 @@ Rectangle {
     anchors.centerIn: parent
     text: badge.text
     color: badge.tint
-    font.family: badge.theme.fontFamily
-    font.pixelSize: badge.theme.captionSize
+    font.family: badge.palette ? badge.palette.fontFamily : Style.font.family
+    font.pixelSize: badge.palette ? badge.palette.captionSize : Style.font.caption
   }
+
+  T.Theme { id: badgeTheme }
 }

@@ -38,16 +38,22 @@ Column {
   signal revealRequested(var item)
   signal categoryToggled(string id)
 
-  Flow {
+  UI.ChipRow {
     objectName: "docChips"
     visible: view.categories.length > 0 && !view.loading && view.error === ""
     width: parent.width
-    spacing: Style.space(6)
-
-    Repeater {
-      model: view.categories
-      delegate: CategoryChip {}
-    }
+    theme: view.theme
+    chipPrefix: "docChip"
+    active: view.activeCategory
+    model: view.categories.map(function(category) {
+      return {
+        id: category.id,
+        label: category.label,
+        count: category.count,
+        tint: Documents.docCategoryColor(category.id, view.dim)
+      }
+    })
+    onChosen: function(id) { view.categoryToggled(id) }
   }
 
   Text {
@@ -141,38 +147,6 @@ Column {
       cursorShape: Qt.PointingHandCursor
       onEntered: view.hovered(row.index)
       onClicked: view.docChosen(row.modelData.path)
-    }
-  }
-
-  component CategoryChip: Rectangle {
-    id: chip
-    required property var modelData
-    readonly property bool active: view.activeCategory === modelData.id
-    property alias text: chipText.text
-    objectName: "docChip" + modelData.id
-
-    width: chipText.implicitWidth + Style.space(20)
-    height: chipText.implicitHeight + Style.space(8)
-    radius: height / 2
-    color: active ? Qt.alpha(tint, 0.35) : Qt.alpha(tint, 0.12)
-    border.width: 1
-    border.color: active ? tint : Qt.alpha(tint, 0.4)
-    readonly property color tint: Documents.docCategoryColor(modelData.id, view.dim)
-
-    Text {
-      id: chipText
-      anchors.centerIn: parent
-      text: chip.modelData.label + " " + chip.modelData.count
-      color: view.foreground
-      font.family: view.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: chip.active
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      cursorShape: Qt.PointingHandCursor
-      onClicked: view.categoryToggled(chip.modelData.id)
     }
   }
 }
