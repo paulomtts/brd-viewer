@@ -34,12 +34,16 @@ section on the right.
 - **Card detail** - kind and status badges (Milestone / Story / Subtask by
   depth; Todo / In progress / Done / Blocked), full description, a parent link
   and clickable blocked-by/children lists, resolving ids to titles.
-- **Documents** - lists the `.md` files under `docs/architecture/`,
-  `docs/specs/` and `docs/superpowers/specs/`, and `docs/audits/` (at most 500;
-  a note says when the list was cut off). Three badges above the list -
-  Architecture, Specs (both spec folders), Audits - show counts; click one to
-  filter, click it again to clear. The filter combines with the search box, and
-  each row carries its category badge.
+- **Documents** - lists every `.md` file under `docs/` (at most 500; a note says
+  when the list was cut off). Each document has one type: Architecture, Specs,
+  Standards, Audits, or Other. Set it with a `tag:` line in the file's YAML
+  frontmatter (`tag: spec`, `standard`, `audit`, `architecture`; case and
+  singular/plural do not matter); without one the folder decides
+  (`docs/architecture`, `docs/specs` and `docs/superpowers/specs`,
+  `docs/standards`, `docs/audits`), and anything else is Other. Badges above the
+  list show counts; click one to filter, click it again to clear. The filter
+  combines with the search box, and each row carries its badge. The frontmatter
+  block is not shown when a document is opened.
   Documents over 1 MB (1048576 bytes) are not displayed. A document is
   rendered as Markdown and reloads live when the file changes; links are not
   clickable, and a document that references remote images may cause them to be

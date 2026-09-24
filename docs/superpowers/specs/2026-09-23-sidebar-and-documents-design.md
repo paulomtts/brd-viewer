@@ -24,11 +24,13 @@ a left **sidebar** with a project dropdown and two sections, **Board** and
 
 ## Decisions (from the design conversation)
 
-- Documents = the selected project's Markdown files under `docs/architecture/`,
-  `docs/specs/` + `docs/superpowers/specs/` (one "Specs" category) and
-  `docs/audits/`. Category badges filter the list (one at a time, click again to
-  clear, counts shown, combined with the search box). Revised after the first
-  version, which listed the root `README.md` and all of `docs/`.
+- Documents = every `.md` under the selected project's `docs/`. Each has one
+  category (Architecture, Specs, Standards, Audits, Other): a `tag:` line in the
+  file's YAML frontmatter wins, else the folder default (`docs/architecture`,
+  `docs/specs` + `docs/superpowers/specs`, `docs/standards`, `docs/audits`),
+  else Other. Category badges filter the list (one at a time, click again to
+  clear, counts shown, combined with the search box). Revised twice: first
+  root `README.md` + `docs/**`, then four fixed folders.
 - On open, the panel shows the last project you viewed, remembered across
   restarts; if it is gone or none is stored, the first registered project.
 - The per-row trash button and the Delete key on the project list are removed
@@ -119,19 +121,23 @@ after the state was already settled is ignored, so it cannot move the selection.
 
 Prints one JSON line: `{"ok": true, "docs": [...], "truncated": false}` or
 `{"ok": false, "error": "..."}`. Each doc is `{"path", "title", "size", "category"}` (`category` is
-`architecture`, `specs` or `audits`):
+`architecture`, `specs`, `standards`, `audits` or `other`):
 
 - `path` is relative to the project root with forward slashes (`README.md`,
   `docs/specs/x.md`). The panel builds the absolute path as
   `root_path + "/" + path`.
 - Candidates: every `*.md` (case-insensitive extension) found recursively under
-  the four folders above. Hidden directories are skipped.
+  `docs/`. Hidden directories are skipped. `category` is the frontmatter `tag:`
+  (`architecture`, `spec(s)`, `standard(s)`, `audit(s)`; case-insensitive, quotes
+  and trailing `# comments` ignored; only a leading, closed `---` block counts;
+  unknown values are ignored) else the folder default else `other`; the title
+  scan skips the frontmatter.
 - **Path safety:** only regular files whose resolved path lies inside the
   resolved project root are listed; symlinks (files or directories) that escape
   the root are skipped, as are unreadable entries.
 - `title` is the text of the first line beginning `# ` within the first 64 KB,
   else the file name without extension.
-- Order: grouped Architecture, Specs, Audits; within a group, paths sorted
+- Order: grouped Architecture, Specs, Standards, Audits, Other; within a group, paths sorted
   case-insensitively.
 - Cap: at most 500 entries; `truncated` is `true` if more existed.
 - A missing project directory or no matches returns `{"ok": true, "docs": []}`.

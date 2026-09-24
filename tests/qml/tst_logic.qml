@@ -456,4 +456,23 @@ TestCase {
     compare(Logic.graphMove(nodes, "gone", "left"), "a")
     compare(Logic.graphMove([], "", "right"), "")
   }
+
+  function test_standards_and_other_are_categories() {
+    compare(Logic.docCategoryLabel("standards"), "Standards")
+    compare(Logic.docCategoryLabel("other"), "Other")
+    var docs = [{ category: "other" }, { category: "standards" }, { category: "audits" }, { category: "architecture" }]
+    compare(Logic.docCategoryCounts(docs).map(function(c) { return c.id }).join(","),
+      "architecture,standards,audits,other")
+    compare(Logic.docCategoryColor("standards", "#111111"), "#4db6ac")
+    compare(Logic.docCategoryColor("other", "#111111"), "#111111")
+  }
+
+  function test_strip_frontmatter_hides_a_leading_yaml_block() {
+    compare(Logic.stripFrontmatter("---\ntag: spec\n---\n# Title\nbody"), "# Title\nbody")
+    compare(Logic.stripFrontmatter("---\r\ntag: spec\r\n---\r\nbody"), "body")
+    compare(Logic.stripFrontmatter("# Title\n---\nnot front\n---\n"), "# Title\n---\nnot front\n---\n")
+    compare(Logic.stripFrontmatter("---\ntag: spec\nnever closed"), "---\ntag: spec\nnever closed")
+    compare(Logic.stripFrontmatter(""), "")
+    compare(Logic.stripFrontmatter(undefined), "")
+  }
 }

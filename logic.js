@@ -194,7 +194,9 @@ function docTooLarge(size) {
 var DOC_CATEGORIES = [
   { id: "architecture", label: "Architecture" },
   { id: "specs", label: "Specs" },
-  { id: "audits", label: "Audits" }
+  { id: "standards", label: "Standards" },
+  { id: "audits", label: "Audits" },
+  { id: "other", label: "Other" }
 ]
 
 function docCategoryLabel(id) {
@@ -223,6 +225,7 @@ function docCategoryCounts(docs) {
 function docCategoryColor(id, fallback) {
   if (id === "architecture") return "#b39ddb"
   if (id === "specs") return "#5fa8d3"
+  if (id === "standards") return "#4db6ac"
   if (id === "audits") return "#e2c15a"
   return fallback
 }
@@ -287,4 +290,12 @@ function graphMove(nodes, currentId, direction) {
     if (score < bestScore) { bestScore = score; best = n }
   })
   return best ? best.id : current.id
+}
+
+// Documents may open with a YAML frontmatter block (list-docs.py reads its
+// `tag:`); it is metadata, so the rendered document leaves it out.
+function stripFrontmatter(text) {
+  var value = String(text === undefined || text === null ? "" : text)
+  var m = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(value)
+  return m ? value.slice(m[0].length) : value
 }

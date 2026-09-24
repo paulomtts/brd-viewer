@@ -37,26 +37,74 @@ def test_missing_project_directory_is_an_empty_list(tmp_path):
     assert code == 0 and result == {"ok": True, "docs": [], "truncated": False}
 
 
-def test_only_the_four_documentation_folders_are_listed(tmp_path):
+def test_every_markdown_file_under_docs_is_listed_and_nothing_else(tmp_path):
     write(tmp_path / "README.md", "# Readme")
     write(tmp_path / "src" / "notes.md")
     write(tmp_path / "docs" / "loose.md")
     write(tmp_path / "docs" / "notes" / "n.md")
     write(tmp_path / "docs" / "superpowers" / "plans" / "plan.md")
-    assert run(str(tmp_path))[1]["docs"] == []
+    assert paths(run(str(tmp_path))[1]) == [
+        "docs/loose.md", "docs/notes/n.md", "docs/superpowers/plans/plan.md"]
 
 
-def test_each_folder_maps_to_its_category(tmp_path):
+def test_each_folder_maps_to_its_default_category(tmp_path):
     write(tmp_path / "docs" / "architecture" / "a.md")
     write(tmp_path / "docs" / "specs" / "s.md")
     write(tmp_path / "docs" / "superpowers" / "specs" / "ss.md")
+    write(tmp_path / "docs" / "standards" / "st.md")
     write(tmp_path / "docs" / "audits" / "u.md")
+    write(tmp_path / "docs" / "misc" / "o.md")
     assert cats(run(str(tmp_path))[1]) == {
         "docs/architecture/a.md": "architecture",
         "docs/specs/s.md": "specs",
         "docs/superpowers/specs/ss.md": "specs",
+        "docs/standards/st.md": "standards",
         "docs/audits/u.md": "audits",
+        "docs/misc/o.md": "other",
     }
+
+
+def test_a_frontmatter_tag_overrides_the_folder(tmp_path):
+    write(tmp_path / "docs" / "specs" / "s.md", "---\ntag: standards\n---\n# S\n")
+    write(tmp_path / "docs" / "loose.md", "---\ntag: audit\n---\n# L\n")
+    assert cats(run(str(tmp_path))[1]) == {
+        "docs/specs/s.md": "standards", "docs/loose.md": "audits"}
+
+
+def test_tag_values_are_forgiving_about_case_quotes_and_plurals(tmp_path):
+    for i, value in enumerate(["Spec", "SPECS", '"spec"', "'Specs'", "spec  # trailing"]):
+        write(tmp_path / "docs" / ("d%d.md" % i), "---\ntag: %s\n---\n# T\n" % value)
+    assert set(cats(run(str(tmp_path))[1]).values()) == {"specs"}
+
+
+def test_an_unknown_or_malformed_tag_falls_back_to_the_folder(tmp_path):
+    write(tmp_path / "docs" / "audits" / "a.md", "---\ntag: banana\n---\n# A\n")
+    write(tmp_path / "docs" / "audits" / "b.md", "tag: spec\n# no frontmatter fence\n")
+    write(tmp_path / "docs" / "audits" / "c.md", "---\ntag: spec\n# never closed\n")
+    write(tmp_path / "docs" / "audits" / "d.md", "# D\n\n---\ntag: spec\n---\n")
+    assert set(cats(run(str(tmp_path))[1]).values()) == {"audits"}
+
+
+def test_the_tag_key_is_the_only_one_read_and_other_keys_are_ignored(tmp_path):
+    write(tmp_path / "docs" / "x.md", "---\ntitle: Foo\nowner: me\ntag: standard\n---\n# X\n")
+    assert cats(run(str(tmp_path))[1]) == {"docs/x.md": "standards"}
+
+
+def test_the_title_skips_the_frontmatter_block(tmp_path):
+    write(tmp_path / "docs" / "x.md", "---\n# a yaml comment\ntag: spec\n---\n# Real Title\n")
+    assert run(str(tmp_path))[1]["docs"][0]["title"] == "Real Title"
+
+
+def test_results_are_grouped_by_category_then_path(tmp_path):
+    write(tmp_path / "docs" / "misc" / "z.md")
+    write(tmp_path / "docs" / "audits" / "a.md")
+    write(tmp_path / "docs" / "standards" / "s.md")
+    write(tmp_path / "docs" / "specs" / "b.md")
+    write(tmp_path / "docs" / "architecture" / "c.md")
+    write(tmp_path / "docs" / "architecture" / "B.md")
+    assert paths(run(str(tmp_path))[1]) == [
+        "docs/architecture/B.md", "docs/architecture/c.md", "docs/specs/b.md",
+        "docs/standards/s.md", "docs/audits/a.md", "docs/misc/z.md"]
 
 
 def test_both_spec_folders_share_the_specs_category_and_sort_by_path(tmp_path):
@@ -66,15 +114,6 @@ def test_both_spec_folders_share_the_specs_category_and_sort_by_path(tmp_path):
     result = run(str(tmp_path))[1]
     assert paths(result) == ["docs/specs/A.md", "docs/specs/z.md", "docs/superpowers/specs/b.md"]
     assert set(cats(result).values()) == {"specs"}
-
-
-def test_results_are_grouped_by_category_then_path(tmp_path):
-    write(tmp_path / "docs" / "audits" / "a.md")
-    write(tmp_path / "docs" / "specs" / "b.md")
-    write(tmp_path / "docs" / "architecture" / "c.md")
-    write(tmp_path / "docs" / "architecture" / "B.md")
-    assert paths(run(str(tmp_path))[1]) == [
-        "docs/architecture/B.md", "docs/architecture/c.md", "docs/specs/b.md", "docs/audits/a.md"]
 
 
 def test_nested_folders_are_searched(tmp_path):

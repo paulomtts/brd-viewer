@@ -641,7 +641,7 @@ Panel {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: { root.docError = ""; root.docText = docFile.text() }
+    onLoaded: { root.docError = ""; root.docText = Logic.stripFrontmatter(docFile.text()) }
     onLoadFailed: {
       if (docFile.path === "" || !root.selectedProject || root.selectedDocPath === "") return
       if (docFile.path === Logic.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath))
