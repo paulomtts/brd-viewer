@@ -1,7 +1,5 @@
 import QtQuick
-import QtQuick.Layouts
 import qs.Commons
-import qs.Ui
 import "core/domain/memories.js" as Memories
 import "ui/components" as UI
 import "ui/theme" as T
@@ -39,14 +37,14 @@ Column {
   signal revealRequested(var item)
   signal typeToggled(string id)
 
-  UI.ChipRow {
-    objectName: "memoryChips"
-    visible: view.types.length > 0 && !view.loading && view.error === ""
+  UI.FilterableList {
     width: parent.width
     theme: view.theme
+
+    chipsObjectName: "memoryChips"
     chipPrefix: "memoryChip"
-    active: view.activeType
-    model: view.types.map(function(type) {
+    activeChip: view.activeType
+    chips: view.types.map(function(type) {
       return {
         id: type.id,
         label: type.label,
@@ -54,13 +52,9 @@ Column {
         tint: Memories.memoryTypeColor(type.id, view.dim)
       }
     })
-    onChosen: function(id) { view.typeToggled(id) }
-  }
+    onChipToggled: function(id) { view.typeToggled(id) }
 
-  UI.ListStatus {
-    objectName: "memoriesMessage"
-    theme: view.theme
-    width: parent.width
+    statusObjectName: "memoriesMessage"
     loading: view.loading
     loadingText: "Loading memories…"
     error: view.error
@@ -70,11 +64,9 @@ Column {
       : "No " + Memories.memoryTypeLabel(view.activeType) + " memories."
     emptyText: !view.found ? "Claude Code has no memory for this project yet."
       : "No memories yet. Use ＋ New to add one."
-  }
 
-  Repeater {
-    model: view.loading || view.error !== "" ? [] : view.notes
-    delegate: NoteRow {}
+    model: view.notes
+    rowDelegate: Component { NoteRow {} }
   }
 
   component NoteRow: UI.ListRow {

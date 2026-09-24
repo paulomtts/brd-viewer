@@ -1,7 +1,5 @@
 import QtQuick
-import QtQuick.Layouts
 import qs.Commons
-import qs.Ui
 import "core/domain/documents.js" as Documents
 import "ui/components" as UI
 import "ui/theme" as T
@@ -38,14 +36,14 @@ Column {
   signal revealRequested(var item)
   signal categoryToggled(string id)
 
-  UI.ChipRow {
-    objectName: "docChips"
-    visible: view.categories.length > 0 && !view.loading && view.error === ""
+  UI.FilterableList {
     width: parent.width
     theme: view.theme
+
+    chipsObjectName: "docChips"
     chipPrefix: "docChip"
-    active: view.activeCategory
-    model: view.categories.map(function(category) {
+    activeChip: view.activeCategory
+    chips: view.categories.map(function(category) {
       return {
         id: category.id,
         label: category.label,
@@ -53,13 +51,9 @@ Column {
         tint: Documents.docCategoryColor(category.id, view.dim)
       }
     })
-    onChosen: function(id) { view.categoryToggled(id) }
-  }
+    onChipToggled: function(id) { view.categoryToggled(id) }
 
-  UI.ListStatus {
-    objectName: "docsMessage"
-    theme: view.theme
-    width: parent.width
+    statusObjectName: "docsMessage"
     loading: view.loading
     loadingText: "Loading documents…"
     error: view.error
@@ -68,11 +62,9 @@ Column {
     filteredText: view.query !== "" ? "No documents match “" + view.query + "”."
       : "No " + Documents.docCategoryLabel(view.activeCategory) + " documents."
     emptyText: "No Markdown documents found in this project."
-  }
 
-  Repeater {
-    model: view.loading || view.error !== "" ? [] : view.docs
-    delegate: DocRow {}
+    model: view.docs
+    rowDelegate: Component { DocRow {} }
   }
 
   UI.ThemedText {
