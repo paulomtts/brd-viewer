@@ -1667,7 +1667,7 @@ Panel {
         }
       }
 
-      ConfirmDialog {
+      TypedConfirmDialog {
         id: memoryConfirm
         anchors.fill: parent
         shown: root.memoryDeleteOpen

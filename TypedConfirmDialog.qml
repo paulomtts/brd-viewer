@@ -7,7 +7,7 @@ import "logic.js" as Logic
 // destructive action. Renders and emits only.
 Item {
   id: dialog
-  objectName: "confirmDialog"
+  objectName: "typedConfirmDialog"
   z: 100
 
   property bool shown: false

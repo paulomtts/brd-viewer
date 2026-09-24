@@ -2,12 +2,12 @@ import QtQuick
 import QtTest
 TestCase {
   id: tc
-  name: "ConfirmDialog"
+  name: "TypedConfirmDialog"
   when: windowShown
   visible: true
   width: 600; height: 400
 
-  Component { id: dialogC; ConfirmDialog { width: 560; height: 360; message: "Remove it?"; detail: "/some/path" } }
+  Component { id: dialogC; TypedConfirmDialog { width: 560; height: 360; message: "Remove it?"; detail: "/some/path" } }
   SignalSpy { id: confirmSpy; signalName: "confirmRequested" }
   SignalSpy { id: cancelSpy; signalName: "cancelRequested" }
 
