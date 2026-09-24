@@ -123,14 +123,23 @@ Panel {
     if (panelFlick) panelFlick.contentY = 0
   }
 
+  property var revealTarget: null
+
+  // Held arrow keys queue many reveals before the first runs; only the newest
+  // row matters, and running the stale ones scrolls to rows the cursor left.
   function scrollItemIntoView(item) {
     if (!panelFlick || !item) return
+    var pending = root.revealTarget !== null
+    root.revealTarget = item
+    if (pending) return
     Qt.callLater(function() {
-      if (!item) return
+      var target = root.revealTarget
+      root.revealTarget = null
+      if (!target || !panelFlick) return
       var margin = Style.space(6)
-      var point = item.mapToItem(panelFlick.contentItem, 0, 0)
+      var point = target.mapToItem(panelFlick.contentItem, 0, 0)
       var top = point.y
-      var bottom = top + item.height
+      var bottom = top + target.height
       var viewTop = panelFlick.contentY
       var viewBottom = viewTop + panelFlick.height
       var maxY = Math.max(0, panelFlick.contentHeight - panelFlick.height)
