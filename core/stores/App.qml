@@ -16,14 +16,32 @@ QtObject {
     onSelected: function(project) {
       app.nav.viewMode = "board"
       app.nav.resetSearch()
+      app.graph.graphCursor = ""
+      app.board.fetchBoard()
     }
-    onCleared: app.nav.viewMode = "board"
+    onCleared: {
+      app.nav.viewMode = "board"
+      app.board.applyTreeData([])
+      app.graph.graphCursor = ""
+    }
     onChosen: app.deleter.lastSnapshot = ""
     onOpened: {
       app.nav.dropdownOpen = false
       app.nav.dropdownQuery = ""
       app.deleter.onPanelOpened()
     }
+  }
+
+  readonly property BoardStore board: BoardStore {
+    project: app.projects.selectedProject
+    dbPath: app.projects.watchedDbPath
+    viewMode: app.nav.viewMode
+    searchQuery: app.nav.searchQuery
+    onErrored: function(message) { app.projects.loadError = message }
+  }
+
+  readonly property GraphStore graph: GraphStore {
+    cardRoots: app.board.cardRoots
   }
 
   readonly property ProjectDeleteStore deleter: ProjectDeleteStore {
