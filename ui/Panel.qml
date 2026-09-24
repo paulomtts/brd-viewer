@@ -5,7 +5,6 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
-import "../core/domain/documents.js" as Documents
 import "../core/stores" as Core
 import "components"
 import "components" as UI
@@ -428,65 +427,19 @@ Panel {
             onEscapePressed: appStores.memories.memoryEscape()
           }
 
-          DocumentsView {
-            visible: appStores.nav.viewMode === "documents" && !!appStores.projects.selectedProject
+          DocumentsScreen {
             width: parent.width
-            docs: appStores.docs.filteredDocs
-            query: appStores.nav.searchQuery
-            categories: Documents.docCategoryCounts(appStores.docs.docs)
-            activeCategory: appStores.docs.docCategory
-            cursorIndex: appStores.nav.cursorIndex
-            loading: appStores.docs.docsLoading
-            error: appStores.docs.docsError
-            truncated: appStores.docs.docsTruncated
-            scrollOnCursor: appStores.nav.scrollOnCursor
+            app: appStores
+            navigator: navi
             theme: panelTheme
-            onCategoryToggled: function(id) { appStores.docs.toggleDocCategory(id) }
-            onDocChosen: function(path) { navi.openDoc(path) }
-            onHovered: function(index) { navi.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
           }
 
-          Column {
-            visible: appStores.nav.viewMode === "document"
+          DocumentScreen {
             width: parent.width
-            spacing: Style.space(10)
-
-            UI.ThemedText {
-              variant: "caption"
-              theme: panelTheme
-              width: parent.width
-              text: appStores.docs.selectedDocPath
-              elide: Text.ElideMiddle
-            }
-
-            TagPicker {
-              width: parent.width
-              current: appStores.docs.selectedDocCategory
-              busy: appStores.docs.docTagBusy
-              error: appStores.docs.docTagError
-              theme: panelTheme
-              onTagChosen: function(id) { appStores.docs.setDocTag(id) }
-            }
-
-            UI.ThemedText {
-              variant: "dim"
-              theme: panelTheme
-              visible: appStores.docs.docTooLargeFlag || appStores.docs.docError !== ""
-              width: parent.width
-              text: appStores.docs.docTooLargeFlag ? "This document is too large to display." : appStores.docs.docError
-              wrapMode: Text.WordWrap
-            }
-
-            UI.ThemedText {
-              variant: "small"
-              theme: panelTheme
-              visible: !appStores.docs.docTooLargeFlag && appStores.docs.docError === ""
-              width: parent.width
-              text: appStores.docs.docText !== "" ? appStores.docs.docText : "Loading…"
-              wrapMode: Text.WordWrap
-              textFormat: Text.MarkdownText
-            }
+            app: appStores
+            navigator: navi
+            theme: panelTheme
           }
 
           CardDetailScreen {
