@@ -60,7 +60,6 @@ Item {
 
     Rectangle {
       id: node
-      required property var modelData
       readonly property bool current: view.cursorId === modelData.id
       readonly property color tint: Logic.statusColor(modelData.status, view.dim)
       objectName: "graphNode" + modelData.id
@@ -92,7 +91,7 @@ Item {
         Text {
           objectName: "graphNodeTitle"
           width: parent.width
-          text: node.modelData.title
+          text: modelData.title
           color: view.foreground
           font.family: view.fontFamily
           font.pixelSize: Style.font.body
@@ -103,7 +102,7 @@ Item {
         Text {
           objectName: "graphNodeProgress"
           width: parent.width
-          text: node.modelData.total > 0 ? node.modelData.done + "/" + node.modelData.total + " done" : "No stories"
+          text: modelData.total > 0 ? modelData.done + "/" + modelData.total + " done" : "No stories"
           color: view.dim
           font.family: view.fontFamily
           font.pixelSize: Style.font.caption
