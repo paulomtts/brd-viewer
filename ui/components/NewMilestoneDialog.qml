@@ -1,0 +1,298 @@
+import QtQuick
+import qs.Commons
+import qs.Ui
+import "../../core/domain/documents.js" as Documents
+import "../../core/domain/milestones.js" as Milestones
+import "../components" as UI
+import "../theme" as T
+
+// A modal form for a new milestone, built on the same ModalCard conventions as
+// New memory: backdrop and Escape cancel unless the job is busy, Enter in the
+// title submits, everything freezes while busy.
+//
+// Two ways in, chosen by the ChipRow: Manual (a title and a description) and
+// From spec (pick one of the project's Markdown documents and let the default
+// agent build the milestone). The owner owns the mode, the title, the
+// description and the selection -- the dialog only reports the edits; the
+// spec list's search text is the one thing it keeps for itself.
+Item {
+  id: dialog
+  objectName: "newMilestoneDialog"
+  z: 100
+
+  property bool shown: false
+  property bool busy: false
+  property string error: ""
+  // "manual" | "spec"
+  property string mode: "manual"
+  property string title: ""
+  property string description: ""
+  // Milestones.specChoices(docs): [{ title, path, category }], specs first.
+  property var specs: []
+  property string selectedSpec: ""
+  // "" when the default agent can run unattended, otherwise the reason it cannot.
+  property string agentMessage: ""
+  property string agentName: ""
+  property string agentNote: ""
+  // The one input for every colour and font: Panel passes its Theme down,
+  // and a standalone instance renders with the shell defaults.
+  property var theme: T.Theme {}
+
+  readonly property Item focusItem: dialog.mode === "spec" ? searchField : titleField
+  readonly property var visibleSpecs: Milestones.filterSpecChoices(dialog.specs, searchField.text)
+  // The index the list paints its cursor on: the selected path's row, if it
+  // survived the search.
+  readonly property int selectedIndex: {
+    var list = dialog.visibleSpecs
+    for (var i = 0; i < list.length; i++) if (list[i].path === dialog.selectedSpec) return i
+    return -1
+  }
+  readonly property bool valid: dialog.mode === "spec"
+    ? (dialog.selectedSpec !== "" && dialog.agentMessage === "")
+    : titleField.text.trim() !== ""
+
+  signal modeChosen(string mode)
+  signal titleEdited(string text)
+  signal descriptionEdited(string text)
+  signal specChosen(string path)
+  signal submitRequested()
+  signal cancelRequested()
+
+  visible: shown
+  onShownChanged: {
+    if (!shown) return
+    titleField.text = dialog.title
+    descriptionArea.text = dialog.description
+    searchField.text = ""
+  }
+
+  function cancel() {
+    if (dialog.busy) return
+    dialog.cancelRequested()
+  }
+
+  function submit() {
+    if (!dialog.valid || dialog.busy) return
+    dialog.submitRequested()
+  }
+
+  UI.ModalCard {
+    id: modal
+    anchors.fill: parent
+    shown: true
+    dismissable: !dialog.busy
+    maxWidth: Style.space(560)
+    maxHeight: modal.height - Style.space(48)
+    backdropObjectName: "newMilestoneBackdrop"
+    cardObjectName: "newMilestoneCard"
+    onDismissed: dialog.cancelRequested()
+
+    UI.ThemedText {
+      objectName: "newMilestoneHeading"
+      variant: "heading"
+      theme: dialog.theme
+      text: "New milestone"
+      font.bold: true
+    }
+
+    UI.ChipRow {
+      width: parent.width
+      theme: dialog.theme
+      busy: dialog.busy
+      chipPrefix: "milestoneMode"
+      active: dialog.mode
+      model: [{ id: "manual", label: "Manual" }, { id: "spec", label: "From spec" }]
+      onChosen: function(id) { dialog.modeChosen(id) }
+    }
+
+    // ---- Manual -----------------------------------------------------------
+
+    Column {
+      objectName: "newMilestoneManual"
+      visible: dialog.mode !== "spec"
+      width: parent.width
+      spacing: Style.space(8)
+
+      TextField {
+        id: titleField
+        objectName: "newMilestoneTitle"
+        width: parent.width
+        foreground: dialog.theme.foreground
+        placeholderText: "Title"
+        enabled: !dialog.busy
+        onTextChanged: dialog.titleEdited(text)
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) { dialog.cancel(); event.accepted = true }
+          else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { dialog.submit(); event.accepted = true }
+        }
+      }
+
+      UI.TextAreaBox {
+        id: descriptionArea
+        width: parent.width
+        height: Style.space(140)
+        editorObjectName: "newMilestoneDescription"
+        submitChords: ["ctrl-enter"]
+        placeholder: "What the milestone is for (optional)"
+        theme: dialog.theme
+        enabled: !dialog.busy
+        onEdited: function(text) { dialog.descriptionEdited(text) }
+        onEscapePressed: dialog.cancel()
+        onSubmitRequested: dialog.submit()
+      }
+    }
+
+    // ---- From spec --------------------------------------------------------
+
+    Column {
+      objectName: "newMilestoneSpecs"
+      visible: dialog.mode === "spec"
+      width: parent.width
+      spacing: Style.space(8)
+
+      TextField {
+        id: searchField
+        objectName: "newMilestoneSearch"
+        width: parent.width
+        foreground: dialog.theme.foreground
+        placeholderText: "Search documents…"
+        enabled: !dialog.busy
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) { dialog.cancel(); event.accepted = true }
+        }
+      }
+
+      Flickable {
+        id: specList
+        objectName: "newMilestoneSpecList"
+        width: parent.width
+        // The card must not grow past the panel: the list scrolls instead.
+        height: Math.min(specColumn.implicitHeight, Style.space(220))
+        contentHeight: specColumn.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+
+        UI.FilterableList {
+          id: specColumn
+          width: specList.width
+          theme: dialog.theme
+          statusObjectName: "specsMessage"
+          empty: dialog.visibleSpecs.length === 0
+          filtered: searchField.text !== ""
+          emptyText: "No documents found in this project."
+          filteredText: "No documents match “" + searchField.text + "”."
+          model: dialog.visibleSpecs
+          rowDelegate: Component { SpecRow {} }
+        }
+      }
+
+      UI.ThemedText {
+        objectName: "newMilestoneAgent"
+        variant: "caption"
+        theme: dialog.theme
+        visible: dialog.agentMessage === "" && dialog.agentName !== ""
+        width: parent.width
+        text: "Agent: " + dialog.agentName
+        elide: Text.ElideRight
+      }
+
+      UI.ThemedText {
+        objectName: "newMilestoneAgentNote"
+        variant: "caption"
+        theme: dialog.theme
+        visible: dialog.agentMessage === "" && dialog.agentNote !== ""
+        width: parent.width
+        text: dialog.agentNote
+        wrapMode: Text.WordWrap
+      }
+
+      UI.ThemedText {
+        objectName: "newMilestoneAgentMessage"
+        variant: "caption"
+        theme: dialog.theme
+        visible: dialog.agentMessage !== ""
+        width: parent.width
+        text: dialog.agentMessage
+        color: dialog.theme.urgent
+        wrapMode: Text.WordWrap
+      }
+    }
+
+    // ---- Footer -----------------------------------------------------------
+
+    UI.ThemedText {
+      objectName: "newMilestoneError"
+      variant: "caption"
+      theme: dialog.theme
+      visible: dialog.error !== ""
+      width: parent.width
+      text: dialog.error
+      color: dialog.theme.urgent
+      wrapMode: Text.WordWrap
+    }
+
+    Row {
+      spacing: Style.spacing.md
+
+      UI.ActionButton {
+        objectName: "newMilestoneCancel"
+        text: "Cancel"
+        enabled: !dialog.busy
+        opacity: 1
+        theme: dialog.theme
+        onClicked: dialog.cancel()
+      }
+
+      UI.ActionButton {
+        objectName: "newMilestoneOk"
+        text: dialog.busy ? "Working…" : dialog.mode === "spec" ? "Start" : "Create"
+        enabled: !dialog.busy && dialog.valid
+        theme: dialog.theme
+        onClicked: dialog.submit()
+      }
+    }
+  }
+
+  component SpecRow: UI.ListRow {
+    id: row
+    required property var modelData
+    required index
+    objectName: "specRow" + row.index
+
+    width: specList.width
+    theme: dialog.theme
+    cursorIndex: dialog.selectedIndex
+    onActivated: dialog.specChosen(row.modelData.path)
+
+    Row {
+      width: parent.width
+      spacing: Style.space(8)
+
+      UI.ThemedText {
+        objectName: "specRowTitle" + row.index
+        theme: dialog.theme
+        width: Math.max(0, parent.width - (rowBadge.visible ? rowBadge.width + parent.spacing : 0))
+        text: row.modelData.title
+        elide: Text.ElideRight
+      }
+
+      UI.Badge {
+        id: rowBadge
+        theme: dialog.theme
+        textObjectName: "specRowBadge" + row.index
+        visible: text !== ""
+        text: Documents.docCategoryLabel(row.modelData.category)
+        tint: Documents.docCategoryColor(row.modelData.category, dialog.theme.dim)
+      }
+    }
+
+    UI.ThemedText {
+      objectName: "specRowPath" + row.index
+      variant: "caption"
+      theme: dialog.theme
+      width: parent.width
+      text: row.modelData.path
+      elide: Text.ElideMiddle
+    }
+  }
+}
