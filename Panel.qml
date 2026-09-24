@@ -7,7 +7,6 @@ import qs.Commons
 import qs.Ui
 import "core/domain/board.js" as Board
 import "core/domain/documents.js" as Documents
-import "core/domain/graph.js" as Graph
 import "core/domain/memories.js" as Memories
 import "core/domain/projects.js" as Projects
 import "core/stores" as Core
@@ -32,7 +31,6 @@ Panel {
   readonly property var app: appStores
 
   readonly property bool documentsEnabled: true
-  property string graphCursor: ""
 
   // The stores announce what the panel still has to do itself: reload the
   // sections a project change invalidates, and put the focus where the new
@@ -40,14 +38,18 @@ Panel {
   Connections {
     target: appStores.projects
     function onSelected(project) {
-      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
-      root.fetchBoard()
+      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
       root.focusForView()
     }
     function onCleared() {
-      root.applyTreeData([])
-      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+      root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     }
+  }
+
+  // The open card left the board (a refetch dropped it): back to the list.
+  Connections {
+    target: appStores.board
+    function onListViewRequested() { root.restoreListView() }
   }
 
   Connections {
@@ -111,8 +113,8 @@ Panel {
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
   function currentList() {
-    if (appStores.nav.viewMode === "board") return root.boardCards
-    if (appStores.nav.viewMode === "entry") return root.detailLinkList
+    if (appStores.nav.viewMode === "board") return appStores.board.boardCards
+    if (appStores.nav.viewMode === "entry") return appStores.board.detailLinkList
     if (appStores.nav.viewMode === "documents") return root.filteredDocs
     if (appStores.nav.viewMode === "memories") return root.filteredMemories
     return []
@@ -137,12 +139,9 @@ Panel {
     appStores.nav.resetSearch()
   }
 
-  readonly property var graph: Graph.graphModel(root.cardRoots)
-
   function moveGraph(direction) {
-    var next = Graph.graphMove(root.graph.nodes, root.graphCursor, direction)
+    var next = appStores.graph.moveGraph(direction)
     if (next === "") return
-    root.graphCursor = next
     if (graphView) graphView.centerOn(next)
   }
 
@@ -202,16 +201,13 @@ Panel {
   }
 
   function activateGraphNode() {
-    if (root.graphCursor !== "") root.openCard(root.graphCursor)
+    var id = appStores.graph.activateGraphNode()
+    if (id !== "") root.openCard(id)
   }
 
   function displayPath(path) {
     return String(path || "").replace(/^\/home\/[^\/]+/, "~")
   }
-
-  property var cardRoots: []   // top-level cards from the last brd tree fetch
-  property var cardMap: ({})   // id -> card, from Board.indexTree
-  readonly property var statuses: ["todo", "in_progress", "done"]
 
   onOpenedChanged: if (opened) { appStores.projects.onPanelOpened(); root.focusForView() }
 
@@ -281,77 +277,16 @@ Panel {
     root.memoryEditing = false
     if (name === "documents") root.fetchDocs()
     if (name === "memories") root.fetchMemories()
-    if (name === "graph" && root.graphCursor === "" && root.graph.nodes.length > 0) root.graphCursor = root.graph.nodes[0].id
+    if (name === "graph" && appStores.graph.graphCursor === "" && appStores.graph.graph.nodes.length > 0) appStores.graph.graphCursor = appStores.graph.graph.nodes[0].id
     Qt.callLater(root.scrollToTop)
     root.focusForView()
   }
 
-  function fetchBoard() {
-    if (!appStores.projects.selectedProject) return
-    appStores.projects.loadError = ""
-    treeProc.workingDirectory = appStores.projects.selectedProject.root_path
-    treeProc.running = false
-    treeProc.running = true
-  }
-
-  function applyTreeData(roots) {
-    root.cardRoots = roots
-    var indexed = Board.indexTree(roots)
-    root.cardMap = indexed.cardMap
-    if (appStores.nav.viewMode === "entry" && !root.cardMap[root.selectedCardId]) root.restoreListView()
-  }
-
-  readonly property var visibleBoardRoots: root.cardRoots.filter(function(c) {
-    return Board.subtreeMatches(c, appStores.nav.searchQuery)
-  })
-
-  function boardColumn(status) {
-    return root.visibleBoardRoots.filter(function(c) {
-      return Board.effectiveStatus(c) === status
-    })
-  }
-
-  // All visible Board cards as one list, section by section: the order the
-  // keyboard cursor walks them in.
-  readonly property var boardCards: Board.boardOrder(root.visibleBoardRoots, root.statuses)
-
-  // The clickable rows of the card being viewed, in display order.
-  readonly property var detailLinkList: appStores.nav.viewMode === "entry"
-    ? Board.detailLinks(root.cardMap[root.selectedCardId], root.cardMap) : []
-
-  function boardIndexOf(id) {
-    for (var i = 0; i < root.boardCards.length; i++)
-      if (root.boardCards[i].id === id) return i
-    return -1
-  }
-
-  function linkIndex(section, id) {
-    for (var i = 0; i < root.detailLinkList.length; i++)
-      if (root.detailLinkList[i].section === section && root.detailLinkList[i].id === id) return i
-    return -1
-  }
-
-  function statusText(status) {
-    if (status === "todo") return "Todo"
-    if (status === "in_progress") return "In progress"
-    if (status === "done") return "Done"
-    if (status === "blocked") return "Blocked"
-    return String(status || "")
-  }
-
-  function statusLabel(status) {
-    if (status === "todo") return "Todo"
-    if (status === "in_progress") return "In Progress"
-    return "Done"
-  }
-
-  property string selectedCardId: ""
-
   function openCard(id) {
-    if (!root.cardMap[id]) return
-    if (appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph")
-      appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0, appStores.nav.viewMode)
-    selectedCardId = id
+    var from = appStores.nav.viewMode
+    if (!appStores.board.openCard(id)) return
+    if (from === "board" || from === "graph")
+      appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0, from)
     appStores.nav.viewMode = "entry"
     appStores.nav.scrollOnCursor = false
     appStores.nav.cursorIndex = 0
@@ -657,12 +592,6 @@ Panel {
     if (appStores.nav.viewMode === "document") { restoreDocumentsList(); return }
   }
 
-  function resolvedCard(id) {
-    var card = root.cardMap[id]
-    return card ? { id: id, title: card.title, status: card.status, inBoard: true }
-                : { id: id, title: id, status: "", inBoard: false }
-  }
-
   visible: true
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -721,40 +650,6 @@ Panel {
       if (docFile.path === "" || !appStores.projects.selectedProject || root.selectedDocPath === "") return
       if (docFile.path === Documents.docAbsolutePath(appStores.projects.selectedProject.root_path, root.selectedDocPath))
         root.docError = "Could not read this document."
-    }
-  }
-
-  FileView {
-    id: dbFile
-    path: appStores.projects.watchedDbPath !== "" ? appStores.projects.watchedDbPath : ""
-    watchChanges: true
-    printErrors: false
-    onFileChanged: root.fetchBoard()
-  }
-
-  Process {
-    id: treeProc
-    objectName: "treeProc"
-    command: ["brd", "tree"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        try {
-          var parsed = JSON.parse(text || "{}")
-          appStores.projects.loadError = ""
-          root.applyTreeData(parsed.data || [])
-        } catch (e) {
-          root.applyTreeData([])
-          appStores.projects.loadError = "Could not load the board for this project."
-        }
-      }
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      if (exitCode !== 0) {
-        root.applyTreeData([])
-        appStores.projects.loadError = "Could not load the board for this project."
-      }
     }
   }
 
@@ -868,7 +763,7 @@ Panel {
         if (dy === 0) return
         // Links are the cursor's targets; a card without any is just text,
         // so the arrows scroll it instead.
-        if (appStores.nav.viewMode === "entry" && root.detailLinkList.length > 0) root.moveCursor(dy)
+        if (appStores.nav.viewMode === "entry" && appStores.board.detailLinkList.length > 0) root.moveCursor(dy)
         else root.scrollBy(dy * Style.space(56))
       }
       onActivateRequested: {
@@ -958,7 +853,7 @@ Panel {
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.nav.viewMode === "memories" ? root.fetchMemories() : root.fetchBoard() }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.nav.viewMode === "memories" ? root.fetchMemories() : appStores.board.fetchBoard() }
           }
         }
 
@@ -1059,7 +954,7 @@ Panel {
             spacing: Style.space(10)
 
             Text {
-              visible: root.cardRoots.length === 0 && appStores.projects.loadError === ""
+              visible: appStores.board.cardRoots.length === 0 && appStores.projects.loadError === ""
               width: parent.width
               text: "This project's board is empty."
               color: root.dim
@@ -1069,7 +964,7 @@ Panel {
             }
 
             Text {
-              visible: root.cardRoots.length > 0 && root.visibleBoardRoots.length === 0
+              visible: appStores.board.cardRoots.length > 0 && appStores.board.visibleBoardRoots.length === 0
               width: parent.width
               text: "No cards match “" + appStores.nav.searchQuery + "”."
               color: root.dim
@@ -1079,7 +974,7 @@ Panel {
             }
 
             Repeater {
-              model: root.statuses
+              model: appStores.board.statuses
 
               Column {
                 required property string modelData
@@ -1087,18 +982,18 @@ Panel {
                 spacing: Style.space(6)
 
                 PanelSectionHeader {
-                  text: root.statusLabel(modelData) + " (" + root.boardColumn(modelData).length + ")"
+                  text: appStores.board.statusLabel(modelData) + " (" + appStores.board.boardColumn(modelData).length + ")"
                   foreground: Board.statusColor(modelData, root.foreground)
                   fontFamily: root.fontFamily
                 }
 
                 Repeater {
-                  model: root.boardColumn(modelData)
+                  model: appStores.board.boardColumn(modelData)
 
                   BoardCard {
                     required property var modelData
                     width: parent.width
-                    cardIndex: root.boardIndexOf(modelData.id)
+                    cardIndex: appStores.board.boardIndexOf(modelData.id)
                     title: modelData.title
                     status: modelData.status
                     progress: Board.subtreeCounts(modelData)
@@ -1114,13 +1009,13 @@ Panel {
             visible: appStores.nav.viewMode === "graph" && !!appStores.projects.selectedProject
             width: parent.width
             height: Math.max(Style.space(240), panelFlick.height - y - Style.space(12))
-            nodes: root.graph.nodes
-            edges: root.graph.edges
-            cursorId: root.graphCursor
+            nodes: appStores.graph.graph.nodes
+            edges: appStores.graph.graph.edges
+            cursorId: appStores.graph.graphCursor
             foreground: root.foreground
             dim: root.dim
             fontFamily: root.fontFamily
-            onNodeClicked: function(id) { root.graphCursor = id; root.openCard(id) }
+            onNodeClicked: function(id) { appStores.graph.graphCursor = id; root.openCard(id) }
           }
 
           MemoriesView {
@@ -1237,19 +1132,19 @@ Panel {
 
           Column {
             id: detailCard
-            visible: appStores.nav.viewMode === "entry" && !!root.cardMap[root.selectedCardId]
+            visible: appStores.nav.viewMode === "entry" && !!appStores.board.cardMap[appStores.board.selectedCardId]
             width: parent.width
             spacing: Style.space(10)
 
-            readonly property var card: root.cardMap[root.selectedCardId]
+            readonly property var card: appStores.board.cardMap[appStores.board.selectedCardId]
 
             DetailLink {
               visible: !!(detailCard.card && detailCard.card.parentId)
               width: parent.width
               prefix: "↑ "
               resolved: detailCard.card && detailCard.card.parentId
-                ? root.resolvedCard(detailCard.card.parentId) : ({ title: "", status: "", inBoard: false })
-              rowIndex: detailCard.card && detailCard.card.parentId ? root.linkIndex("parent", detailCard.card.parentId) : -1
+                ? appStores.board.resolvedCard(detailCard.card.parentId) : ({ title: "", status: "", inBoard: false })
+              rowIndex: detailCard.card && detailCard.card.parentId ? appStores.board.linkIndex("parent", detailCard.card.parentId) : -1
               onActivated: if (resolved.inBoard) root.openCard(detailCard.card.parentId)
             }
 
@@ -1272,7 +1167,7 @@ Panel {
               }
 
               Badge {
-                text: detailCard.card ? root.statusText(detailCard.card.status) : ""
+                text: detailCard.card ? appStores.board.statusText(detailCard.card.status) : ""
                 tone: detailCard.card ? Board.statusColor(detailCard.card.status, root.dim) : root.dim
               }
             }
@@ -1302,8 +1197,8 @@ Panel {
               DetailLink {
                 required property string modelData
                 width: parent.width
-                resolved: root.resolvedCard(modelData)
-                rowIndex: root.linkIndex("blocker", modelData)
+                resolved: appStores.board.resolvedCard(modelData)
+                rowIndex: appStores.board.linkIndex("blocker", modelData)
                 onActivated: if (resolved.inBoard) root.openCard(modelData)
               }
             }
@@ -1321,8 +1216,8 @@ Panel {
               DetailLink {
                 required property var modelData
                 width: parent.width
-                resolved: root.resolvedCard(modelData.id)
-                rowIndex: root.linkIndex("child", modelData.id)
+                resolved: appStores.board.resolvedCard(modelData.id)
+                rowIndex: appStores.board.linkIndex("child", modelData.id)
                 onActivated: root.openCard(modelData.id)
               }
             }

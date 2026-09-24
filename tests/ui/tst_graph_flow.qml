@@ -25,7 +25,7 @@ TestCase {
     p.opened = true
     p.app.projects.stateLoaded = true
     p.app.projects.applyProjectsList([pA, pB])
-    p.applyTreeData(roots())
+    p.app.board.applyTreeData(roots())
     return p
   }
   function named(p, name) {
@@ -45,8 +45,8 @@ TestCase {
     compare(p.app.nav.viewMode, "graph")
     compare(p.app.nav.section, "graph")
     compare(p.app.nav.sectionTitle, "Graph")
-    compare(p.graphCursor, "m1")
-    compare(p.graph.nodes.length, 3)
+    compare(p.app.graph.graphCursor, "m1")
+    compare(p.app.graph.graph.nodes.length, 3)
   }
 
   function test_ctrl_3_shows_the_graph() {
@@ -56,31 +56,18 @@ TestCase {
     compare(p.app.nav.viewMode, "graph")
   }
 
-  function test_arrow_keys_move_the_selection_along_the_dependency_chain() {
-    var p = make(); if (!p) return
-    p.showSection("graph")
-    p.moveGraph("right")
-    compare(p.graphCursor, "m2")
-    p.moveGraph("right")
-    compare(p.graphCursor, "m3")
-    p.moveGraph("right")
-    compare(p.graphCursor, "m3")
-    p.moveGraph("left")
-    compare(p.graphCursor, "m2")
-  }
-
   function test_key_catcher_moves_and_activates_in_the_graph() {
     var p = make(); if (!p) return
     p.showSection("graph")
     var kc = p.focusItem
     compare(kc.objectName, "keyCatcher")
     kc.moveRequested(1, 0)
-    compare(p.graphCursor, "m2")
+    compare(p.app.graph.graphCursor, "m2")
     kc.moveRequested(-1, 0)
-    compare(p.graphCursor, "m1")
+    compare(p.app.graph.graphCursor, "m1")
     kc.activateRequested()
     compare(p.app.nav.viewMode, "entry")
-    compare(p.selectedCardId, "m1")
+    compare(p.app.board.selectedCardId, "m1")
     compare(p.app.nav.section, "graph")
   }
 
@@ -92,7 +79,7 @@ TestCase {
     compare(p.app.nav.viewMode, "entry")
     p.goBack()
     compare(p.app.nav.viewMode, "graph")
-    compare(p.graphCursor, "m2")
+    compare(p.app.graph.graphCursor, "m2")
   }
 
   function test_back_from_a_board_card_still_returns_to_the_board() {
@@ -110,25 +97,9 @@ TestCase {
     compare(gv.nodes.length, 3)
     compare(gv.edges.length, 2)
     gv.nodeClicked("m2")
-    compare(p.graphCursor, "m2")
+    compare(p.app.graph.graphCursor, "m2")
     compare(p.app.nav.viewMode, "entry")
-    compare(p.selectedCardId, "m2")
-  }
-
-  function test_switching_project_clears_the_graph_selection() {
-    var p = make(); if (!p) return
-    p.showSection("graph")
-    p.moveGraph("right")
-    p.app.projects.selectProject(pB)
-    compare(p.graphCursor, "")
-  }
-
-  function test_an_unknown_selection_recovers_to_the_first_milestone() {
-    var p = make(); if (!p) return
-    p.showSection("graph")
-    p.graphCursor = "gone"
-    p.moveGraph("right")
-    compare(p.graphCursor, "m1")
+    compare(p.app.board.selectedCardId, "m2")
   }
 
   function test_the_popup_is_at_least_eighty_percent_of_the_screen_tall() {

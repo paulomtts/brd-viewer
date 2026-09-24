@@ -57,10 +57,10 @@ TestCase {
   function test_empty_registry_clears_the_selection() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA, pB])
-    p.applyTreeData([{ id: "x", title: "X", status: "todo", blocked_by: [], children: [] }])
+    p.app.board.applyTreeData([{ id: "x", title: "X", status: "todo", blocked_by: [], children: [] }])
     p.app.projects.applyProjectsList([])
     compare(p.app.projects.selectedProject, null)
-    compare(p.cardRoots.length, 0)
+    compare(p.app.board.cardRoots.length, 0)
     compare(p.app.nav.viewMode, "board")
     p.showSection("board")
     compare(p.app.nav.viewMode, "board")
@@ -116,7 +116,7 @@ TestCase {
   function test_back_from_the_board_does_nothing_and_from_a_card_returns_to_the_board() {
     var p = make(); if (!p) return
     p.app.projects.applyProjectsList([pA])
-    p.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
+    p.app.board.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
     p.goBack()
     compare(p.app.nav.viewMode, "board")
     p.app.nav.cursorIndex = 0; p.activateCursor()
@@ -145,7 +145,7 @@ TestCase {
     compare(p.focusItem.objectName, "confirmField")
     p.app.deleter.cancelDelete()
     compare(p.focusItem.objectName, "searchField")
-    p.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
+    p.app.board.applyTreeData([{ id: "m", title: "M", status: "todo", blocked_by: [], children: [] }])
     p.app.nav.cursorIndex = 0; p.activateCursor()
     compare(p.focusItem.objectName, "keyCatcher")
   }
