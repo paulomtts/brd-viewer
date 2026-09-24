@@ -41,19 +41,32 @@ def parse_args(argv):
     return root, title, desc
 
 
-def card_id(out):
-    """brd prints a JSON card; accept {"id": ...} or {"card": {"id": ...}}."""
+def parse_result(out):
+    """brd prints one JSON line: {"ok": true, "data": {"id": ...}} or
+    {"ok": false, "error": {"type": ..., "message": ...}}. Returns (id, error)."""
     try:
         data = json.loads(out)
     except ValueError:
-        return None
-    if isinstance(data, dict):
-        if isinstance(data.get("card"), dict):
-            data = data["card"]
-        value = data.get("id")
-        if isinstance(value, (str, int)) and str(value):
-            return str(value)
-    return None
+        return None, None
+    if not isinstance(data, dict):
+        return None, None
+    if data.get("ok") is True:
+        card = data.get("data")
+        value = card.get("id") if isinstance(card, dict) else None
+        if isinstance(value, str) and value:
+            return value, None
+        return None, None
+    err = data.get("error")
+    if isinstance(err, dict) and err.get("message"):
+        kind = err.get("type")
+        return None, (kind + ": " if kind else "") + str(err["message"])
+    if isinstance(err, str) and err:
+        return None, err
+    return None, None
+
+
+def tail(text):
+    return text.strip()[-500:]
 
 
 def main(argv):
@@ -77,10 +90,10 @@ def main(argv):
                               stdin=subprocess.DEVNULL, timeout=60)
     except (OSError, subprocess.TimeoutExpired) as e:
         return emit({"ok": False, "error": "Could not run brd: " + str(e)}, 1)
-    if proc.returncode != 0:
-        msg = (proc.stderr.strip() or proc.stdout.strip() or "brd failed.")
+    new_id, err = parse_result(proc.stdout)
+    if proc.returncode != 0 or err:
+        msg = err or tail(proc.stderr) or tail(proc.stdout) or "brd failed."
         return emit({"ok": False, "error": msg}, 1)
-    new_id = card_id(proc.stdout)
     if new_id is None:
         return emit({"ok": False, "error": "brd created a card but its id could not be read."}, 1)
     return emit({"ok": True, "id": new_id})
