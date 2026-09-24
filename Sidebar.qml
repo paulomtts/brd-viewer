@@ -89,6 +89,7 @@ Item {
     NavRow { objectName: "navBoard"; label: "Board"; section: "board"; enabled: sidebar.hasProject }
     NavRow { objectName: "navGraph"; label: "Graph"; section: "graph"; enabled: sidebar.hasProject }
     NavRow { objectName: "navDocuments"; label: "Documents"; section: "documents"; enabled: sidebar.hasProject && sidebar.documentsEnabled }
+    NavRow { objectName: "navMemories"; label: "Memories"; section: "memories"; enabled: sidebar.hasProject }
 
     Item { Layout.fillHeight: true }
 

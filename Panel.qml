@@ -22,7 +22,7 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string pluginDir: Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
 
-  property string viewMode: "board"   // "board" | "entry" | "documents" | "document" | "graph"
+  property string viewMode: "board"   // "board" | "entry" | "documents" | "document" | "graph" | "memories" | "memory"
   property bool dropdownOpen: false
   property string dropdownQuery: ""
   property int dropdownCursor: 0
@@ -31,9 +31,10 @@ Panel {
   property bool stateReadOk: false
 
   readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents"
+    : (viewMode === "memories" || viewMode === "memory") ? "memories"
     : viewMode === "graph" ? "graph"
     : (viewMode === "entry" && root.returnMode === "graph") ? "graph" : "board"
-  readonly property string sectionTitle: section === "documents" ? "Documents" : section === "graph" ? "Graph" : "Board"
+  readonly property string sectionTitle: section === "documents" ? "Documents" : section === "graph" ? "Graph" : section === "memories" ? "Memories" : "Board"
   readonly property bool documentsEnabled: true
   property var projects: []            // [{ root_path, name }]
   property var selectedProject: null   // { root_path, name } | null
@@ -118,12 +119,16 @@ Panel {
     if (root.viewMode === "board") return root.boardCards
     if (root.viewMode === "entry") return root.detailLinkList
     if (root.viewMode === "documents") return root.filteredDocs
+    if (root.viewMode === "memories") return root.filteredMemories
     return []
   }
 
   readonly property Item focusItem: root.deleteTarget ? confirmField
+    : root.memoryDeleteOpen ? memoryConfirm.focusItem
+    : root.newMemoryOpen ? newMemoryDialog.focusItem
+    : (root.viewMode === "memory" && root.memoryEditing) ? memoryNote.editorItem
     : root.dropdownOpen ? sidebar.filterItem
-    : (root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "graph" || !root.selectedProject) ? keyCatcher
+    : (root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory" || root.viewMode === "graph" || !root.selectedProject) ? keyCatcher
     : searchField
 
   function focusForView() {
@@ -206,6 +211,7 @@ Panel {
     var list = root.currentList()
     if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
     if (root.viewMode === "documents") root.openDoc(list[root.cursorIndex].path)
+    else if (root.viewMode === "memories") root.openMemory(list[root.cursorIndex].file)
     else root.openCard(list[root.cursorIndex].id)
   }
 
@@ -286,14 +292,14 @@ Panel {
     root.watchedDbPath = ""
     root.applyTreeData([])
     root.viewMode = "board"
-    root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
   }
 
   function selectProject(project) {
     selectedProject = project
     resetSearch()
     viewMode = "board"
-    root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
+    root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     root.watchedDbPath = ""
     resolveDbPathProc.command = ["python3", root.pluginDir + "resolve-db-path.py", project.root_path]
     resolveDbPathProc.running = false
@@ -365,22 +371,28 @@ Panel {
   // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
   // move things underneath it.
   function handleGlobalKey(event) {
-    if (!(event.modifiers & Qt.ControlModifier) || root.deleteTarget) return false
+    if (!(event.modifiers & Qt.ControlModifier) || root.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return false
     if (event.key === Qt.Key_P) { root.toggleDropdown(); return true }
     if (event.key === Qt.Key_1) { root.showSection("board"); return true }
     if (event.key === Qt.Key_2) { root.showSection("documents"); return true }
     if (event.key === Qt.Key_3) { root.showSection("graph"); return true }
+    if (event.key === Qt.Key_4) { root.showSection("memories"); return true }
+    if (event.key === Qt.Key_N && root.viewMode === "memories") { root.openNewMemory(); return true }
+    if (event.key === Qt.Key_E && root.viewMode === "memory") { root.startMemoryEdit(); return true }
     return false
   }
 
   function showSection(name) {
-    if (!root.selectedProject || root.deleteTarget) return
+    if (!root.selectedProject || root.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return
+    if (root.memoryEditing && root.memoryDraft !== root.memoryText) return
     if (name === "documents" && !root.documentsEnabled) return
     if (root.dropdownOpen) root.dropdownOpen = false
     root.resetSearch()
     root.scrollOnCursor = false
-    root.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : "board"
+    root.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : name === "memories" ? "memories" : "board"
+    root.memoryEditing = false
     if (name === "documents") root.fetchDocs()
+    if (name === "memories") root.fetchMemories()
     if (name === "graph" && root.graphCursor === "" && root.graph.nodes.length > 0) root.graphCursor = root.graph.nodes[0].id
     Qt.callLater(root.scrollToTop)
     root.focusForView()
@@ -529,7 +541,232 @@ Panel {
     root.focusForView()
   }
 
+  // ---- Memories: the project's Claude Code memory notes, read and managed via
+  // list-memories.py / memory-op.py (which back up before every change).
+  property var memories: []
+  property bool memoriesLoading: false
+  property string memoriesError: ""
+  property bool memoriesFound: true
+  property string memoryDir: ""
+  property string memoryType: ""
+  property string selectedMemory: ""
+  property string memoryText: ""
+  property string memoryReadError: ""
+  property bool memoryEditing: false
+  property string memoryDraft: ""
+  property bool memoryBusy: false
+  property string memoryOpError: ""
+  property bool newMemoryOpen: false
+  property string newMemoryError: ""
+  property bool memoryDeleteOpen: false
+  property string memoryDeleteError: ""
+  property string pendingMemoryOpen: ""
+  property int memoriesSeq: 0
+  property var memoriesProc: null
+
+  readonly property var memoryTypes: Logic.memoryTypeCounts(root.memories)
+  readonly property var filteredMemories: Logic.filterMemories(Logic.filterMemoriesByType(root.memories, root.memoryType), root.searchQuery)
+  readonly property bool canCreateMemory: root.memoryDir !== ""
+  readonly property var selectedMemoryEntry: {
+    for (var i = 0; i < root.memories.length; i++)
+      if (root.memories[i].file === root.selectedMemory) return root.memories[i]
+    return { file: root.selectedMemory, name: root.selectedMemory, description: "", type: "other" }
+  }
+
+  function resetMemories() {
+    root.memoriesSeq += 1
+    root.memories = []; root.memoriesError = ""; root.memoriesLoading = false; root.memoriesFound = true
+    root.memoryDir = ""; root.memoryType = ""; root.selectedMemory = ""; root.memoryText = ""
+    root.memoryReadError = ""; root.memoryEditing = false; root.memoryDraft = ""; root.memoryOpError = ""
+    root.newMemoryOpen = false; root.newMemoryError = ""; root.memoryDeleteOpen = false; root.memoryDeleteError = ""
+    root.pendingMemoryOpen = ""
+  }
+
+  function fetchMemories() {
+    if (!root.selectedProject) return
+    var old = root.memoriesProc
+    if (old) old.running = false
+    root.memoriesError = ""
+    root.memoriesLoading = true
+    root.memoriesSeq += 1
+    var rootPath = root.selectedProject.root_path
+    var proc = memoriesProcC.createObject(root, { forRoot: rootPath, seq: root.memoriesSeq })
+    proc.command = ["python3", root.pluginDir + "list-memories.py", rootPath]
+    root.memoriesProc = proc
+    proc.running = true
+  }
+
+  function applyMemoriesResult(text, exitCode) {
+    var result = Logic.parseMemoriesResult(text, exitCode)
+    root.memoriesLoading = false
+    root.memories = result.notes
+    root.memoriesFound = result.found
+    root.memoryDir = result.memoryDir
+    root.memoriesError = result.ok ? "" : result.error
+    if (root.pendingMemoryOpen !== "") {
+      var file = root.pendingMemoryOpen
+      root.pendingMemoryOpen = ""
+      root.openMemory(file)
+    }
+  }
+
+  function toggleMemoryType(id) {
+    root.memoryType = root.memoryType === id ? "" : id
+    root.cursorIndex = 0
+    root.scrollOnCursor = false
+    Qt.callLater(root.scrollToTop)
+  }
+
+  function openMemory(file) {
+    var known = false
+    for (var i = 0; i < root.memories.length; i++) if (root.memories[i].file === file) known = true
+    if (!known || !root.selectedProject || root.memoryDir === "") return
+    if (root.viewMode === "memories") {
+      root.returnCursor = root.cursorIndex
+      root.returnScrollY = panelFlick ? panelFlick.contentY : 0
+    }
+    root.selectedMemory = file
+    root.memoryText = ""
+    root.memoryReadError = ""
+    root.memoryEditing = false
+    root.memoryDraft = ""
+    root.memoryOpError = ""
+    root.viewMode = "memory"
+    root.scrollOnCursor = false
+    root.cursorIndex = 0
+    Qt.callLater(root.scrollToTop)
+    root.focusForView()
+  }
+
+  function restoreMemoriesList() {
+    root.selectedMemory = ""
+    root.memoryText = ""
+    root.memoryReadError = ""
+    root.memoryEditing = false
+    root.memoryDraft = ""
+    root.memoryOpError = ""
+    root.viewMode = "memories"
+    root.scrollOnCursor = false
+    root.cursorIndex = root.returnCursor
+    Qt.callLater(function() { if (panelFlick) root.scrollBy(root.returnScrollY - panelFlick.contentY) })
+    root.focusForView()
+  }
+
+  function setMemoryText(text) {
+    root.memoryText = text
+    root.memoryReadError = ""
+  }
+
+  function startMemoryEdit() {
+    if (root.viewMode !== "memory" || root.memoryEditing || root.memoryBusy || root.memoryText === "") return
+    root.memoryEditing = true
+    root.memoryDraft = root.memoryText
+    root.memoryOpError = ""
+    root.focusForView()
+  }
+
+  function cancelMemoryEdit() {
+    if (root.memoryBusy) return
+    root.memoryEditing = false
+    root.memoryDraft = ""
+    root.memoryOpError = ""
+    root.focusForView()
+  }
+
+  // Escape never throws edits away: a dirty draft stays until Cancel is chosen.
+  function memoryEscape() {
+    if (!root.memoryEditing) return
+    if (root.memoryDraft === root.memoryText) root.cancelMemoryEdit()
+    else root.memoryOpError = "You have unsaved changes. Save them, or choose Cancel to discard."
+  }
+
+  function runMemoryOp(op, file, content) {
+    memoryOpProc.op = op
+    memoryOpProc.forRoot = root.selectedProject ? root.selectedProject.root_path : ""
+    memoryOpProc.forFile = file
+    var command = ["python3", root.pluginDir + "memory-op.py", op, root.memoryDir, file]
+    if (content !== undefined) command.push(content)
+    memoryOpProc.command = command
+    root.memoryBusy = true
+    memoryOpProc.running = true
+  }
+
+  function saveMemory() {
+    if (!root.memoryEditing || root.memoryBusy || root.memoryDir === "" || root.memoryDraft === root.memoryText) return
+    root.memoryOpError = ""
+    root.runMemoryOp("save", root.selectedMemory, root.memoryDraft)
+  }
+
+  function openNewMemory() {
+    if (!root.canCreateMemory || root.memoryBusy || root.viewMode !== "memories") return
+    root.newMemoryOpen = true
+    root.newMemoryError = ""
+    root.focusForView()
+  }
+
+  function cancelNewMemory() {
+    if (root.memoryBusy) return
+    root.newMemoryOpen = false
+    root.focusForView()
+  }
+
+  function createMemory(name, type, description, body) {
+    if (root.memoryBusy || root.memoryDir === "" || String(name).trim() === "") return
+    var file = Logic.newMemoryFile(type, name, root.memories.map(function(n) { return n.file }))
+    root.newMemoryError = ""
+    root.runMemoryOp("create", file, Logic.composeMemory(name, description, type, body))
+  }
+
+  function requestMemoryDelete() {
+    if (root.viewMode !== "memory" || root.selectedMemory === "" || root.memoryBusy) return
+    root.memoryDeleteOpen = true
+    root.memoryDeleteError = ""
+    root.focusForView()
+  }
+
+  function cancelMemoryDelete() {
+    if (root.memoryBusy) return
+    root.memoryDeleteOpen = false
+    root.focusForView()
+  }
+
+  function performMemoryDelete() {
+    if (!root.memoryDeleteOpen || root.memoryBusy || root.selectedMemory === "" || root.memoryDir === "") return
+    root.memoryDeleteError = ""
+    root.runMemoryOp("delete", root.selectedMemory)
+  }
+
+  function applyMemoryOpResult(text, exitCode) {
+    var result = Logic.parseMemoryOpResult(text, exitCode)
+    var op = memoryOpProc.op
+    var sameProject = root.selectedProject && root.selectedProject.root_path === memoryOpProc.forRoot
+    root.memoryBusy = false
+    if (!sameProject) return
+    if (op === "save") {
+      if (result.ok) {
+        root.memoryText = root.memoryDraft
+        root.memoryEditing = false
+        root.memoryDraft = ""
+        root.fetchMemories()
+      } else root.memoryOpError = result.error
+    } else if (op === "create") {
+      if (result.ok) {
+        root.newMemoryOpen = false
+        root.pendingMemoryOpen = memoryOpProc.forFile
+        root.fetchMemories()
+      } else root.newMemoryError = result.error
+    } else if (op === "delete") {
+      if (result.ok) {
+        root.memoryDeleteOpen = false
+        root.restoreMemoriesList()
+        root.fetchMemories()
+      } else root.memoryDeleteError = result.error
+    }
+    root.focusForView()
+  }
+
   function goBack() {
+    if (viewMode === "memory") { if (root.memoryEditing) root.memoryEscape(); else root.restoreMemoriesList(); return }
     if (viewMode === "entry") { restoreListView(); return }
     if (viewMode === "document") { restoreDocumentsList(); return }
   }
@@ -717,6 +954,58 @@ Panel {
 
   // snapshot-and-forget.py prints one JSON line and exits 0/1; nothing here
   // assumes success until Logic.parseDeleteResult says so.
+  Component {
+    id: memoriesProcC
+    Process {
+      id: mp
+      objectName: "listMemoriesProc"
+      property string outText: ""
+      property string forRoot: ""
+      property int seq: 0
+      stdout: StdioCollector {
+        waitForEnd: true
+        onStreamFinished: mp.outText = String(text || "")
+      }
+      stderr: StdioCollector { waitForEnd: true }
+      onExited: function(exitCode) {
+        var current = root.selectedProject ? root.selectedProject.root_path : ""
+        if (mp.seq === root.memoriesSeq && mp.forRoot === current) root.applyMemoriesResult(mp.outText, exitCode)
+        mp.destroy()
+      }
+    }
+  }
+
+  Process {
+    id: memoryOpProc
+    objectName: "memoryOpProc"
+    property string op: ""
+    property string forRoot: ""
+    property string forFile: ""
+    property string outText: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: memoryOpProc.outText = String(text || "")
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      var out = memoryOpProc.outText
+      memoryOpProc.outText = ""
+      root.applyMemoryOpResult(out, exitCode)
+    }
+  }
+
+  FileView {
+    id: memoryFile
+    objectName: "memoryFile"
+    path: root.viewMode === "memory" && root.memoryDir !== "" && root.selectedMemory !== ""
+      ? Logic.memoryAbsolutePath(root.memoryDir, root.selectedMemory) : ""
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.setMemoryText(memoryFile.text())
+    onLoadFailed: if (memoryFile.path !== "") root.memoryReadError = "Could not read this memory."
+  }
+
   Process {
     id: setDocTagProc
     objectName: "setDocTagProc"
@@ -788,15 +1077,15 @@ Panel {
       objectName: "keyCatcher"
       Keys.forwardTo: [globalKeys]
       anchors.fill: parent
-      onCloseRequested: root.deleteTarget ? root.cancelDelete() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document") ? root.goBack() : root.close()))
+      onCloseRequested: root.deleteTarget ? root.cancelDelete() : root.memoryDeleteOpen ? root.cancelMemoryDelete() : root.newMemoryOpen ? root.cancelNewMemory() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
         if (root.viewMode === "graph") {
           if (dx !== 0) root.moveGraph(dx < 0 ? "left" : "right")
           else if (dy !== 0) root.moveGraph(dy < 0 ? "up" : "down")
           return
         }
-        if (dx < 0 && (root.viewMode === "entry" || root.viewMode === "document")) { root.goBack(); return }
-        if (root.viewMode !== "entry" && root.viewMode !== "document") return
+        if (dx < 0 && (root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory")) { root.goBack(); return }
+        if (root.viewMode !== "entry" && root.viewMode !== "document" && root.viewMode !== "memory") return
         if (dx > 0) { if (root.viewMode === "entry") root.activateCursor(); return }
         if (dy === 0) return
         // Links are the cursor's targets; a card without any is just text,
@@ -856,7 +1145,7 @@ Panel {
           spacing: Style.spacing.md
 
           Text {
-            visible: root.viewMode === "entry" || root.viewMode === "document"
+            visible: root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory"
             text: "‹ Back"
             color: root.foreground
             font.family: root.fontFamily
@@ -876,22 +1165,32 @@ Panel {
           }
 
           Text {
-            visible: root.viewMode === "board" || root.viewMode === "graph"
+            objectName: "newMemoryButton"
+            visible: root.viewMode === "memories" && root.canCreateMemory
+            text: "＋ New"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openNewMemory() }
+          }
+
+          Text {
+            visible: root.viewMode === "board" || root.viewMode === "graph" || root.viewMode === "memories"
             text: "⟳"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.fetchBoard() }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.viewMode === "memories" ? root.fetchMemories() : root.fetchBoard() }
           }
         }
 
         TextField {
           id: searchField
           objectName: "searchField"
-          visible: !!root.selectedProject && (root.viewMode === "board" || root.viewMode === "documents")
+          visible: !!root.selectedProject && (root.viewMode === "board" || root.viewMode === "documents" || root.viewMode === "memories")
           width: parent.width
           foreground: root.foreground
-          placeholderText: root.viewMode === "documents" ? "Search documents…" : "Search cards…"
+          placeholderText: root.viewMode === "documents" ? "Search documents…" : root.viewMode === "memories" ? "Search memories…" : "Search cards…"
           text: root.searchQuery
           Keys.forwardTo: [globalKeys]
 
@@ -1044,6 +1343,50 @@ Panel {
             dim: root.dim
             fontFamily: root.fontFamily
             onNodeClicked: function(id) { root.graphCursor = id; root.openCard(id) }
+          }
+
+          MemoriesView {
+            visible: root.viewMode === "memories" && !!root.selectedProject
+            width: parent.width
+            notes: root.filteredMemories
+            types: root.memoryTypes
+            activeType: root.memoryType
+            query: root.searchQuery
+            cursorIndex: root.cursorIndex
+            loading: root.memoriesLoading
+            found: root.memoriesFound
+            error: root.memoriesError
+            scrollOnCursor: root.scrollOnCursor
+            foreground: root.foreground
+            dim: root.dim
+            fontFamily: root.fontFamily
+            onNoteChosen: function(file) { root.openMemory(file) }
+            onHovered: function(index) { root.hoverCursor(index) }
+            onRevealRequested: function(item) { root.scrollItemIntoView(item) }
+            onTypeToggled: function(id) { root.toggleMemoryType(id) }
+          }
+
+          MemoryNoteView {
+            id: memoryNote
+            visible: root.viewMode === "memory" && !!root.selectedProject
+            width: parent.width
+            entry: root.selectedMemoryEntry
+            text: root.memoryText
+            readError: root.memoryReadError
+            editing: root.memoryEditing
+            draft: root.memoryDraft
+            busy: root.memoryBusy
+            error: root.memoryOpError
+            foreground: root.foreground
+            urgent: root.urgent
+            dim: root.dim
+            fontFamily: root.fontFamily
+            onEditRequested: root.startMemoryEdit()
+            onDeleteRequested: root.requestMemoryDelete()
+            onSaveRequested: root.saveMemory()
+            onCancelEditRequested: root.cancelMemoryEdit()
+            onDraftEdited: function(text) { root.memoryDraft = text }
+            onEscapePressed: root.memoryEscape()
           }
 
           DocumentsView {
@@ -1322,6 +1665,34 @@ Panel {
             }
           }
         }
+      }
+
+      ConfirmDialog {
+        id: memoryConfirm
+        anchors.fill: parent
+        shown: root.memoryDeleteOpen
+        message: "Type delete to permanently remove this memory note and its MEMORY.md entry. A backup is saved first."
+        detail: root.selectedMemory
+        busy: root.memoryBusy
+        error: root.memoryDeleteError
+        foreground: root.foreground
+        urgent: root.urgent
+        fontFamily: root.fontFamily
+        onConfirmRequested: root.performMemoryDelete()
+        onCancelRequested: root.cancelMemoryDelete()
+      }
+
+      NewMemoryDialog {
+        id: newMemoryDialog
+        anchors.fill: parent
+        shown: root.newMemoryOpen
+        busy: root.memoryBusy
+        error: root.newMemoryError
+        foreground: root.foreground
+        urgent: root.urgent
+        fontFamily: root.fontFamily
+        onCreateRequested: function(name, type, description, body) { root.createMemory(name, type, description, body) }
+        onCancelRequested: root.cancelNewMemory()
       }
     }
   }

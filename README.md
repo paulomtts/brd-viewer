@@ -19,7 +19,7 @@ section on the right.
   also after a shell restart. It is stored in
   `~/.local/state/brd-viewer/state.json` (`$XDG_STATE_HOME` is respected). If
   that project is no longer registered, the first one is shown.
-- **Sections** - **Board** (**Ctrl+1**), **Documents** (**Ctrl+2**) and **Graph** (**Ctrl+3**), also
+- **Sections** - **Board** (**Ctrl+1**), **Documents** (**Ctrl+2**), **Graph** (**Ctrl+3**) and **Memories** (**Ctrl+4**), also
   reachable from the sidebar with the mouse.
 - **Board** - top-level cards in three status sections (Todo / In Progress /
   Done), each showing a done/total progress badge for its subtasks. A card
@@ -31,6 +31,21 @@ section on the right.
   opens the milestone's card, and Back returns to the graph. The canvas also
   has mouse pan/zoom, `+`/`-` and on-screen zoom/organize/fit buttons. Nodes can
   be dragged for a look around, but the graph never creates or removes links.
+- **Memories** (Ctrl+4) - the project's Claude Code memory notes, from
+  `~/.claude/projects/<slug>/memory/` (the slug is the project path with every
+  non-alphanumeric character turned into `-`; if that folder is missing, a
+  project whose session transcripts record this path is used). Each note shows
+  its name, description and a type badge (User, Feedback, Project, Reference,
+  Other) that filters like the Documents badges; search matches name,
+  description and file name. Open a note to read it, then **Edit** (Ctrl+E) to
+  change its raw text (Ctrl+S saves, Escape leaves a clean editor and never
+  discards unsaved changes), **Delete** (type `delete`), or **＋ New** (Ctrl+N)
+  to create one. Every change goes through `memory-op.py`, which first copies the
+  note and `MEMORY.md` to `~/.cache/brd-viewer/memory-backups/`, replaces files
+  atomically, and keeps the note's `- [Title](file.md) - hook` line in
+  `MEMORY.md` in sync (name and description come from the note's frontmatter).
+  A project that was renamed since Claude Code stored its memory will show none,
+  because Claude Code keys memory by path; nothing is lost on disk.
 - **Card detail** - kind and status badges (Milestone / Story / Subtask by
   depth; Todo / In progress / Done / Blocked), full description, a parent link
   and clickable blocked-by/children lists, resolving ids to titles.
