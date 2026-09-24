@@ -198,3 +198,65 @@ def test_shared_python_helpers_are_defined_once():
             if needle in text:
                 seen.setdefault(needle, []).append(rel(path))
     assert all(len(v) == 1 for v in seen.values()), seen
+
+
+# ---- duplication guards ("reuse before writing a second copy") ------------------------------
+# pattern -> {file or directory prefix: why it is allowed}. Anything else is a second copy.
+GUARDS = {
+    r"Qt\.rgba\(0, 0, 0, 0\.55\)": {
+        "ui/components/ModalCard.qml": "the one modal backdrop",
+    },
+    r"radius:\s*height\s*/\s*2": {
+        "ui/components/Badge.qml": "pill primitive",
+        "ui/components/Chip.qml": "pill primitive",
+        "ui/screens/CardDetailScreen.qml": "documented: detail-panel tone pill (own tone colour and padding; not a Badge)",
+    },
+    r"bordered:\s*true": {
+        "ui/components/ActionButton.qml": "the one bordered button",
+        "vendor/canvas/": "vendored canvas controls",
+        "ui/components/Sidebar.qml": "documented CursorSurface: project dropdown button",
+        "ui/screens/BoardScreen.qml": "documented CursorSurface: BoardCard",
+    },
+    r"font\.family:": {
+        "ui/components/ThemedText.qml": "the one text primitive",
+        "vendor/": "vendored",
+        "ui/components/Badge.qml": "shared primitive owning its caption Text (resolves the family in one place)",
+        "ui/components/Chip.qml": "shared primitive owning its caption Text (resolves the family in one place)",
+        "ui/components/TextAreaBox.qml": "shared primitive owning its Controls.TextArea (resolves the family in one place)",
+    },
+    r"\bCursorSurface\s*\{": {
+        "ui/components/ListRow.qml": "the row primitive",
+        "ui/components/Sidebar.qml": "documented: project button, NavRow, ProjectItem",
+        "ui/screens/BoardScreen.qml": "documented: BoardCard",
+    },
+}
+
+
+def guard_hits(pattern, files):
+    """files: {relpath: text}; returns the relpaths containing the pattern."""
+    rx = re.compile(pattern)
+    return sorted(r for r, text in files.items() if rx.search(text))
+
+
+def allowed(relpath, allow):
+    return any(relpath == a or (a.endswith("/") and relpath.startswith(a)) for a in allow)
+
+
+def test_guard_helpers_flag_and_accept_what_they_should():
+    files = {"ui/components/ModalCard.qml": "color: Qt.rgba(0, 0, 0, 0.55)",
+             "ui/screens/X.qml": "color: Qt.rgba(0, 0, 0, 0.55)", "ui/screens/Y.qml": "color: Qt.rgba(0, 0, 0, 0.5)"}
+    hits = guard_hits(next(iter(GUARDS)), files)
+    assert hits == ["ui/components/ModalCard.qml", "ui/screens/X.qml"]
+    assert [h for h in hits if not allowed(h, GUARDS[next(iter(GUARDS))])] == ["ui/screens/X.qml"]
+    assert allowed("vendor/canvas/CanvasControls.qml", {"vendor/canvas/": "x"})
+    assert not allowed("vendor/canvasX.qml", {"vendor/canvas/": "x"})
+    assert guard_hits(r"radius:\s*height\s*/\s*2", {"a.qml": "radius:height/2"}) == ["a.qml"]
+    assert guard_hits(r"\bCursorSurface\s*\{", {"a.qml": "component R: CursorSurface {"}) == ["a.qml"]
+
+
+def test_no_second_copy_of_shared_visual_patterns():
+    files = {rel(p): p.read_text() for p in source_files(".qml")}
+    for pattern, allow in GUARDS.items():
+        assert all(allow.values())
+        extra = [h for h in guard_hits(pattern, files) if not allowed(h, allow)]
+        assert extra == [], (pattern, extra)
