@@ -310,6 +310,11 @@ Panel {
 
   // The user picked a project in the dropdown.
   function chooseProject(project) {
+    if (root.memoryEditing && root.memoryDraft !== root.memoryText) {
+      root.closeDropdown()
+      root.memoryOpError = "You have unsaved changes. Save them, or choose Cancel to discard, before switching project."
+      return
+    }
     root.closeDropdown()
     if (!project) return
     root.lastSnapshot = ""
@@ -554,6 +559,7 @@ Panel {
   property string memoryReadError: ""
   property bool memoryEditing: false
   property string memoryDraft: ""
+  property string memoryEditBase: ""
   property bool memoryBusy: false
   property string memoryOpError: ""
   property bool newMemoryOpen: false
@@ -601,12 +607,12 @@ Panel {
     root.memoriesLoading = false
     root.memories = result.notes
     root.memoriesFound = result.found
-    root.memoryDir = result.memoryDir
+    if (result.ok) root.memoryDir = result.memoryDir
     root.memoriesError = result.ok ? "" : result.error
     if (root.pendingMemoryOpen !== "") {
       var file = root.pendingMemoryOpen
       root.pendingMemoryOpen = ""
-      root.openMemory(file)
+      if (root.viewMode === "memories") root.openMemory(file)
     }
   }
 
@@ -661,6 +667,7 @@ Panel {
     if (root.viewMode !== "memory" || root.memoryEditing || root.memoryBusy || root.memoryText === "") return
     root.memoryEditing = true
     root.memoryDraft = root.memoryText
+    root.memoryEditBase = root.memoryText
     root.memoryOpError = ""
     root.focusForView()
   }
@@ -680,12 +687,13 @@ Panel {
     else root.memoryOpError = "You have unsaved changes. Save them, or choose Cancel to discard."
   }
 
-  function runMemoryOp(op, file, content) {
+  function runMemoryOp(op, file, content, expected) {
     memoryOpProc.op = op
     memoryOpProc.forRoot = root.selectedProject ? root.selectedProject.root_path : ""
     memoryOpProc.forFile = file
     var command = ["python3", root.pluginDir + "memory-op.py", op, root.memoryDir, file]
     if (content !== undefined) command.push(content)
+    if (expected !== undefined) command.push(expected)
     memoryOpProc.command = command
     root.memoryBusy = true
     memoryOpProc.running = true
@@ -694,7 +702,7 @@ Panel {
   function saveMemory() {
     if (!root.memoryEditing || root.memoryBusy || root.memoryDir === "" || root.memoryDraft === root.memoryText) return
     root.memoryOpError = ""
-    root.runMemoryOp("save", root.selectedMemory, root.memoryDraft)
+    root.runMemoryOp("save", root.selectedMemory, root.memoryDraft, root.memoryEditBase)
   }
 
   function openNewMemory() {

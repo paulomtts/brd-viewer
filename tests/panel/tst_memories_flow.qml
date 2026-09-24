@@ -306,4 +306,53 @@ TestCase {
     var p = make(); if (!p) return
     verify(findIn(p.parent, "navMemories"), "navMemories")
   }
+
+  function test_save_passes_the_text_it_was_opened_with_so_outside_edits_are_caught() {
+    var p = loaded(); if (!p) return
+    p.openMemory("feedback_a.md")
+    p.setMemoryText("opened text")
+    p.startMemoryEdit()
+    p.setMemoryText("someone else changed it")
+    p.memoryDraft = "my edit"
+    p.saveMemory()
+    compare(named(p, "memoryOpProc").command[5], "my edit")
+    compare(named(p, "memoryOpProc").command[6], "opened text")
+  }
+
+  function test_a_late_list_does_not_pull_you_into_a_new_note() {
+    var p = loaded(); if (!p) return
+    p.createMemory("Late", "user", "", "")
+    p.applyMemoryOpResult('{"ok": true, "backup": ""}', 0)
+    p.showSection("board")
+    p.applyMemoriesResult(memList.replace('"notes": [', '"notes": [{"file": "user_late.md", "name": "Late", "description": "", "type": "user", "size": 1, "indexed": true},'), 0)
+    compare(p.viewMode, "board")
+    compare(p.selectedMemory, "")
+  }
+
+  function test_a_failed_refresh_keeps_the_memory_folder_so_saving_still_works() {
+    var p = loaded(); if (!p) return
+    p.openMemory("feedback_a.md")
+    p.setMemoryText("t")
+    p.startMemoryEdit()
+    p.memoryDraft = "t2"
+    p.applyMemoriesResult('{"ok": false, "error": "boom"}', 1)
+    compare(p.memoryDir, "/c/-home-u-my-proj/memory")
+    p.saveMemory()
+    compare(p.memoryBusy, true)
+  }
+
+  function test_switching_project_is_blocked_while_an_edit_has_unsaved_changes() {
+    var p = loaded(); if (!p) return
+    p.openMemory("feedback_a.md")
+    p.setMemoryText("t")
+    p.startMemoryEdit()
+    p.memoryDraft = "unsaved"
+    p.chooseProject(pB)
+    compare(p.selectedProject.root_path, pA.root_path)
+    compare(p.memoryDraft, "unsaved")
+    verify(p.memoryOpError !== "")
+    p.cancelMemoryEdit()
+    p.chooseProject(pB)
+    compare(p.selectedProject.root_path, pB.root_path)
+  }
 }

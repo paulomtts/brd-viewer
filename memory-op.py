@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Save, create or delete one Claude Code memory note.
 
-    memory-op.py <save|create|delete> <memory_dir> <file> [content]
+    memory-op.py <save|create|delete> <memory_dir> <file> [content [expected]]
 
 <memory_dir> must be a real directory named "memory"; <file> a plain lower-case
 ".md" name other than MEMORY.md. Before anything changes, the note (if it
@@ -11,9 +11,14 @@ XDG_CACHE_HOME or ~/.cache); if that fails, nothing is changed. save and create
 keep MEMORY.md's line for the note in sync (rewritten in place, or appended);
 delete removes only that note's lines. Writes are atomic and keep the files'
 modes and the index's line-ending style.
+Runs are serialised per project with a lock so parallel invocations cannot lose
+each other's MEMORY.md lines; `create` never overwrites, and `save` with an
+`expected` text refuses if the note no longer equals it (edited elsewhere).
 Prints one JSON line: {"ok": true, "backup": "<dir or empty>"} or
 {"ok": false, "error": "..."}.
 """
+import contextlib
+import fcntl
 import json
 import os
 import shutil
@@ -57,77 +62,105 @@ def make_backup(memory_dir, files):
     return dest
 
 
+@contextlib.contextmanager
+def project_lock(memory_dir):
+    project = os.path.basename(os.path.dirname(os.path.abspath(memory_dir))) or "unknown"
+    base = os.path.join(lib.cache_root(), "brd-viewer", "memory-backups")
+    try:
+        os.makedirs(base, exist_ok=True)
+        handle = open(os.path.join(base, project + ".lock"), "w")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+    except OSError:
+        raise lib.Refused("Could not lock the memory directory, so nothing was changed.")
+    try:
+        yield
+    finally:
+        handle.close()
+
+
 def main(argv):
     if len(argv) < 3 or argv[0] not in OPS or (argv[0] != "delete" and len(argv) < 4):
         return emit({"ok": False, "error": "usage: memory-op.py <save|create|delete> <memory_dir> <file> [content]"}, 2)
     op, memory_dir, name = argv[0], argv[1], argv[2]
     try:
-        lib.check_filename(name)
+        lib.check_filename(name, creating=(op == "create"))
         data = lib.check_content(argv[3]) if op != "delete" else None
         content = argv[3] if op != "delete" else None
+        expected = argv[4] if op == "save" and len(argv) > 4 else None
 
         if os.path.basename(os.path.normpath(memory_dir)) != "memory":
             raise lib.Refused("That is not a memory directory.")
-        exists = os.path.lexists(memory_dir)
-        if exists and (os.path.islink(memory_dir) or not os.path.isdir(memory_dir)):
-            raise lib.Refused("That is not a memory directory.")
-        if not exists and (op != "create" or not os.path.isdir(os.path.dirname(os.path.abspath(memory_dir)))):
-            raise lib.Refused("This project has no memory directory.")
-        memory_real = os.path.realpath(memory_dir)
-
-        full = os.path.join(memory_dir, name)
-        note_real = os.path.realpath(full)
-        if op == "create":
-            if os.path.lexists(full):
-                raise lib.Refused("A note with that file name already exists.")
-        else:
-            if not (os.path.isfile(note_real) and lib.inside(memory_real, note_real)):
-                raise lib.Refused("Note not found.")
-
-        index_full = os.path.join(memory_dir, lib.MEMORY_INDEX)
-        index_real = os.path.realpath(index_full)
-        index_exists = os.path.lexists(index_full)
-        if index_exists and not (os.path.isfile(index_real) and lib.inside(memory_real, index_real)):
-            raise lib.Refused("MEMORY.md is not a regular file inside the memory directory.")
-        try:
-            index_text = open(index_real, "rb").read().decode("utf-8") if index_exists else ""
-        except (OSError, UnicodeDecodeError):
-            raise lib.Refused("MEMORY.md could not be read as text.")
-
-        if op == "delete":
-            new_index = lib.index_without_note(index_text, name)
-        else:
-            new_index = lib.index_with_note(index_text, name, content)
-
-        to_back_up = []
-        if op != "create":
-            to_back_up.append((name, note_real))
-        if index_exists:
-            to_back_up.append((lib.MEMORY_INDEX, index_real))
-        backup = make_backup(memory_dir, to_back_up)
-
-        if not exists:
-            os.mkdir(memory_dir)
+        with project_lock(memory_dir):
+            exists = os.path.lexists(memory_dir)
+            if exists and (os.path.islink(memory_dir) or not os.path.isdir(memory_dir)):
+                raise lib.Refused("That is not a memory directory.")
+            if not exists and (op != "create" or not os.path.isdir(os.path.dirname(os.path.abspath(memory_dir)))):
+                raise lib.Refused("This project has no memory directory.")
             memory_real = os.path.realpath(memory_dir)
-            note_real = os.path.join(memory_real, name)
-            index_real = os.path.join(memory_real, lib.MEMORY_INDEX)
 
-        if op == "delete":
-            if new_index is not None:
-                lib.write_atomic(index_real, new_index.encode("utf-8"))
-            os.remove(full)
-        else:
-            old = open(note_real, "rb").read() if op == "save" else None
-            lib.write_atomic(note_real, data)
+            full = os.path.join(memory_dir, name)
+            note_real = os.path.realpath(full)
+            if op == "create":
+                if os.path.lexists(full):
+                    raise lib.Refused("A note with that file name already exists.")
+            else:
+                if not (os.path.isfile(note_real) and lib.inside(memory_real, note_real)):
+                    raise lib.Refused("Note not found.")
+                if expected is not None:
+                    try:
+                        current = open(note_real, "rb").read().decode("utf-8")
+                    except (OSError, UnicodeDecodeError):
+                        raise lib.Refused("The note could not be read as text.")
+                    if current != expected:
+                        raise lib.Refused("The note changed on disk since you opened it. Reload it and try again.")
+
+            index_full = os.path.join(memory_dir, lib.MEMORY_INDEX)
+            index_real = os.path.realpath(index_full)
+            index_exists = os.path.lexists(index_full)
+            if index_exists and not (os.path.isfile(index_real) and lib.inside(memory_real, index_real)):
+                raise lib.Refused("MEMORY.md is not a regular file inside the memory directory.")
             try:
-                lib.write_atomic(index_real, new_index.encode("utf-8"))
-            except OSError:
-                if old is None:
-                    os.remove(note_real)
+                index_text = open(index_real, "rb").read().decode("utf-8") if index_exists else ""
+            except (OSError, UnicodeDecodeError):
+                raise lib.Refused("MEMORY.md could not be read as text.")
+
+            if op == "delete":
+                new_index = lib.index_without_note(index_text, name)
+            else:
+                new_index = lib.index_with_note(index_text, name, content)
+
+            to_back_up = []
+            if op != "create":
+                to_back_up.append((name, note_real))
+            if index_exists:
+                to_back_up.append((lib.MEMORY_INDEX, index_real))
+            backup = make_backup(memory_dir, to_back_up)
+
+            if not exists:
+                os.mkdir(memory_dir)
+                memory_real = os.path.realpath(memory_dir)
+                note_real = os.path.join(memory_real, name)
+                index_real = os.path.join(memory_real, lib.MEMORY_INDEX)
+
+            if op == "delete":
+                if new_index is not None:
+                    lib.write_atomic(index_real, new_index.encode("utf-8"))
+                os.remove(full)
+            else:
+                old = open(note_real, "rb").read() if op == "save" else None
+                if op == "create":
+                    lib.write_new(note_real, data)
                 else:
-                    lib.write_atomic(note_real, old)
-                raise
-        return emit({"ok": True, "backup": backup})
+                    lib.write_atomic(note_real, data)
+                try:
+                    lib.write_atomic(index_real, new_index.encode("utf-8"))
+                except OSError:
+                    if old is None:
+                        os.remove(note_real)
+                    else:
+                        lib.write_atomic(note_real, old)
+                    raise
+            return emit({"ok": True, "backup": backup})
     except lib.Refused as e:
         return emit({"ok": False, "error": str(e)}, 1)
     except OSError as e:

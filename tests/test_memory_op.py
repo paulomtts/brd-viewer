@@ -401,3 +401,69 @@ def test_usage_errors_exit_2(tmp_path):
                  ("explode", str(m), "a.md", "x"), ("delete", str(m))]:
         code, result = run(tmp_path, *args)
         assert code == 2 and result["ok"] is False, args
+
+
+# --- review fixes -------------------------------------------------------
+
+def test_parallel_creates_of_one_name_let_exactly_one_win(tmp_path):
+    d = memory(tmp_path)
+    env = dict(os.environ, XDG_CACHE_HOME=str(tmp_path / "cache"))
+    procs = [subprocess.Popen([sys.executable, SCRIPT, "create", str(d), "same.md", "---\nname: N%d\n---\nb%d\n" % (i, i)],
+                              stdout=subprocess.PIPE, text=True, env=env) for i in range(6)]
+    results = [json.loads(p.communicate()[0].strip().splitlines()[-1]) for p in procs]
+    assert sum(1 for r in results if r["ok"]) == 1
+    assert names(d) == ["MEMORY.md", "same.md"]
+
+
+def test_parallel_creates_of_different_notes_keep_every_index_line(tmp_path):
+    d = memory(tmp_path)
+    env = dict(os.environ, XDG_CACHE_HOME=str(tmp_path / "cache"))
+    procs = [subprocess.Popen([sys.executable, SCRIPT, "create", str(d), "n%d.md" % i, "---\nname: N%d\ndescription: h\n---\nb\n" % i],
+                              stdout=subprocess.PIPE, text=True, env=env) for i in range(12)]
+    assert all(json.loads(p.communicate()[0].strip().splitlines()[-1])["ok"] for p in procs)
+    index = (d / "MEMORY.md").read_text()
+    for i in range(12):
+        assert "(n%d.md)" % i in index
+    assert len(index.splitlines()) == 12
+
+
+def test_control_characters_in_a_file_name_are_refused_everywhere(tmp_path):
+    d = memory(tmp_path)
+    put(d / "ok.md", OLD)
+    for op in ("save", "create", "delete"):
+        for bad in ["a\nb.md", "a\rb.md", "a\tb.md", "a\x1fb.md"]:
+            args = [op, str(d), bad] + ([NEW] if op != "delete" else [])
+            refused(tmp_path, *args)
+
+
+def test_create_refuses_names_that_would_break_the_index_link_syntax(tmp_path):
+    d = memory(tmp_path)
+    for bad in ["a(b).md", "a[b].md", "a)b.md", "a]b.md"]:
+        refused(tmp_path, "create", str(d), bad, NEW)
+    assert names(d) == []
+
+
+def test_an_existing_awkward_name_can_still_be_saved_and_deleted(tmp_path):
+    d = memory(tmp_path)
+    put(d / "a(b).md", OLD)
+    ok(tmp_path, "save", str(d), "a(b).md", NEW)
+    assert (d / "a(b).md").read_text() == NEW
+    ok(tmp_path, "delete", str(d), "a(b).md")
+    assert not (d / "a(b).md").exists()
+
+
+def test_save_with_an_expected_text_refuses_when_the_note_changed_on_disk(tmp_path):
+    d = memory(tmp_path)
+    note = put(d / "a.md", OLD)
+    result = refused(tmp_path, "save", str(d), "a.md", NEW, "something else entirely")
+    assert "changed" in result["error"].lower()
+    assert note.read_text() == OLD
+    ok(tmp_path, "save", str(d), "a.md", NEW, OLD)
+    assert note.read_text() == NEW
+
+
+def test_save_without_an_expected_text_still_works(tmp_path):
+    d = memory(tmp_path)
+    note = put(d / "a.md", OLD)
+    ok(tmp_path, "save", str(d), "a.md", NEW)
+    assert note.read_text() == NEW

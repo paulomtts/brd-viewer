@@ -239,10 +239,15 @@ def index_without_note(text, filename):
 
 # --- validation ---------------------------------------------------------
 
-def check_filename(name):
-    if (not isinstance(name, str) or name in ("", ".", "..") or "/" in name or "\x00" in name
+def check_filename(name, creating=False):
+    if (not isinstance(name, str) or name in ("", ".", "..") or "/" in name
+            or any(ord(c) < 32 or ord(c) == 127 for c in name)
             or not name.endswith(".md") or name == MEMORY_INDEX):
         raise Refused("That is not a valid memory note file name.")
+    # A new name must survive the "- [Title](file.md)" index syntax; notes that
+    # already exist under other names can still be saved and deleted.
+    if creating and any(c in name for c in "()[]"):
+        raise Refused("A new note's file name cannot contain ( ) [ ].")
     return name
 
 
@@ -278,3 +283,24 @@ def write_atomic(real_path, data, mode=None):
         except OSError:
             pass
         raise
+
+
+def write_new(real_path, data, mode=0o644):
+    """Create a file that must not exist yet, atomically: the content is fully
+    written before the name appears, and a concurrent creator of the same name
+    loses (Refused) instead of being overwritten."""
+    directory = os.path.dirname(real_path)
+    fd, tmp = tempfile.mkstemp(prefix=".mem-", dir=directory)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.chmod(tmp, mode)
+        try:
+            os.link(tmp, real_path)
+        except FileExistsError:
+            raise Refused("A note with that file name already exists.")
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
