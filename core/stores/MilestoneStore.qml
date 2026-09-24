@@ -34,6 +34,7 @@ Scope {
   property string jobError: ""
   property int cardsAtStart: 0
   property int cardsFrozen: -1        // the count as it stood when the job ended
+  property bool cardsCountKnown: true // false when the job ended away from its own board
   property bool jobDismissed: false
   property string createProject: ""   // the project root the create in flight is for
 
@@ -144,8 +145,15 @@ Scope {
   // One job per shell: refused while one runs, without a spec, and without an
   // agent that can run unattended.
   function startFromSpec() {
-    if (!store.project || store.jobState === "running") return
+    if (!store.project) return
+    // One job per shell -- including one started from a project the dialog is
+    // not showing. Say so instead of ignoring the click.
+    if (store.jobState === "running") {
+      store.dialogError = "A milestone run is already in progress."
+      return
+    }
     if (!store.agentReady || store.selectedSpec === "") return
+    store.cardsCountKnown = true
     store.jobState = "running"
     store.jobProject = store.project.root_path
     store.jobAgent = store.agentInfo ? String(store.agentInfo.agent || "") : ""
@@ -184,14 +192,18 @@ Scope {
     store.endJobBookkeeping()
   }
 
-  // What every ending has in common. The count is frozen -- and the board
-  // refreshed -- only when the job's own project is the selected one: the
-  // numbers on screen belong to another project otherwise, and the job stays
-  // readable for when the user comes back to it.
+  // What every ending has in common. The count is ALWAYS frozen: a job that has
+  // ended must never keep counting later board changes as its own. It can only
+  // be counted against the job's own board, though -- when the job ends while
+  // another project is selected, the number on screen belongs to that other
+  // project, so nothing is claimed (`cardsCountKnown` is false and the UI drops
+  // the count) rather than a figure being invented. Only the board refresh is
+  // gated on the project: it is this project's board that would be refetched.
   function endJobBookkeeping() {
-    if (!store.project || store.project.root_path !== store.jobProject) return
-    store.cardsFrozen = Math.max(0, store.cardCount - store.cardsAtStart)
-    store.boardRefreshRequested()
+    var own = store.project && store.project.root_path === store.jobProject
+    store.cardsFrozen = own ? Math.max(0, store.cardCount - store.cardsAtStart) : 0
+    store.cardsCountKnown = own
+    if (own) store.boardRefreshRequested()
   }
 
   function dismissResult() {

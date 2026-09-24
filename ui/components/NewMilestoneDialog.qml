@@ -37,6 +37,13 @@ Item {
   // True while the default agent is still being looked up: nothing is known
   // yet, so OK waits rather than starting a run that may be refused.
   property bool agentChecking: false
+  // The owner's verdict on whether a run may start at all. The default is what
+  // the dialog can work out on its own, so a standalone instance behaves; Panel
+  // overrides it with the store's `agentReady`, which also knows that an agent
+  // nobody has checked yet is not one to run on.
+  property bool agentReady: !dialog.agentChecking && dialog.agentMessage === ""
+  // A milestone job is already running (one per shell), so no run can start.
+  property bool jobRunning: false
   // The documents listing's own state, so an empty list while it is still
   // being fetched never reads as "this project has no documents".
   property bool docsLoading: false
@@ -55,7 +62,7 @@ Item {
     return -1
   }
   readonly property bool valid: dialog.mode === "spec"
-    ? (dialog.selectedSpec !== "" && dialog.agentMessage === "" && !dialog.agentChecking)
+    ? (dialog.selectedSpec !== "" && dialog.agentReady && !dialog.jobRunning)
     : titleField.text.trim() !== ""
 
   signal modeChosen(string mode)
@@ -239,6 +246,17 @@ Item {
         visible: !dialog.agentChecking && dialog.agentMessage === "" && dialog.agentNote !== ""
         width: parent.width
         text: dialog.agentNote
+        wrapMode: Text.WordWrap
+      }
+
+      UI.ThemedText {
+        objectName: "newMilestoneJobRunning"
+        variant: "caption"
+        theme: dialog.theme
+        visible: dialog.jobRunning
+        width: parent.width
+        text: "A milestone run is already in progress."
+        color: dialog.theme.urgent
         wrapMode: Text.WordWrap
       }
 

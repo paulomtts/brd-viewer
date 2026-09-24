@@ -81,9 +81,11 @@ ui/Panel.qml              hosts the toolbar button/indicator and the dialog
 
 ## The agent run (`run-setup-milestone.py <project_root> <spec_path>`)
 
-1. Validate: project root is a directory; spec is a regular `.md`/text file
-   whose real path is inside the project root (same containment rule as the
-   other helpers); `brd` is on PATH; a prompt file exists.
+1. Validate: project root is a directory; the spec is a regular file whose real
+   path is inside the project root (same containment rule as the other
+   helpers); `brd` is on PATH; a prompt file exists. No extension check: the
+   picker only ever offers the project's Markdown documents, and the agent is
+   given the path to read, so refusing a file for its name would buy nothing.
 2. Resolve the agent: `omarchy-default-agent` (empty → error "No default agent
    is set"), the adapter for it (unknown/unverified → error "<agent> has no
    supported unattended mode"), `command -v` (missing → "<agent> is not

@@ -78,10 +78,14 @@ until it is next saved, and existing snapshots and backups are left in their
     `~/.local/state/omarchy-project-manager/agent-logs/<utc>-<project>.log`
     (`$XDG_STATE_HOME` is respected; the directory is `0700` and the file
     `0600`).
-  - Limits: **one job at a time**, per shell. The job is a child of the shell,
-    so restarting the shell (or logging out) kills it; the cards already
-    created stay. A run gives up after 30 minutes
-    (`OPM_AGENT_TIMEOUT_SECONDS`). The job keeps running when you switch
+  - Limits: **one job at a time**, per shell - a second Start is refused with a
+    note in the dialog, also when the run belongs to another project. The job
+    is a child of the shell, so restarting the shell (or logging out) ends it;
+    the cards already created stay. A run gives up after 30 minutes
+    (`OPM_AGENT_TIMEOUT_SECONDS`). That shutdown kills the agent's whole
+    process group - but if the shell itself is killed outright (`SIGKILL`, a
+    crash) the agent is orphaned and keeps writing cards until it finishes or
+    the time limit ends it; the log file is how you see what it did. The job keeps running when you switch
     project, but only its own project's Board shows it. Nothing the agent does
     is reviewed by the plugin - it writes cards to `brd` on your behalf.
 - **Card detail** - kind and status badges (Milestone / Story / Subtask by

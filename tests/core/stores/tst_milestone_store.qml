@@ -405,6 +405,18 @@ TestCase {
     compare(app.milestones.jobStartedAt, startedAt)
   }
 
+  // Refusing silently would read as a broken button -- especially from another
+  // project, where the running job is not even on screen.
+  function test_a_second_run_is_refused_with_a_reason() {
+    var app = startedJob(); if (!app) return
+    app.projects.chooseProject(pB)
+    specFixture(app)
+    app.milestones.startFromSpec()
+    compare(app.milestones.dialogError, "A milestone run is already in progress.")
+    compare(app.milestones.dialogOpen, true, "the dialog stays up to show it")
+    compare(app.milestones.jobProject, pA.root_path, "and the running job is untouched")
+  }
+
   // ---- the job's end
 
   function test_a_finished_run_ends_the_job_and_asks_for_a_board_refresh() {
@@ -535,12 +547,51 @@ TestCase {
     compare(app.milestones.specRunner.busy, false)
     compare(app.milestones.jobVisible, false, "but it is not this project's job")
     compare(spy.count, 0, "and this project's board is not refreshed for it")
-    // Back at its own project, the result reads correctly against its own board.
+    // The count could only be taken from another project's board, so the job
+    // claims none -- and, being frozen, never starts counting one later.
+    compare(app.milestones.cardsCountKnown, false)
     app.projects.chooseProject(pA)
     app.board.applyTreeData(cards(6))
     compare(app.milestones.jobVisible, true)
     compare(app.milestones.jobState, "done")
-    compare(app.milestones.cardsCreated, 4, "counted against the project it belongs to")
+    compare(app.milestones.cardsCreated, 0, "no card count is invented for it")
+    compare(app.milestones.cardsCountKnown, false)
+  }
+
+  // The defect this guards: a job that ended away from its own board used to
+  // leave the count live, so every later board change inflated its result.
+  function test_a_job_that_ended_elsewhere_never_counts_a_later_board() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    app.board.applyTreeData(cards(2))
+    specFixture(app)
+    app.milestones.startFromSpec()
+    var proc = app.milestones.specRunner.current
+    app.projects.chooseProject(pB)
+    proc.outText = '{"ok": true, "agent": "claude", "log": "/l/x.log", "exit_code": 0}'
+    proc.exited(0)
+    app.projects.chooseProject(pA)
+    app.board.applyTreeData(cards(30))
+    compare(app.milestones.cardsCreated, 0, "a finished job's result never moves again")
+    compare(app.milestones.cardsCountKnown, false)
+  }
+
+  // Ending on its own board is the normal case: the count is taken there and
+  // frozen, and a later refetch cannot change it.
+  function test_a_job_that_ended_at_home_freezes_the_count_it_took() {
+    var app = make(); if (!app) return
+    app.projects.chooseProject(pA)
+    app.board.applyTreeData(cards(2))
+    specFixture(app)
+    app.milestones.startFromSpec()
+    app.board.applyTreeData(cards(5))
+    var proc = app.milestones.specRunner.current
+    proc.outText = '{"ok": true, "agent": "claude", "log": "/l/x.log", "exit_code": 0}'
+    proc.exited(0)
+    compare(app.milestones.cardsCountKnown, true)
+    compare(app.milestones.cardsCreated, 3)
+    app.board.applyTreeData(cards(12))
+    compare(app.milestones.cardsCreated, 3, "later cards are not this job's")
   }
 
   // Nothing is stuck afterwards either: the next project can start its own job.

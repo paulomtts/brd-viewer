@@ -18,6 +18,7 @@ TestCase {
   Component { id: hostC; Item { width: 900; height: 700 } }
 
   property var pA: ({ root_path: "/home/u/my proj", name: "alpha" })
+  property var pB: ({ root_path: "/home/u/b", name: "beta" })
   property string agentOk: '{"agent": "claude", "supported": true, "restricted": true, "note": "reads and brd only", "installed": true}'
   property string agentNone: '{"agent": "", "supported": false, "restricted": false, "note": "", "installed": false}'
   property string docList: '{"ok": true, "docs": [' +
@@ -159,6 +160,58 @@ TestCase {
     compare(String(H.find(p, "milestoneDetail").text), "claude is not installed.")
   }
 
+  // The stub KeyboardPanel is a fixed-size Item; widening it is how a test
+  // gets a realistic panel width. 200 sidebar + 12 margin = the toolbar's
+  // left inset.
+  function widen(p, contentWidth) {
+    H.find(p, "mainPanel").width = contentWidth + 212
+    wait(50)
+    return H.find(p, "panelToolbar")
+  }
+
+  function fits(toolbar, name) {
+    var item = H.find(toolbar, name)
+    verify(item, name)
+    compare(item.visible, true, name + " is on screen")
+    var right = item.mapToItem(toolbar, 0, 0).x + item.width
+    verify(right <= toolbar.width + 1, name + " ends at " + right + " within " + toolbar.width)
+  }
+
+  // A 512 px panel is the narrow end of what the shell gives us: the trail must
+  // still be readable and nothing may hang off the edge.
+  function test_the_toolbar_fits_a_narrow_panel() {
+    var p = runningJob(); if (!p) return
+    var toolbar = widen(p, 512)
+    compare(toolbar.width, 512)
+    var crumb = H.find(p, "crumb0")
+    verify(crumb.width > 0, "the breadcrumb keeps a width (" + crumb.width + ")")
+    fits(toolbar, "crumb0")
+    fits(toolbar, "refreshButton")
+    fits(toolbar, "milestoneIndicator")
+    fits(toolbar, "milestoneCancel")
+    var indicator = H.find(p, "milestoneIndicator")
+    verify(indicator.mapToItem(toolbar, 0, 0).y >= crumb.mapToItem(toolbar, 0, 0).y + crumb.height,
+      "the indicator has a row of its own under the trail")
+    // The result state carries the longest text: a failure and its log path.
+    p.app.milestones.applyRunResult('{"ok": false, "agent": "claude", "log": "/home/u/.local/state/omarchy-project-manager/agent-logs/20260924T101500Z-my-proj.log",' +
+      ' "exit_code": 1, "error": "the agent exited with 1 before it finished writing the milestone; see the log for what it did"}',
+      1, pA.root_path)
+    wait(50)
+    fits(toolbar, "milestoneDetail")
+    fits(toolbar, "milestoneLog")
+    fits(toolbar, "milestoneDismiss")
+    fits(toolbar, "milestoneIndicator")
+  }
+
+  // Without a job the button shares the row with the trail and the refresh.
+  function test_the_new_milestone_button_fits_a_narrow_panel() {
+    var p = make(); if (!p) return
+    var toolbar = widen(p, 512)
+    verify(H.find(p, "crumb0").width > 0, "the breadcrumb keeps a width")
+    fits(toolbar, "newMilestoneButton")
+    fits(toolbar, "refreshButton")
+  }
+
   // ---- the dialog over the panel
 
   function test_the_manual_form_reaches_the_helper() {
@@ -240,6 +293,29 @@ TestCase {
     wait(50)
     compare(H.find(p, "newMilestoneOk").enabled, false)
     compare(String(H.find(p, "newMilestoneAgentMessage").text), "No default agent is set.")
+  }
+
+  // The job runs for another project, so its indicator is nowhere in sight:
+  // the dialog has to be the one to explain why Start is dead.
+  function test_a_run_for_another_project_blocks_start_and_says_why() {
+    var p = makePanel([pA, pB]); if (!p) return
+    specReady(p)
+    p.app.milestones.selectedSpec = "docs/specs/s.md"
+    p.app.milestones.startFromSpec()
+    p.navigator.chooseProject(pB)
+    wait(50)
+    compare(H.find(p, "milestoneIndicator").visible, false, "not this project's job")
+    p.app.milestones.openDialog()
+    p.app.milestones.mode = "spec"
+    var describe = p.app.milestones.describeRunner.current
+    describe.outText = agentOk
+    describe.exited(0)
+    p.app.docs.applyDocsResult(docList, 0)
+    p.app.milestones.selectedSpec = "docs/specs/s.md"
+    wait(50)
+    compare(String(H.find(p, "newMilestoneJobRunning").text), "A milestone run is already in progress.")
+    compare(H.find(p, "newMilestoneJobRunning").visible, true)
+    compare(H.find(p, "newMilestoneOk").enabled, false)
   }
 
   function test_the_dialog_takes_the_focus_and_blocks_the_global_shortcuts() {

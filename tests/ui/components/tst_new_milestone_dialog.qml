@@ -267,6 +267,35 @@ TestCase {
     compare(H.find(d, "newMilestoneOk").enabled, false)
   }
 
+  // One job per shell: a run already going is not something a second Start
+  // could ever fix, so the dialog says so and refuses.
+  function test_a_run_already_in_progress_freezes_start_and_says_so() {
+    var d = make("spec")
+    d.selectedSpec = "docs/architecture.md"
+    var line = H.find(d, "newMilestoneJobRunning")
+    verify(line, "the in-progress line")
+    compare(line.visible, false)
+    compare(H.find(d, "newMilestoneOk").enabled, true)
+    d.jobRunning = true
+    compare(line.visible, true)
+    compare(line.text, "A milestone run is already in progress.")
+    compare(H.find(d, "newMilestoneOk").enabled, false)
+    click(H.find(d, "newMilestoneOk"))
+    compare(submits.count, 0, "and nothing is submitted")
+  }
+
+  // The owner has the last word on whether a run may start: an agent nobody has
+  // checked yet has nothing to report and is still not one to run on.
+  function test_the_owner_can_veto_a_run_with_agent_ready() {
+    var d = make("spec")
+    d.selectedSpec = "docs/architecture.md"
+    compare(d.agentReady, true, "on its own the dialog trusts a silent check")
+    compare(H.find(d, "newMilestoneOk").enabled, true)
+    d.agentReady = false
+    compare(H.find(d, "newMilestoneAgentMessage").visible, false, "nothing to report")
+    compare(H.find(d, "newMilestoneOk").enabled, false, "but no run either")
+  }
+
   function test_while_the_agent_is_being_checked_ok_waits_and_the_dialog_says_so() {
     var d = make("spec")
     var checking = H.find(d, "newMilestoneAgentChecking")

@@ -14,7 +14,9 @@ import "theme" as T
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
 // project: pick a project, then view its cards as a Board.
-// Read-only -- nothing here ever calls brd add/update/delete/block.
+// Cards are read-only with one exception: New milestone, which adds cards --
+// by hand through `brd add`, or by handing a spec to the default coding agent
+// (see MilestoneStore and core/backend/milestones/).
 Panel {
   id: root
   moduleName: "paulomtts.omarchy-project-manager"
@@ -302,6 +304,9 @@ Panel {
           // crumb does what "‹ Back" used to, the ones after it open ancestors.
           UI.Breadcrumbs {
             Layout.fillWidth: true
+            // Whatever else the row carries, the trail keeps a readable stub
+            // rather than collapsing to nothing.
+            Layout.minimumWidth: Style.space(60)
             theme: panelTheme
             crumbs: navi.crumbs
             onCrumbActivated: function(index) { navi.activateCrumb(index) }
@@ -333,26 +338,32 @@ Panel {
             objectName: "newMilestoneButton"
             theme: panelTheme
             // The board list only, and only while this project has no job to
-            // show -- the indicator below takes the same spot for that.
+            // show -- the indicator below the row takes over for that.
             visible: appStores.nav.viewMode === "board" && !!appStores.projects.selectedProject
               && !appStores.milestones.jobVisible
             text: "＋ New milestone"
+            tooltipText: "New milestone"
             onClicked: appStores.milestones.openDialog()
           }
+        }
 
-          UI.MilestoneJobIndicator {
-            theme: panelTheme
-            state: appStores.milestones.jobVisible && appStores.nav.viewMode === "board"
-              ? appStores.milestones.jobState : ""
-            elapsed: root.milestoneElapsed
-            detail: appStores.milestones.jobState === "failed" ? appStores.milestones.jobError
-              : appStores.milestones.jobState === "done"
-                ? appStores.milestones.cardsCreated + (appStores.milestones.cardsCreated === 1 ? " card created" : " cards created")
-                : ""
-            logPath: appStores.milestones.jobState === "running" ? "" : appStores.milestones.jobLog
-            onCancelRequested: appStores.milestones.cancelJob()
-            onDismissRequested: appStores.milestones.dismissResult()
-          }
+        // A row of its own, under the trail: the indicator is as wide as a
+        // sentence and would squeeze the breadcrumbs to nothing on a narrow
+        // panel. `maxTextWidth` keeps its own text inside the toolbar too.
+        UI.MilestoneJobIndicator {
+          width: parent.width
+          maxTextWidth: toolbar.width
+          theme: panelTheme
+          state: appStores.milestones.jobVisible && appStores.nav.viewMode === "board"
+            ? appStores.milestones.jobState : ""
+          elapsed: root.milestoneElapsed
+          detail: appStores.milestones.jobState === "failed" ? appStores.milestones.jobError
+            : appStores.milestones.jobState === "done" && appStores.milestones.cardsCountKnown
+              ? appStores.milestones.cardsCreated + (appStores.milestones.cardsCreated === 1 ? " card created" : " cards created")
+              : ""
+          logPath: appStores.milestones.jobState === "running" ? "" : appStores.milestones.jobLog
+          onCancelRequested: appStores.milestones.cancelJob()
+          onDismissRequested: appStores.milestones.dismissResult()
         }
 
         TextField {
@@ -550,10 +561,12 @@ Panel {
         agentName: appStores.milestones.agentInfo ? String(appStores.milestones.agentInfo.agent || "") : ""
         agentNote: appStores.milestones.agentInfo ? String(appStores.milestones.agentInfo.note || "") : ""
         agentMessage: appStores.milestones.agentMessage
-        // OK follows the store's own verdict: an agent nobody has checked yet
-        // has no message and is not ready either, and that is exactly the
-        // "still checking" the dialog waits on.
-        agentChecking: !appStores.milestones.agentReady && appStores.milestones.agentMessage === ""
+        // The caption says what the check is doing; OK follows the store's own
+        // verdict, which also knows that an agent nobody has checked yet is not
+        // one to start a run on.
+        agentChecking: appStores.milestones.agentChecking
+        agentReady: appStores.milestones.agentReady
+        jobRunning: appStores.milestones.jobState === "running"
         docsLoading: appStores.docs.docsLoading
         docsError: appStores.docs.docsError
         theme: panelTheme

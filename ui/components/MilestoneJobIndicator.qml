@@ -20,6 +20,11 @@ Item {
   property string elapsed: ""
   property string detail: ""
   property string logPath: ""
+  // How wide the owner's toolbar is. 0 (the default) means "no cap": every
+  // piece of text keeps its natural width. When it is set, the detail and the
+  // log path are elided to a share of it, so a long error or a deep log path
+  // cannot push the row past the panel's edge.
+  property real maxTextWidth: 0
   // The one input for every colour and font: Panel passes its Theme down,
   // and a standalone instance renders with the shell defaults.
   property var theme: T.Theme {}
@@ -86,21 +91,28 @@ Item {
     }
 
     UI.ThemedText {
+      id: detailText
       objectName: "milestoneDetail"
       variant: "caption"
       theme: indicator.theme
       visible: indicator.detail !== ""
+      width: indicator.maxTextWidth > 0
+        ? Math.min(detailText.implicitWidth, Math.max(Style.space(80), indicator.maxTextWidth * 0.35))
+        : detailText.implicitWidth
       height: row.lineHeight
       verticalAlignment: Text.AlignVCenter
       text: indicator.detail
+      elide: Text.ElideRight
     }
 
     UI.ThemedText {
+      id: logText
       objectName: "milestoneLog"
       variant: "caption"
       theme: indicator.theme
       visible: indicator.logPath !== ""
-      width: Style.space(180)
+      width: Math.min(Style.space(180), indicator.maxTextWidth > 0
+        ? Math.max(Style.space(80), indicator.maxTextWidth * 0.3) : Style.space(180))
       height: row.lineHeight
       verticalAlignment: Text.AlignVCenter
       text: indicator.logPath
