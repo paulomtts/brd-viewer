@@ -30,6 +30,14 @@ manifest entry point.
 - `GraphStore.qml` graph model from the board, graph cursor and movement.
 - `DocumentsStore.qml` listing, category filter, open document, tagging.
 - `MemoriesStore.qml` listing, type filter, open/edit/create/delete a note.
+- `MilestoneStore.qml` the New-milestone dialog and the one agent job
+  (`idle -> running -> done|failed`): three `HelperRunner`s
+  (`create-milestone.py`, `run-setup-milestone.py`, the same with
+  `--describe`). It never reaches for the board: `App` hands it `cardCount` and
+  routes its `boardRefreshRequested()` to `board.fetchBoard()`. The spec
+  runner's guard is the project the JOB is for, not the selected one, so a run
+  that outlives a project switch is still recorded truthfully; `jobVisible`
+  decides whose panel shows it.
 
 Other `ui/` pieces: `Navigator.qml` (screen switching), `Shortcuts.qml` (key
 events to store calls; Ctrl+1..4 follow the sidebar's order: Board, Graph,
@@ -46,7 +54,9 @@ presentational),
 `Chip` and `ChipRow` (filter chips), `ModalCard` (dimmed backdrop and card),
 `TypedConfirmDialog`, `ListRow` (hover / keyboard cursor / reveal),
 `ListStatus` (loading/error/empty), `FilterableList`, `TextAreaBox`,
-`TagPicker`, `NewMemoryDialog`, `Sidebar`, and the views
+`TagPicker`, `NewMemoryDialog`, `NewMilestoneDialog` (manual / from-spec modal),
+`MilestoneJobIndicator` (the toolbar strip while a milestone job runs, and its
+result), `Sidebar`, and the views
 `DocumentsView`, `MemoriesView`, `MemoryNoteView`, `GraphView`.
 `Sidebar`'s four nav rows (Board, Graph, Documents, Memories) each lead with an
 icon glyph drawn in the theme's font; `tests/architecture/test_icon_glyphs.py`
@@ -56,8 +66,23 @@ Fonts, because a glyph the font does not have renders as an empty box.
 toolbar - the category chips of the list, and the path and type picker of an
 open document - so only the document body scrolls.
 Domain helpers: `taxonomy.js` (typed labels), `results.js` (one JSON line +
-exit code), `text.js` (`matchesQuery`); Python: `core/backend/common`
+exit code), `text.js` (`matchesQuery`), `milestones.js` (the three helper
+parsers, `agentMessage`, `formatElapsed`, the spec-list ordering and filter);
+Python: `core/backend/common`
 (`json_line`, `safe_paths`, `atomic_write`, `frontmatter`).
+`core/backend/milestones/` is the New-milestone backend:
+`create-milestone.py` (manual mode, one `brd add` with `cwd` = the project),
+`setup-milestone.md` (the prompt the agent is given),
+`agents.py` (one adapter per coding agent: the exact argv, whether the run can
+be restricted, and the `--help` lines that justify it) and
+`run-setup-milestone.py`, which resolves the default agent through
+`omarchy-default-agent`, spawns it in its own session (argv only, never a
+shell), enforces `OPM_AGENT_TIMEOUT_SECONDS` (default 1800), kills the whole
+process group on cancel or timeout, and logs to
+`${XDG_STATE_HOME:-~/.local/state}/omarchy-project-manager/agent-logs/`
+(dir `0700`, file `0600`). Only `claude` runs restricted (read plus
+`Bash(brd *)`); every other agent runs with full auto-approval, which the
+dialog states before the run starts.
 
 When a thing is needed a second time it becomes shared **before** the second
 use is written. The architecture test fails on a second copy of: the modal

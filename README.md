@@ -55,6 +55,35 @@ until it is next saved, and existing snapshots and backups are left in their
   `MEMORY.md` in sync (name and description come from the note's frontmatter).
   A project that was renamed since Claude Code stored its memory will show none,
   because Claude Code keys memory by path; nothing is lost on disk.
+- **New milestone** - in the Board list, **＋ New milestone** opens a modal with
+  two ways to create one.
+  - **Manual** - a title and an optional description go straight to
+    `brd add` in the project, and the board refreshes.
+  - **From spec** - pick one of the project's Markdown documents (the Specs
+    ones lead the list; search by title or path) and your default coding agent
+    reads it and builds the milestone, story and subtask cards with `brd`,
+    unattended. The agent is whatever `omarchy-default-agent` reports; the
+    dialog names it and says how it will run, and refuses to start when no
+    default agent is set, it is not installed, or it has no supported
+    unattended mode. Supported: `claude`, `codex`, `crush`, `copilot`, `pi`,
+    `hermes`, `gemini`, `opencode`, `cursor-agent`, `grok`, `omp`, `muse`.
+    **Only `claude` is restricted** (it runs with `--allowedTools
+    "Read Glob Grep Bash(brd *)"`, i.e. reading the project and running `brd`);
+    every other agent runs with its own full auto-approval flags, which is
+    stated in the dialog before you start.
+  - While it runs, a toolbar indicator replaces the button with the elapsed
+    time and a **Cancel** (which kills the agent's whole process group), and at
+    the end it reports how many cards appeared, or why the run failed, plus the
+    log path. The agent's output is written to
+    `~/.local/state/omarchy-project-manager/agent-logs/<utc>-<project>.log`
+    (`$XDG_STATE_HOME` is respected; the directory is `0700` and the file
+    `0600`).
+  - Limits: **one job at a time**, per shell. The job is a child of the shell,
+    so restarting the shell (or logging out) kills it; the cards already
+    created stay. A run gives up after 30 minutes
+    (`OPM_AGENT_TIMEOUT_SECONDS`). The job keeps running when you switch
+    project, but only its own project's Board shows it. Nothing the agent does
+    is reviewed by the plugin - it writes cards to `brd` on your behalf.
 - **Card detail** - kind and status badges (Milestone / Story / Subtask by
   depth; Todo / In progress / Done / Blocked), full description, a parent link
   and clickable blocked-by/children lists, resolving ids to titles.
@@ -109,8 +138,13 @@ until it is next saved, and existing snapshots and backups are left in their
 The plugin runs `brd` (`brd projects`, `brd tree`), plus small helpers in its
 `core/backend/<domain>/` folders: `projects/resolve-db-path.py`,
 `projects/viewer-state.py` (remembers the last project),
-`documents/list-docs.py` (lists a project's documents) and
-`projects/snapshot-and-forget.py` (the delete flow).
+`documents/list-docs.py` (lists a project's documents),
+`projects/snapshot-and-forget.py` (the delete flow), and the New-milestone
+pair: `milestones/create-milestone.py` (manual mode: one `brd add`) and
+`milestones/run-setup-milestone.py` (the unattended agent run, plus
+`--describe` for which agent the dialog will use), which builds its prompt from
+`milestones/setup-milestone.md` and resolves the agent's argv through
+`milestones/agents.py`.
 
 ## Install
 

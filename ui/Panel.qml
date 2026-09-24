@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "../core/domain/milestones.js" as Milestones
 import "../core/stores" as Core
 import "components"
 import "components" as UI
@@ -76,6 +77,33 @@ Panel {
     function onListViewRequested() { navi.restoreListView() }
   }
 
+  // From-spec mode picks one of the project's Markdown documents, so the
+  // documents listing has to exist by the time the list is drawn. The store
+  // never reaches for another store: the panel does the fetching, once -- a
+  // listing already in hand is reused.
+  Connections {
+    target: appStores.milestones
+    function onModeChanged() {
+      if (appStores.milestones.mode !== "spec") return
+      if (appStores.docs.docs.length > 0 || appStores.docs.docsLoading) return
+      appStores.docs.fetchDocs()
+    }
+  }
+
+  // The running job's clock: one tick a second while it runs, so the elapsed
+  // time below is recomputed. Nothing else in the panel polls.
+  property real milestoneNow: 0
+  Timer {
+    interval: 1000
+    repeat: true
+    triggeredOnStart: true
+    running: appStores.milestones.jobState === "running"
+    onTriggered: root.milestoneNow = Date.now()
+  }
+  readonly property string milestoneElapsed: appStores.milestones.jobState === "running"
+    ? Milestones.formatElapsed(Math.max(0, root.milestoneNow - appStores.milestones.jobStartedAt))
+    : ""
+
   Connections {
     target: appStores.deleter
     function onRequested() { root.focusForView() }
@@ -120,6 +148,7 @@ Panel {
   readonly property Item focusItem: appStores.deleter.deleteTarget ? deleteModal.focusItem
     : appStores.memories.memoryDeleteOpen ? memoryConfirm.focusItem
     : appStores.memories.newMemoryOpen ? newMemoryDialog.focusItem
+    : appStores.milestones.dialogOpen ? newMilestoneDialog.focusItem
     : (appStores.nav.viewMode === "memory" && appStores.memories.memoryEditing) ? memoryNoteScreen.editorItem
     : appStores.nav.dropdownOpen ? sidebar.filterItem
     : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "graph" || !appStores.projects.selectedProject) ? keyCatcher
@@ -298,6 +327,31 @@ Panel {
             visible: appStores.nav.viewMode === "memories" && appStores.memories.canCreateMemory
             text: "＋ New"
             onClicked: appStores.memories.openNewMemory()
+          }
+
+          UI.ActionButton {
+            objectName: "newMilestoneButton"
+            theme: panelTheme
+            // The board list only, and only while this project has no job to
+            // show -- the indicator below takes the same spot for that.
+            visible: appStores.nav.viewMode === "board" && !!appStores.projects.selectedProject
+              && !appStores.milestones.jobVisible
+            text: "＋ New milestone"
+            onClicked: appStores.milestones.openDialog()
+          }
+
+          UI.MilestoneJobIndicator {
+            theme: panelTheme
+            state: appStores.milestones.jobVisible && appStores.nav.viewMode === "board"
+              ? appStores.milestones.jobState : ""
+            elapsed: root.milestoneElapsed
+            detail: appStores.milestones.jobState === "failed" ? appStores.milestones.jobError
+              : appStores.milestones.jobState === "done"
+                ? appStores.milestones.cardsCreated + (appStores.milestones.cardsCreated === 1 ? " card created" : " cards created")
+                : ""
+            logPath: appStores.milestones.jobState === "running" ? "" : appStores.milestones.jobLog
+            onCancelRequested: appStores.milestones.cancelJob()
+            onDismissRequested: appStores.milestones.dismissResult()
           }
         }
 
@@ -480,6 +534,36 @@ Panel {
         theme: panelTheme
         onCreateRequested: function(name, type, description, body) { appStores.memories.createMemory(name, type, description, body) }
         onCancelRequested: appStores.memories.cancelNewMemory()
+      }
+
+      NewMilestoneDialog {
+        id: newMilestoneDialog
+        anchors.fill: parent
+        shown: appStores.milestones.dialogOpen
+        busy: appStores.milestones.dialogBusy
+        error: appStores.milestones.dialogError
+        mode: appStores.milestones.mode
+        title: appStores.milestones.title
+        description: appStores.milestones.description
+        specs: Milestones.specChoices(appStores.docs.docs)
+        selectedSpec: appStores.milestones.selectedSpec
+        agentName: appStores.milestones.agentInfo ? String(appStores.milestones.agentInfo.agent || "") : ""
+        agentNote: appStores.milestones.agentInfo ? String(appStores.milestones.agentInfo.note || "") : ""
+        agentMessage: appStores.milestones.agentMessage
+        // OK follows the store's own verdict: an agent nobody has checked yet
+        // has no message and is not ready either, and that is exactly the
+        // "still checking" the dialog waits on.
+        agentChecking: !appStores.milestones.agentReady && appStores.milestones.agentMessage === ""
+        docsLoading: appStores.docs.docsLoading
+        docsError: appStores.docs.docsError
+        theme: panelTheme
+        onModeChosen: function(mode) { appStores.milestones.mode = mode }
+        onTitleEdited: function(text) { appStores.milestones.title = text }
+        onDescriptionEdited: function(text) { appStores.milestones.description = text }
+        onSpecChosen: function(path) { appStores.milestones.selectedSpec = path }
+        onSubmitRequested: appStores.milestones.mode === "spec"
+          ? appStores.milestones.startFromSpec() : appStores.milestones.createManual()
+        onCancelRequested: appStores.milestones.cancelDialog()
       }
     }
   }
