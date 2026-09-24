@@ -98,7 +98,7 @@ Panel {
       focusForView: root.focusForView,
       scrollToTop: root.scrollToTop,
       scrollBy: root.scrollBy,
-      centerOnGraphNode: function(id) { if (graphView) graphView.centerOn(id) }
+      centerOnGraphNode: function(id) { if (graphScreen.graphView) graphScreen.graphView.centerOn(id) }
     })
   }
   readonly property var navigator: navi
@@ -380,16 +380,13 @@ Panel {
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
           }
 
-          GraphView {
-            id: graphView
-            visible: appStores.nav.viewMode === "graph" && !!appStores.projects.selectedProject
+          GraphScreen {
+            id: graphScreen
             width: parent.width
-            height: Math.max(Style.space(240), panelFlick.height - y - Style.space(12))
-            nodes: appStores.graph.graph.nodes
-            edges: appStores.graph.graph.edges
-            cursorId: appStores.graph.graphCursor
+            viewportHeight: panelFlick.height
+            app: appStores
+            navigator: navi
             theme: panelTheme
-            onNodeClicked: function(id) { appStores.graph.graphCursor = id; navi.openCard(id) }
           }
 
           MemoriesView {
