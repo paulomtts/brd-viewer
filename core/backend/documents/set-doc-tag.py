@@ -11,11 +11,14 @@ every other byte, the line-ending style and the file mode are preserved. The
 file is replaced atomically, and left alone when nothing would change.
 Prints one JSON line: {"ok": true, "changed": bool} or {"ok": false, "error"}.
 """
-import json
 import os
-import shutil
 import sys
-import tempfile
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from common import frontmatter  # noqa: E402
+from common.atomic_write import write_atomic  # noqa: E402
+from common.json_line import emit  # noqa: E402
+from common.safe_paths import contained_file  # noqa: E402
 
 MAX_BYTES = 1024 * 1024
 CANONICAL = {
@@ -30,15 +33,6 @@ class Refused(Exception):
     pass
 
 
-def emit(payload, code=0):
-    print(json.dumps(payload))
-    return code
-
-
-def inside(root_real, path_real):
-    return path_real == root_real or path_real.startswith(root_real + os.sep)
-
-
 def resolve(root, rel):
     if not os.path.isdir(root):
         raise Refused("Project folder not found.")
@@ -46,65 +40,10 @@ def resolve(root, rel):
     if (not rel or rel.startswith("/") or ".." in parts or parts[0] != "docs"
             or not rel.lower().endswith(".md")):
         raise Refused("Only Markdown documents under docs/ can be tagged.")
-    root_real = os.path.realpath(root)
-    real = os.path.realpath(os.path.join(root, rel))
-    if not (inside(root_real, real) and os.path.isfile(real)):
+    real = contained_file(root, rel)
+    if real is None:
         raise Refused("Document not found in this project.")
     return real
-
-
-def is_tag_line(line):
-    key, sep, _ = line.partition(":")
-    return bool(sep) and key.strip().lower() == "tag"
-
-
-def edit(text, tag):
-    """text with its tag set (canonical name) or removed (tag is None)."""
-    first = text.find("\n")
-    newline = "\r\n" if first > 0 and text[first - 1] == "\r" else "\n"
-    lines = text.splitlines(keepends=True)
-    close = None
-    if lines and lines[0].rstrip("\r\n").strip() == "---":
-        for i in range(1, len(lines)):
-            if lines[i].rstrip("\r\n").strip() == "---":
-                close = i
-                break
-
-    if close is None:
-        if tag is None:
-            return text
-        return "---" + newline + "tag: " + tag + newline + "---" + newline + text
-
-    front = lines[1:close]
-    kept, placed = [], False
-    for line in front:
-        if is_tag_line(line.rstrip("\r\n")):
-            if tag is not None and not placed:
-                kept.append("tag: " + tag + newline)
-                placed = True
-            continue
-        kept.append(line)
-    if tag is not None and not placed:
-        kept.append("tag: " + tag + newline)
-    if tag is None and not "".join(kept).strip():
-        return "".join(lines[close + 1:])
-    return "".join([lines[0]] + kept + lines[close:])
-
-
-def write_atomic(real, data):
-    directory = os.path.dirname(real)
-    fd, tmp = tempfile.mkstemp(prefix=".tag-", dir=directory)
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        shutil.copymode(real, tmp)
-        os.replace(tmp, real)
-    except BaseException:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
 
 
 def main(argv):
@@ -128,7 +67,7 @@ def main(argv):
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
             raise Refused("This document is not valid UTF-8 text.")
-        updated = edit(text, tag)
+        updated = frontmatter.set_key(text, "tag", tag)
         if updated == text:
             return emit({"ok": True, "changed": False})
         write_atomic(real, updated.encode("utf-8"))

@@ -89,7 +89,7 @@ Panel {
     root.docTagError = ""
     root.docTagBusy = true
     setDocTagProc.forRoot = root.selectedProject.root_path
-    setDocTagProc.command = ["python3", root.pluginDir + "set-doc-tag.py",
+    setDocTagProc.command = ["python3", root.pluginDir + "core/backend/documents/set-doc-tag.py",
       root.selectedProject.root_path, root.selectedDocPath, id]
     setDocTagProc.running = true
   }
@@ -502,7 +502,7 @@ Panel {
     root.docsSeq += 1
     var rootPath = root.selectedProject.root_path
     var proc = docsProcC.createObject(root, { forRoot: rootPath, seq: root.docsSeq })
-    proc.command = ["python3", root.pluginDir + "list-docs.py", rootPath]
+    proc.command = ["python3", root.pluginDir + "core/backend/documents/list-docs.py", rootPath]
     root.docsProc = proc
     proc.running = true
   }

@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "core", "backend", "documents")
 SCRIPT = os.path.join(HERE, "set-doc-tag.py")
 LIST = os.path.join(HERE, "list-docs.py")
 

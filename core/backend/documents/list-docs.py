@@ -14,9 +14,13 @@ the resolved project root are listed; symlinked directories are never followed
 and hidden directories are skipped. Results are grouped by category (in the
 order below), then by path.
 """
-import json
 import os
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from common import frontmatter  # noqa: E402
+from common.json_line import emit  # noqa: E402
+from common.safe_paths import inside  # noqa: E402
 
 MAX_ENTRIES = 500
 HEAD_BYTES = 65536
@@ -40,15 +44,6 @@ TAG_ALIASES = {
 }
 
 
-def emit(payload, code=0):
-    print(json.dumps(payload))
-    return code
-
-
-def inside(root_real, path_real):
-    return path_real == root_real or path_real.startswith(root_real + os.sep)
-
-
 def read_head(path):
     try:
         with open(path, "rb") as f:
@@ -57,23 +52,9 @@ def read_head(path):
         return ""
 
 
-def split_frontmatter(text):
-    """(frontmatter lines, body lines). No closed leading --- block means none."""
-    lines = text.splitlines()
-    if lines and lines[0].strip() == "---":
-        for i in range(1, len(lines)):
-            if lines[i].strip() == "---":
-                return lines[1:i], lines[i + 1:]
-    return [], lines
-
-
 def tag_of(front):
-    for line in front:
-        key, sep, value = line.partition(":")
-        if sep and key.strip().lower() == "tag":
-            value = value.split("#", 1)[0].strip().strip("\"'").strip().lower()
-            return TAG_ALIASES.get(value)
-    return None
+    value = frontmatter.value(front, "tag")
+    return None if value is None else TAG_ALIASES.get(value.lower())
 
 
 def title_of(body, fallback):
@@ -122,7 +103,7 @@ def main(argv):
         if not (os.path.isfile(real) and inside(root_real, real) and os.access(real, os.R_OK)):
             continue
         stem = os.path.splitext(os.path.basename(rel))[0]
-        front, body = split_frontmatter(read_head(real))
+        front, body = frontmatter.split(read_head(real))
         docs.append({"path": rel, "title": title_of(body, stem), "size": os.path.getsize(real),
                      "category": tag_of(front) or folder_default(rel)})
 

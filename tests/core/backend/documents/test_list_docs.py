@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "list-docs.py")
+SCRIPT = os.path.join(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."), "core", "backend", "documents", "list-docs.py")
 
 
 def run(*args):
