@@ -19,12 +19,14 @@ QtObject {
       app.graph.graphCursor = ""
       app.board.fetchBoard()
       app.docs.reset()
+      app.memories.resetMemories()
     }
     onCleared: {
       app.nav.viewMode = "board"
       app.board.applyTreeData([])
       app.graph.graphCursor = ""
       app.docs.reset()
+      app.memories.resetMemories()
     }
     onChosen: app.deleter.lastSnapshot = ""
     onOpened: {
@@ -48,6 +50,17 @@ QtObject {
     viewMode: app.nav.viewMode
     searchQuery: app.nav.searchQuery
     onCategoryToggled: {
+      app.nav.cursorIndex = 0
+      app.nav.scrollOnCursor = false
+    }
+  }
+
+  readonly property MemoriesStore memories: MemoriesStore {
+    backendDir: app.backendDir
+    project: app.projects.selectedProject
+    viewMode: app.nav.viewMode
+    searchQuery: app.nav.searchQuery
+    onTypeToggled: {
       app.nav.cursorIndex = 0
       app.nav.scrollOnCursor = false
     }

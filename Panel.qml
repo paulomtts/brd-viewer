@@ -7,7 +7,6 @@ import qs.Commons
 import qs.Ui
 import "core/domain/board.js" as Board
 import "core/domain/documents.js" as Documents
-import "core/domain/memories.js" as Memories
 import "core/domain/projects.js" as Projects
 import "core/stores" as Core
 
@@ -38,11 +37,7 @@ Panel {
   Connections {
     target: appStores.projects
     function onSelected(project) {
-      root.resetMemories()
       root.focusForView()
-    }
-    function onCleared() {
-      root.resetMemories()
     }
   }
 
@@ -51,6 +46,16 @@ Panel {
   Connections {
     target: appStores.docs
     function onCategoryToggled() { Qt.callLater(root.scrollToTop) }
+  }
+
+  // The memories store asks for the navigation and focus work it does not do
+  // itself: the same list/note bookkeeping the panel does everywhere else.
+  Connections {
+    target: appStores.memories
+    function onTypeToggled() { Qt.callLater(root.scrollToTop) }
+    function onNoteOpenRequested(file) { root.openMemory(file) }
+    function onListRestoreRequested() { root.restoreMemoriesList() }
+    function onFocusRequested() { root.focusForView() }
   }
 
   // The open card left the board (a refetch dropped it): back to the list.
@@ -72,14 +77,14 @@ Panel {
     if (appStores.nav.viewMode === "board") return appStores.board.boardCards
     if (appStores.nav.viewMode === "entry") return appStores.board.detailLinkList
     if (appStores.nav.viewMode === "documents") return appStores.docs.filteredDocs
-    if (appStores.nav.viewMode === "memories") return root.filteredMemories
+    if (appStores.nav.viewMode === "memories") return appStores.memories.filteredMemories
     return []
   }
 
   readonly property Item focusItem: appStores.deleter.deleteTarget ? confirmField
-    : root.memoryDeleteOpen ? memoryConfirm.focusItem
-    : root.newMemoryOpen ? newMemoryDialog.focusItem
-    : (appStores.nav.viewMode === "memory" && root.memoryEditing) ? memoryNote.editorItem
+    : appStores.memories.memoryDeleteOpen ? memoryConfirm.focusItem
+    : appStores.memories.newMemoryOpen ? newMemoryDialog.focusItem
+    : (appStores.nav.viewMode === "memory" && appStores.memories.memoryEditing) ? memoryNote.editorItem
     : appStores.nav.dropdownOpen ? sidebar.filterItem
     : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "graph" || !appStores.projects.selectedProject) ? keyCatcher
     : searchField
@@ -168,11 +173,11 @@ Panel {
   onOpenedChanged: if (opened) { appStores.projects.onPanelOpened(); root.focusForView() }
 
   // The user picked a project in the dropdown. A dirty memory draft blocks the
-  // switch (memory state still lives here).
+  // switch.
   function chooseProject(project) {
-    if (root.memoryEditing && root.memoryDraft !== root.memoryText) {
+    if (appStores.memories.memoryEditing && appStores.memories.memoryDraft !== appStores.memories.memoryText) {
       root.closeDropdown()
-      root.memoryOpError = "You have unsaved changes. Save them, or choose Cancel to discard, before switching project."
+      appStores.memories.memoryOpError = "You have unsaved changes. Save them, or choose Cancel to discard, before switching project."
       return
     }
     root.closeDropdown()
@@ -211,28 +216,28 @@ Panel {
   // key. Ignored while a delete confirmation is open so a stray Ctrl+P cannot
   // move things underneath it.
   function handleGlobalKey(event) {
-    if (!(event.modifiers & Qt.ControlModifier) || appStores.deleter.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return false
+    if (!(event.modifiers & Qt.ControlModifier) || appStores.deleter.deleteTarget || appStores.memories.memoryDeleteOpen || appStores.memories.newMemoryOpen) return false
     if (event.key === Qt.Key_P) { root.toggleDropdown(); return true }
     if (event.key === Qt.Key_1) { root.showSection("board"); return true }
     if (event.key === Qt.Key_2) { root.showSection("documents"); return true }
     if (event.key === Qt.Key_3) { root.showSection("graph"); return true }
     if (event.key === Qt.Key_4) { root.showSection("memories"); return true }
-    if (event.key === Qt.Key_N && appStores.nav.viewMode === "memories") { root.openNewMemory(); return true }
-    if (event.key === Qt.Key_E && appStores.nav.viewMode === "memory") { root.startMemoryEdit(); return true }
+    if (event.key === Qt.Key_N && appStores.nav.viewMode === "memories") { appStores.memories.openNewMemory(); return true }
+    if (event.key === Qt.Key_E && appStores.nav.viewMode === "memory") { appStores.memories.startMemoryEdit(); return true }
     return false
   }
 
   function showSection(name) {
-    if (!appStores.projects.selectedProject || appStores.deleter.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return
-    if (root.memoryEditing && root.memoryDraft !== root.memoryText) return
+    if (!appStores.projects.selectedProject || appStores.deleter.deleteTarget || appStores.memories.memoryDeleteOpen || appStores.memories.newMemoryOpen) return
+    if (appStores.memories.memoryEditing && appStores.memories.memoryDraft !== appStores.memories.memoryText) return
     if (name === "documents" && !root.documentsEnabled) return
     if (appStores.nav.dropdownOpen) appStores.nav.dropdownOpen = false
     root.resetSearch()
     appStores.nav.scrollOnCursor = false
     appStores.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : name === "memories" ? "memories" : "board"
-    root.memoryEditing = false
+    appStores.memories.memoryEditing = false
     if (name === "documents") appStores.docs.fetchDocs()
-    if (name === "memories") root.fetchMemories()
+    if (name === "memories") appStores.memories.fetchMemories()
     if (name === "graph" && appStores.graph.graphCursor === "" && appStores.graph.graph.nodes.length > 0) appStores.graph.graphCursor = appStores.graph.graph.nodes[0].id
     Qt.callLater(root.scrollToTop)
     root.focusForView()
@@ -281,95 +286,12 @@ Panel {
     root.focusForView()
   }
 
-  // ---- Memories: the project's Claude Code memory notes, read and managed via
-  // list-memories.py / memory-op.py (which back up before every change).
-  property var memories: []
-  property bool memoriesLoading: false
-  property string memoriesError: ""
-  property bool memoriesFound: true
-  property string memoryDir: ""
-  property string memoryType: ""
-  property string selectedMemory: ""
-  property string memoryText: ""
-  property string memoryReadError: ""
-  property bool memoryEditing: false
-  property string memoryDraft: ""
-  property string memoryEditBase: ""
-  property bool memoryBusy: false
-  property string memoryOpError: ""
-  property bool newMemoryOpen: false
-  property string newMemoryError: ""
-  property bool memoryDeleteOpen: false
-  property string memoryDeleteError: ""
-  property string pendingMemoryOpen: ""
-  property int memoriesSeq: 0
-  property var memoriesProc: null
-
-  readonly property var memoryTypes: Memories.memoryTypeCounts(root.memories)
-  readonly property var filteredMemories: Memories.filterMemories(Memories.filterMemoriesByType(root.memories, root.memoryType), appStores.nav.searchQuery)
-  readonly property bool canCreateMemory: root.memoryDir !== ""
-  readonly property var selectedMemoryEntry: {
-    for (var i = 0; i < root.memories.length; i++)
-      if (root.memories[i].file === root.selectedMemory) return root.memories[i]
-    return { file: root.selectedMemory, name: root.selectedMemory, description: "", type: "other" }
-  }
-
-  function resetMemories() {
-    root.memoriesSeq += 1
-    root.memories = []; root.memoriesError = ""; root.memoriesLoading = false; root.memoriesFound = true
-    root.memoryDir = ""; root.memoryType = ""; root.selectedMemory = ""; root.memoryText = ""
-    root.memoryReadError = ""; root.memoryEditing = false; root.memoryDraft = ""; root.memoryOpError = ""
-    root.newMemoryOpen = false; root.newMemoryError = ""; root.memoryDeleteOpen = false; root.memoryDeleteError = ""
-    root.pendingMemoryOpen = ""
-  }
-
-  function fetchMemories() {
-    if (!appStores.projects.selectedProject) return
-    var old = root.memoriesProc
-    if (old) old.running = false
-    root.memoriesError = ""
-    root.memoriesLoading = true
-    root.memoriesSeq += 1
-    var rootPath = appStores.projects.selectedProject.root_path
-    var proc = memoriesProcC.createObject(root, { forRoot: rootPath, seq: root.memoriesSeq })
-    proc.command = ["python3", root.pluginDir + "core/backend/memories/list-memories.py", rootPath]
-    root.memoriesProc = proc
-    proc.running = true
-  }
-
-  function applyMemoriesResult(text, exitCode) {
-    var result = Memories.parseMemoriesResult(text, exitCode)
-    root.memoriesLoading = false
-    root.memories = result.notes
-    root.memoriesFound = result.found
-    if (result.ok) root.memoryDir = result.memoryDir
-    root.memoriesError = result.ok ? "" : result.error
-    if (root.pendingMemoryOpen !== "") {
-      var file = root.pendingMemoryOpen
-      root.pendingMemoryOpen = ""
-      if (appStores.nav.viewMode === "memories") root.openMemory(file)
-    }
-  }
-
-  function toggleMemoryType(id) {
-    root.memoryType = root.memoryType === id ? "" : id
-    appStores.nav.cursorIndex = 0
-    appStores.nav.scrollOnCursor = false
-    Qt.callLater(root.scrollToTop)
-  }
-
+  // ---- Memories: the notes themselves live in MemoriesStore; what stays here
+  // is the navigation and focus work around them.
   function openMemory(file) {
-    var known = false
-    for (var i = 0; i < root.memories.length; i++) if (root.memories[i].file === file) known = true
-    if (!known || !appStores.projects.selectedProject || root.memoryDir === "") return
+    if (!appStores.memories.openMemory(file)) return
     if (appStores.nav.viewMode === "memories")
       appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
-    root.selectedMemory = file
-    root.memoryText = ""
-    root.memoryReadError = ""
-    root.memoryEditing = false
-    root.memoryDraft = ""
-    root.memoryOpError = ""
     appStores.nav.viewMode = "memory"
     appStores.nav.scrollOnCursor = false
     appStores.nav.cursorIndex = 0
@@ -378,12 +300,7 @@ Panel {
   }
 
   function restoreMemoriesList() {
-    root.selectedMemory = ""
-    root.memoryText = ""
-    root.memoryReadError = ""
-    root.memoryEditing = false
-    root.memoryDraft = ""
-    root.memoryOpError = ""
+    appStores.memories.restoreMemoriesList()
     var back = appStores.nav.popReturn()
     appStores.nav.viewMode = "memories"
     appStores.nav.scrollOnCursor = false
@@ -392,123 +309,9 @@ Panel {
     root.focusForView()
   }
 
-  function setMemoryText(text) {
-    root.memoryText = text
-    root.memoryReadError = ""
-  }
-
-  function startMemoryEdit() {
-    if (appStores.nav.viewMode !== "memory" || root.memoryEditing || root.memoryBusy || root.memoryText === "") return
-    root.memoryEditing = true
-    root.memoryDraft = root.memoryText
-    root.memoryEditBase = root.memoryText
-    root.memoryOpError = ""
-    root.focusForView()
-  }
-
-  function cancelMemoryEdit() {
-    if (root.memoryBusy) return
-    root.memoryEditing = false
-    root.memoryDraft = ""
-    root.memoryOpError = ""
-    root.focusForView()
-  }
-
-  // Escape never throws edits away: a dirty draft stays until Cancel is chosen.
-  function memoryEscape() {
-    if (!root.memoryEditing) return
-    if (root.memoryDraft === root.memoryText) root.cancelMemoryEdit()
-    else root.memoryOpError = "You have unsaved changes. Save them, or choose Cancel to discard."
-  }
-
-  function runMemoryOp(op, file, content, expected) {
-    memoryOpProc.op = op
-    memoryOpProc.forRoot = appStores.projects.selectedProject ? appStores.projects.selectedProject.root_path : ""
-    memoryOpProc.forFile = file
-    var command = ["python3", root.pluginDir + "core/backend/memories/memory-op.py", op, root.memoryDir, file]
-    if (content !== undefined) command.push(content)
-    if (expected !== undefined) command.push(expected)
-    memoryOpProc.command = command
-    root.memoryBusy = true
-    memoryOpProc.running = true
-  }
-
-  function saveMemory() {
-    if (!root.memoryEditing || root.memoryBusy || root.memoryDir === "" || root.memoryDraft === root.memoryText) return
-    root.memoryOpError = ""
-    root.runMemoryOp("save", root.selectedMemory, root.memoryDraft, root.memoryEditBase)
-  }
-
-  function openNewMemory() {
-    if (!root.canCreateMemory || root.memoryBusy || appStores.nav.viewMode !== "memories") return
-    root.newMemoryOpen = true
-    root.newMemoryError = ""
-    root.focusForView()
-  }
-
-  function cancelNewMemory() {
-    if (root.memoryBusy) return
-    root.newMemoryOpen = false
-    root.focusForView()
-  }
-
-  function createMemory(name, type, description, body) {
-    if (root.memoryBusy || root.memoryDir === "" || String(name).trim() === "") return
-    var file = Memories.newMemoryFile(type, name, root.memories.map(function(n) { return n.file }))
-    root.newMemoryError = ""
-    root.runMemoryOp("create", file, Memories.composeMemory(name, description, type, body))
-  }
-
-  function requestMemoryDelete() {
-    if (appStores.nav.viewMode !== "memory" || root.selectedMemory === "" || root.memoryBusy) return
-    root.memoryDeleteOpen = true
-    root.memoryDeleteError = ""
-    root.focusForView()
-  }
-
-  function cancelMemoryDelete() {
-    if (root.memoryBusy) return
-    root.memoryDeleteOpen = false
-    root.focusForView()
-  }
-
-  function performMemoryDelete() {
-    if (!root.memoryDeleteOpen || root.memoryBusy || root.selectedMemory === "" || root.memoryDir === "") return
-    root.memoryDeleteError = ""
-    root.runMemoryOp("delete", root.selectedMemory)
-  }
-
-  function applyMemoryOpResult(text, exitCode) {
-    var result = Memories.parseMemoryOpResult(text, exitCode)
-    var op = memoryOpProc.op
-    var sameProject = appStores.projects.selectedProject && appStores.projects.selectedProject.root_path === memoryOpProc.forRoot
-    root.memoryBusy = false
-    if (!sameProject) return
-    if (op === "save") {
-      if (result.ok) {
-        root.memoryText = root.memoryDraft
-        root.memoryEditing = false
-        root.memoryDraft = ""
-        root.fetchMemories()
-      } else root.memoryOpError = result.error
-    } else if (op === "create") {
-      if (result.ok) {
-        root.newMemoryOpen = false
-        root.pendingMemoryOpen = memoryOpProc.forFile
-        root.fetchMemories()
-      } else root.newMemoryError = result.error
-    } else if (op === "delete") {
-      if (result.ok) {
-        root.memoryDeleteOpen = false
-        root.restoreMemoriesList()
-        root.fetchMemories()
-      } else root.memoryDeleteError = result.error
-    }
-    root.focusForView()
-  }
 
   function goBack() {
-    if (appStores.nav.viewMode === "memory") { if (root.memoryEditing) root.memoryEscape(); else root.restoreMemoriesList(); return }
+    if (appStores.nav.viewMode === "memory") { if (appStores.memories.memoryEditing) appStores.memories.memoryEscape(); else root.restoreMemoriesList(); return }
     if (appStores.nav.viewMode === "entry") { restoreListView(); return }
     if (appStores.nav.viewMode === "document") { restoreDocumentsList(); return }
   }
@@ -533,58 +336,6 @@ Panel {
     bar: root.bar
     text: "🗂️"
     onPressed: function(buttonCode) { root.toggle() }
-  }
-
-  Component {
-    id: memoriesProcC
-    Process {
-      id: mp
-      objectName: "listMemoriesProc"
-      property string outText: ""
-      property string forRoot: ""
-      property int seq: 0
-      stdout: StdioCollector {
-        waitForEnd: true
-        onStreamFinished: mp.outText = String(text || "")
-      }
-      stderr: StdioCollector { waitForEnd: true }
-      onExited: function(exitCode) {
-        var current = appStores.projects.selectedProject ? appStores.projects.selectedProject.root_path : ""
-        if (mp.seq === root.memoriesSeq && mp.forRoot === current) root.applyMemoriesResult(mp.outText, exitCode)
-        mp.destroy()
-      }
-    }
-  }
-
-  Process {
-    id: memoryOpProc
-    objectName: "memoryOpProc"
-    property string op: ""
-    property string forRoot: ""
-    property string forFile: ""
-    property string outText: ""
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: memoryOpProc.outText = String(text || "")
-    }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(exitCode) {
-      var out = memoryOpProc.outText
-      memoryOpProc.outText = ""
-      root.applyMemoryOpResult(out, exitCode)
-    }
-  }
-
-  FileView {
-    id: memoryFile
-    objectName: "memoryFile"
-    path: appStores.nav.viewMode === "memory" && root.memoryDir !== "" && root.selectedMemory !== ""
-      ? Memories.memoryAbsolutePath(root.memoryDir, root.selectedMemory) : ""
-    watchChanges: true
-    printErrors: false
-    onFileChanged: reload()
-    onLoaded: root.setMemoryText(memoryFile.text())
-    onLoadFailed: if (memoryFile.path !== "") root.memoryReadError = "Could not read this memory."
   }
 
   KeyboardPanel {
@@ -615,7 +366,7 @@ Panel {
       objectName: "keyCatcher"
       Keys.forwardTo: [globalKeys]
       anchors.fill: parent
-      onCloseRequested: appStores.deleter.deleteTarget ? appStores.deleter.cancelDelete() : root.memoryDeleteOpen ? root.cancelMemoryDelete() : root.newMemoryOpen ? root.cancelNewMemory() : (appStores.nav.dropdownOpen ? root.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? root.goBack() : root.close()))
+      onCloseRequested: appStores.deleter.deleteTarget ? appStores.deleter.cancelDelete() : appStores.memories.memoryDeleteOpen ? appStores.memories.cancelMemoryDelete() : appStores.memories.newMemoryOpen ? appStores.memories.cancelNewMemory() : (appStores.nav.dropdownOpen ? root.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
         if (appStores.nav.viewMode === "graph") {
           if (dx !== 0) root.moveGraph(dx < 0 ? "left" : "right")
@@ -704,12 +455,12 @@ Panel {
 
           Text {
             objectName: "newMemoryButton"
-            visible: appStores.nav.viewMode === "memories" && root.canCreateMemory
+            visible: appStores.nav.viewMode === "memories" && appStores.memories.canCreateMemory
             text: "＋ New"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openNewMemory() }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.memories.openNewMemory() }
           }
 
           Text {
@@ -718,7 +469,7 @@ Panel {
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.nav.viewMode === "memories" ? root.fetchMemories() : appStores.board.fetchBoard() }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.nav.viewMode === "memories" ? appStores.memories.fetchMemories() : appStores.board.fetchBoard() }
           }
         }
 
@@ -886,14 +637,14 @@ Panel {
           MemoriesView {
             visible: appStores.nav.viewMode === "memories" && !!appStores.projects.selectedProject
             width: parent.width
-            notes: root.filteredMemories
-            types: root.memoryTypes
-            activeType: root.memoryType
+            notes: appStores.memories.filteredMemories
+            types: appStores.memories.memoryTypes
+            activeType: appStores.memories.memoryType
             query: appStores.nav.searchQuery
             cursorIndex: appStores.nav.cursorIndex
-            loading: root.memoriesLoading
-            found: root.memoriesFound
-            error: root.memoriesError
+            loading: appStores.memories.memoriesLoading
+            found: appStores.memories.memoriesFound
+            error: appStores.memories.memoriesError
             scrollOnCursor: appStores.nav.scrollOnCursor
             foreground: root.foreground
             dim: root.dim
@@ -901,30 +652,30 @@ Panel {
             onNoteChosen: function(file) { root.openMemory(file) }
             onHovered: function(index) { root.hoverCursor(index) }
             onRevealRequested: function(item) { root.scrollItemIntoView(item) }
-            onTypeToggled: function(id) { root.toggleMemoryType(id) }
+            onTypeToggled: function(id) { appStores.memories.toggleMemoryType(id) }
           }
 
           MemoryNoteView {
             id: memoryNote
             visible: appStores.nav.viewMode === "memory" && !!appStores.projects.selectedProject
             width: parent.width
-            entry: root.selectedMemoryEntry
-            text: root.memoryText
-            readError: root.memoryReadError
-            editing: root.memoryEditing
-            draft: root.memoryDraft
-            busy: root.memoryBusy
-            error: root.memoryOpError
+            entry: appStores.memories.selectedMemoryEntry
+            text: appStores.memories.memoryText
+            readError: appStores.memories.memoryReadError
+            editing: appStores.memories.memoryEditing
+            draft: appStores.memories.memoryDraft
+            busy: appStores.memories.memoryBusy
+            error: appStores.memories.memoryOpError
             foreground: root.foreground
             urgent: root.urgent
             dim: root.dim
             fontFamily: root.fontFamily
-            onEditRequested: root.startMemoryEdit()
-            onDeleteRequested: root.requestMemoryDelete()
-            onSaveRequested: root.saveMemory()
-            onCancelEditRequested: root.cancelMemoryEdit()
-            onDraftEdited: function(text) { root.memoryDraft = text }
-            onEscapePressed: root.memoryEscape()
+            onEditRequested: appStores.memories.startMemoryEdit()
+            onDeleteRequested: appStores.memories.requestMemoryDelete()
+            onSaveRequested: appStores.memories.saveMemory()
+            onCancelEditRequested: appStores.memories.cancelMemoryEdit()
+            onDraftEdited: function(text) { appStores.memories.memoryDraft = text }
+            onEscapePressed: appStores.memories.memoryEscape()
           }
 
           DocumentsView {
@@ -1208,29 +959,29 @@ Panel {
       TypedConfirmDialog {
         id: memoryConfirm
         anchors.fill: parent
-        shown: root.memoryDeleteOpen
+        shown: appStores.memories.memoryDeleteOpen
         message: "Type delete to permanently remove this memory note and its MEMORY.md entry. A backup is saved first."
-        detail: root.selectedMemory
-        busy: root.memoryBusy
-        error: root.memoryDeleteError
+        detail: appStores.memories.selectedMemory
+        busy: appStores.memories.memoryBusy
+        error: appStores.memories.memoryDeleteError
         foreground: root.foreground
         urgent: root.urgent
         fontFamily: root.fontFamily
-        onConfirmRequested: root.performMemoryDelete()
-        onCancelRequested: root.cancelMemoryDelete()
+        onConfirmRequested: appStores.memories.performMemoryDelete()
+        onCancelRequested: appStores.memories.cancelMemoryDelete()
       }
 
       NewMemoryDialog {
         id: newMemoryDialog
         anchors.fill: parent
-        shown: root.newMemoryOpen
-        busy: root.memoryBusy
-        error: root.newMemoryError
+        shown: appStores.memories.newMemoryOpen
+        busy: appStores.memories.memoryBusy
+        error: appStores.memories.newMemoryError
         foreground: root.foreground
         urgent: root.urgent
         fontFamily: root.fontFamily
-        onCreateRequested: function(name, type, description, body) { root.createMemory(name, type, description, body) }
-        onCancelRequested: root.cancelNewMemory()
+        onCreateRequested: function(name, type, description, body) { appStores.memories.createMemory(name, type, description, body) }
+        onCancelRequested: appStores.memories.cancelNewMemory()
       }
     }
   }
