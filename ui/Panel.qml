@@ -5,11 +5,12 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
-import "core/domain/board.js" as Board
-import "core/domain/documents.js" as Documents
-import "core/stores" as Core
-import "ui/components" as UI
-import "ui/theme" as T
+import "../core/domain/board.js" as Board
+import "../core/domain/documents.js" as Documents
+import "../core/stores" as Core
+import "components"
+import "components" as UI
+import "theme" as T
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
 // project: pick a project, then view its cards as a Board.

@@ -1,8 +1,8 @@
 import QtQuick
 import qs.Commons
-import "core/domain/documents.js" as Documents
-import "ui/components" as UI
-import "ui/theme" as T
+import "../../core/domain/documents.js" as Documents
+import "../components" as UI
+import "../theme" as T
 
 // The Documents section's list: one row per Markdown file (title, dim path).
 // It renders and emits only; Panel.qml owns the list, the cursor and the query.

@@ -21,7 +21,7 @@ TestCase {
 
   function make() {
     var host = createTemporaryObject(hostC, tc)
-    var comp = Qt.createComponent("../../Panel.qml")
+    var comp = Qt.createComponent("../../ui/Panel.qml")
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return null }
     var p = comp.createObject(host)
     p.opened = true

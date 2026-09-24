@@ -1,8 +1,8 @@
 import QtQuick
 import qs.Commons
-import "core/domain/documents.js" as Documents
-import "ui/components" as UI
-import "ui/theme" as T
+import "../../core/domain/documents.js" as Documents
+import "../components" as UI
+import "../theme" as T
 
 // Chooses the open document's type. Renders and emits only; Panel.qml runs
 // set-doc-tag.py and owns busy/error.

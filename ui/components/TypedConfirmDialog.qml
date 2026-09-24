@@ -1,9 +1,9 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "core/domain/projects.js" as Projects
-import "ui/components" as UI
-import "ui/theme" as T
+import "../../core/domain/projects.js" as Projects
+import "../components" as UI
+import "../theme" as T
 
 // A modal card over a dimmed backdrop that asks for a typed word before a
 // destructive action. Renders and emits only.

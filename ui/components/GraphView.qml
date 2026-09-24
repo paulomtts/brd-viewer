@@ -1,10 +1,10 @@
 import QtQuick
 import qs.Commons
-import "vendor/canvas" as Local
-import "core/domain/board.js" as Board
-import "core/domain/graph.js" as Graph
-import "ui/components" as UI
-import "ui/theme" as T
+import "../../vendor/canvas" as Local
+import "../../core/domain/board.js" as Board
+import "../../core/domain/graph.js" as Graph
+import "../components" as UI
+import "../theme" as T
 
 // The Graph section: one node per milestone on a pan/zoom canvas. It renders
 // and emits only; Panel.qml owns the model (Graph.graphModel) and the cursor.

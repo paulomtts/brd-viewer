@@ -13,7 +13,7 @@ TestCase {
 
   function make() {
     var host = createTemporaryObject(hostC, tc)
-    var comp = Qt.createComponent("../../Panel.qml")
+    var comp = Qt.createComponent("../../ui/Panel.qml")
     if (comp.status !== Component.Ready) { fail(comp.errorString()); return null }
     var p = comp.createObject(host)
     p.opened = true
@@ -163,7 +163,7 @@ TestCase {
 
   function test_the_toolbar_stays_outside_the_scrolling_area() {
     var host = createTemporaryObject(hostC, tc)
-    var comp = Qt.createComponent("../../Panel.qml")
+    var comp = Qt.createComponent("../../ui/Panel.qml")
     var p = comp.createObject(host)
     p.opened = true
     p.app.projects.stateLoaded = true

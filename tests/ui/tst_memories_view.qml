@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../.."
+import "../../ui/components"
 TestCase {
   id: tc
   name: "MemoriesView"

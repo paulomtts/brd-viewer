@@ -1,8 +1,8 @@
 import QtQuick
 import qs.Commons
-import "core/domain/memories.js" as Memories
-import "ui/components" as UI
-import "ui/theme" as T
+import "../../core/domain/memories.js" as Memories
+import "../components" as UI
+import "../theme" as T
 
 // The Memories section's list: one row per memory note (name, description,
 // type badge) under type filter chips. Renders and emits only; Panel.qml owns

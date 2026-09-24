@@ -2,8 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
-import "ui/components" as UI
-import "ui/theme" as T
+import "../components" as UI
+import "../theme" as T
 
 // The panel's left column: a project dropdown, the section list, and a Delete
 // project button. It renders and emits only; Panel.qml owns every piece of

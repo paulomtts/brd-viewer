@@ -1,10 +1,10 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "core/domain/documents.js" as Documents
-import "core/domain/memories.js" as Memories
-import "ui/components" as UI
-import "ui/theme" as T
+import "../../core/domain/documents.js" as Documents
+import "../../core/domain/memories.js" as Memories
+import "../components" as UI
+import "../theme" as T
 
 // One memory note: rendered text with Edit / Delete, or a raw-text editor with
 // Save / Cancel. Renders and emits only; Panel.qml owns the text, the draft and

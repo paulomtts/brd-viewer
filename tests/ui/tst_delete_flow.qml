@@ -20,7 +20,7 @@ TestCase {
   }
   function makePanel() {
     var host = createTemporaryObject(hostC, testCase)
-    var p = Qt.createComponent("../../Panel.qml").createObject(host)
+    var p = Qt.createComponent("../../ui/Panel.qml").createObject(host)
     p.opened = true
     p.app.projects.stateLoaded = true
     p.app.projects.applyProjectsList([{ root_path: "/home/u/a", name: "alpha" }, { root_path: "/home/u/b", name: "beta" }])

@@ -1,9 +1,9 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "core/domain/memories.js" as Memories
-import "ui/components" as UI
-import "ui/theme" as T
+import "../../core/domain/memories.js" as Memories
+import "../components" as UI
+import "../theme" as T
 
 // A modal form for a new memory note. Keeps its own field state, reset each
 // time it opens; emits createRequested(name, type, description, body).
