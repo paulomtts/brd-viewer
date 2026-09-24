@@ -47,13 +47,12 @@ Column {
     width: parent.width
     spacing: Style.space(8)
 
-    Text {
+    UI.ThemedText {
       objectName: "memoryNoteName"
+      variant: "heading"
+      theme: view.theme
       width: Math.max(0, parent.width - noteBadge.width - parent.spacing)
       text: view.entry.name
-      color: view.foreground
-      font.family: view.fontFamily
-      font.pixelSize: Style.font.heading
       font.bold: true
       elide: Text.ElideRight
     }
@@ -68,24 +67,22 @@ Column {
     }
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "memoryNoteDescription"
+    variant: "caption"
+    theme: view.theme
     visible: text !== ""
     width: parent.width
     text: view.entry.description
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.caption
     wrapMode: Text.WordWrap
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "memoryNoteFile"
+    variant: "caption"
+    theme: view.theme
     width: parent.width
     text: view.entry.file
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.caption
     elide: Text.ElideMiddle
   }
 
@@ -131,36 +128,34 @@ Column {
     }
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "memoryNoteError"
+    variant: "caption"
+    theme: view.theme
     visible: view.error !== ""
     width: parent.width
     text: view.error
     color: view.urgent
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.caption
     wrapMode: Text.WordWrap
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "memoryNoteReadError"
+    variant: "dim"
+    theme: view.theme
     visible: view.readError !== ""
     width: parent.width
     text: view.readError
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.body
     wrapMode: Text.WordWrap
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "memoryNoteBody"
+    variant: "small"
+    theme: view.theme
     visible: !view.editing && view.readError === ""
     width: parent.width
     text: view.text !== "" ? Documents.stripFrontmatter(view.text) : "Loading…"
-    color: view.foreground
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.bodySmall
     wrapMode: Text.WordWrap
     textFormat: Text.MarkdownText
   }
@@ -180,12 +175,11 @@ Column {
     onSubmitRequested: view.saveRequested()
   }
 
-  Text {
+  UI.ThemedText {
+    variant: "caption"
+    theme: view.theme
     visible: view.editing
     width: parent.width
     text: view.dirty ? "Unsaved changes. Ctrl+S saves; Cancel discards." : "Ctrl+S saves. Escape cancels."
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.caption
   }
 }

@@ -59,11 +59,10 @@ Item {
     cardObjectName: "newMemoryCard"
     onDismissed: dialog.cancelRequested()
 
-    Text {
+    UI.ThemedText {
+      variant: "heading"
+      theme: dialog.theme
       text: "New memory"
-      color: dialog.foreground
-      font.family: dialog.fontFamily
-      font.pixelSize: Style.font.heading
       font.bold: true
     }
 
@@ -119,14 +118,14 @@ Item {
       onSubmitRequested: dialog.submit()
     }
 
-    Text {
+    UI.ThemedText {
       objectName: "newMemoryError"
+      variant: "caption"
+      theme: dialog.theme
       visible: dialog.error !== ""
       width: parent.width
       text: dialog.error
       color: dialog.urgent
-      font.family: dialog.fontFamily
-      font.pixelSize: Style.font.caption
       wrapMode: Text.WordWrap
     }
 

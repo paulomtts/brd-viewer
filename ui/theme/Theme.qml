@@ -13,6 +13,8 @@ QtObject {
   property string fontFamily: Style.font.family
 
   property real bodySize: Style.font.body
+  // The slightly smaller body size the markdown bodies and link rows use.
+  property real smallSize: Style.font.bodySmall
   property real captionSize: Style.font.caption
   property real headingSize: Style.font.heading
 }

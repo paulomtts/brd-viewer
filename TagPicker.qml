@@ -38,12 +38,11 @@ Column {
   Row {
     spacing: Style.space(8)
 
-    Text {
+    UI.ThemedText {
+      variant: "caption"
+      theme: picker.theme
       anchors.verticalCenter: parent.verticalCenter
       text: "Type"
-      color: picker.dim
-      font.family: picker.fontFamily
-      font.pixelSize: Style.font.caption
     }
 
     UI.ChipRow {
@@ -63,14 +62,13 @@ Column {
     }
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "tagError"
+    variant: "caption"
+    theme: picker.theme
     visible: picker.error !== ""
     width: parent.width
     text: picker.error
-    color: picker.dim
-    font.family: picker.fontFamily
-    font.pixelSize: Style.font.caption
     wrapMode: Text.WordWrap
   }
 }

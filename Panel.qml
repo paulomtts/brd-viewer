@@ -8,6 +8,8 @@ import qs.Ui
 import "core/domain/board.js" as Board
 import "core/domain/documents.js" as Documents
 import "core/stores" as Core
+import "ui/components" as UI
+import "ui/theme" as T
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
 // project: pick a project, then view its cards as a Board.
@@ -22,6 +24,15 @@ Panel {
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  // The one Theme in the plugin: every view and shared component draws with
+  // it, so the bar's palette reaches them through a single property.
+  T.Theme {
+    id: panelTheme
+    foreground: root.foreground
+    urgent: root.urgent
+    fontFamily: root.fontFamily
+  }
+
   readonly property string pluginDir: Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
 
   // All non-visual state lives in the stores; `app` is how the tests reach it.
@@ -432,42 +443,35 @@ Panel {
           width: parent.width
           spacing: Style.spacing.md
 
-          Text {
+          UI.ThemedText {
+            theme: panelTheme
             visible: appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory"
             text: "‹ Back"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.goBack() }
           }
 
-          Text {
+          UI.ThemedText {
             objectName: "projectHeading"
+            variant: "heading"
+            theme: panelTheme
             Layout.fillWidth: true
             text: appStores.projects.selectedProject ? appStores.nav.sectionTitle : "Project Manager"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.heading
             font.bold: true
             elide: Text.ElideMiddle
           }
 
-          Text {
+          UI.ThemedText {
             objectName: "newMemoryButton"
+            theme: panelTheme
             visible: appStores.nav.viewMode === "memories" && appStores.memories.canCreateMemory
             text: "＋ New"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.memories.openNewMemory() }
           }
 
-          Text {
+          UI.ThemedText {
+            theme: panelTheme
             visible: appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph" || appStores.nav.viewMode === "memories"
             text: "⟳"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.nav.viewMode === "memories" ? appStores.memories.fetchMemories() : appStores.board.fetchBoard() }
           }
         }
@@ -510,13 +514,12 @@ Panel {
           }
         }
 
-        Text {
+        UI.ThemedText {
+          variant: "caption"
+          theme: panelTheme
           visible: appStores.projects.loadError !== ""
           width: parent.width
           text: appStores.projects.loadError
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
           wrapMode: Text.WordWrap
         }
       }
@@ -543,23 +546,21 @@ Panel {
           width: panelFlick.width
           spacing: Style.space(12)
 
-          Text {
+          UI.ThemedText {
+            variant: "caption"
+            theme: panelTheme
             visible: !appStores.deleter.deleteTarget && appStores.deleter.lastSnapshot !== ""
             width: parent.width
             text: "Removed. Snapshot saved to " + root.displayPath(appStores.deleter.lastSnapshot)
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
             wrapMode: Text.WrapAnywhere
           }
 
-          Text {
+          UI.ThemedText {
+            variant: "dim"
+            theme: panelTheme
             visible: !appStores.projects.selectedProject && appStores.projects.loadError === ""
             width: parent.width
             text: "No projects registered with brd."
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
             wrapMode: Text.WordWrap
           }
 
@@ -568,23 +569,21 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
 
-            Text {
+            UI.ThemedText {
+              variant: "dim"
+              theme: panelTheme
               visible: appStores.board.cardRoots.length === 0 && appStores.projects.loadError === ""
               width: parent.width
               text: "This project's board is empty."
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
               wrapMode: Text.WordWrap
             }
 
-            Text {
+            UI.ThemedText {
+              variant: "dim"
+              theme: panelTheme
               visible: appStores.board.cardRoots.length > 0 && appStores.board.visibleBoardRoots.length === 0
               width: parent.width
               text: "No cards match “" + appStores.nav.searchQuery + "”."
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
               wrapMode: Text.WordWrap
             }
 
@@ -703,12 +702,11 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
 
-            Text {
+            UI.ThemedText {
+              variant: "caption"
+              theme: panelTheme
               width: parent.width
               text: appStores.docs.selectedDocPath
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
               elide: Text.ElideMiddle
             }
 
@@ -723,23 +721,21 @@ Panel {
               onTagChosen: function(id) { appStores.docs.setDocTag(id) }
             }
 
-            Text {
+            UI.ThemedText {
+              variant: "dim"
+              theme: panelTheme
               visible: appStores.docs.docTooLargeFlag || appStores.docs.docError !== ""
               width: parent.width
               text: appStores.docs.docTooLargeFlag ? "This document is too large to display." : appStores.docs.docError
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
               wrapMode: Text.WordWrap
             }
 
-            Text {
+            UI.ThemedText {
+              variant: "small"
+              theme: panelTheme
               visible: !appStores.docs.docTooLargeFlag && appStores.docs.docError === ""
               width: parent.width
               text: appStores.docs.docText !== "" ? appStores.docs.docText : "Loading…"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
               wrapMode: Text.WordWrap
               textFormat: Text.MarkdownText
             }
@@ -763,12 +759,11 @@ Panel {
               onActivated: if (resolved.inBoard) root.openCard(detailCard.card.parentId)
             }
 
-            Text {
+            UI.ThemedText {
+              variant: "heading"
+              theme: panelTheme
               width: parent.width
               text: detailCard.card ? detailCard.card.title : ""
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.heading
               font.bold: true
               wrapMode: Text.WordWrap
             }
@@ -789,12 +784,11 @@ Panel {
 
             PanelSeparator { foreground: root.foreground }
 
-            Text {
+            UI.ThemedText {
+              variant: "small"
+              theme: panelTheme
               width: parent.width
               text: (detailCard.card && detailCard.card.description) ? detailCard.card.description : "No description."
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
               wrapMode: Text.WordWrap
               textFormat: Text.MarkdownText
             }
@@ -910,13 +904,13 @@ Panel {
     border.color: tone
     border.width: 1
 
-    Text {
+    UI.ThemedText {
       id: badgeLabel
+      variant: "caption"
+      theme: panelTheme
       anchors.centerIn: parent
       text: badge.text
       color: badge.tone
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
       font.bold: true
     }
   }
@@ -941,21 +935,21 @@ Panel {
       anchors.leftMargin: Style.space(6)
       anchors.rightMargin: Style.space(6)
 
-      Text {
+      UI.ThemedText {
+        variant: "small"
+        theme: panelTheme
         Layout.fillWidth: true
         text: detailLink.prefix + detailLink.resolved.title + (detailLink.resolved.inBoard ? "" : " (not in this board)")
         color: detailLink.resolved.inBoard ? root.foreground : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
         elide: Text.ElideRight
       }
 
-      Text {
+      UI.ThemedText {
+        variant: "caption"
+        theme: panelTheme
         visible: detailLink.resolved.inBoard
         text: "[" + detailLink.resolved.status + "]"
         color: Board.statusColor(detailLink.resolved.status, root.dim)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
       }
     }
 
@@ -999,30 +993,27 @@ Panel {
       anchors.leftMargin: Style.space(14)
       spacing: Style.space(4)
 
-      Text {
+      UI.ThemedText {
+        theme: panelTheme
         Layout.fillWidth: true
         text: boardCard.title
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
         wrapMode: Text.WordWrap
       }
 
-      Text {
+      UI.ThemedText {
+        variant: "caption"
+        theme: panelTheme
         visible: boardCard.status === "blocked"
         text: "Blocked"
         color: Board.statusColor("blocked", root.dim)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
         font.bold: true
       }
 
-      Text {
+      UI.ThemedText {
+        variant: "caption"
+        theme: panelTheme
         visible: boardCard.progress.total > 0
         text: boardCard.progress.done + "/" + boardCard.progress.total + " done"
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
       }
     }
 

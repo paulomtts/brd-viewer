@@ -57,8 +57,10 @@ Column {
     onChosen: function(id) { view.typeToggled(id) }
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "memoriesMessage"
+    variant: "dim"
+    theme: view.theme
     visible: text !== ""
     width: parent.width
     text: view.loading ? "Loading memories…"
@@ -68,9 +70,6 @@ Column {
         : view.activeType !== "" ? "No " + Memories.memoryTypeLabel(view.activeType) + " memories."
         : "No memories yet. Use ＋ New to add one.")
       : ""
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.body
     wrapMode: Text.WordWrap
   }
 
@@ -104,13 +103,11 @@ Column {
         width: parent.width
         spacing: Style.space(8)
 
-        Text {
+        UI.ThemedText {
           objectName: "memoryRowTitle" + row.index
+          theme: view.theme
           width: Math.max(0, parent.width - badge.width - parent.spacing)
           text: row.modelData.name
-          color: view.foreground
-          font.family: view.fontFamily
-          font.pixelSize: Style.font.body
           elide: Text.ElideRight
         }
 
@@ -123,14 +120,13 @@ Column {
         }
       }
 
-      Text {
+      UI.ThemedText {
         objectName: "memoryRowDescription" + row.index
+        variant: "caption"
+        theme: view.theme
         visible: text !== ""
         width: parent.width
         text: row.modelData.description
-        color: view.dim
-        font.family: view.fontFamily
-        font.pixelSize: Style.font.caption
         elide: Text.ElideRight
       }
     }

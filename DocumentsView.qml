@@ -56,8 +56,10 @@ Column {
     onChosen: function(id) { view.categoryToggled(id) }
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "docsMessage"
+    variant: "dim"
+    theme: view.theme
     visible: text !== ""
     width: parent.width
     text: view.loading ? "Loading documents…"
@@ -66,9 +68,6 @@ Column {
         : view.activeCategory !== "" ? "No " + Documents.docCategoryLabel(view.activeCategory) + " documents."
         : "No Markdown documents found in this project.")
       : ""
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.body
     wrapMode: Text.WordWrap
   }
 
@@ -77,14 +76,13 @@ Column {
     delegate: DocRow {}
   }
 
-  Text {
+  UI.ThemedText {
     objectName: "docsTruncated"
+    variant: "caption"
+    theme: view.theme
     visible: view.truncated
     width: parent.width
     text: "Showing the first 500 documents."
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.caption
   }
 
   component DocRow: CursorSurface {
@@ -112,12 +110,10 @@ Column {
         width: parent.width
         spacing: Style.space(8)
 
-        Text {
+        UI.ThemedText {
+          theme: view.theme
           width: Math.max(0, parent.width - (rowBadge.visible ? rowBadge.width + parent.spacing : 0))
           text: row.modelData.title
-          color: view.foreground
-          font.family: view.fontFamily
-          font.pixelSize: Style.font.body
           elide: Text.ElideRight
         }
 
@@ -131,12 +127,11 @@ Column {
         }
       }
 
-      Text {
+      UI.ThemedText {
+        variant: "caption"
+        theme: view.theme
         width: parent.width
         text: row.modelData.path
-        color: view.dim
-        font.family: view.fontFamily
-        font.pixelSize: Style.font.caption
         elide: Text.ElideMiddle
       }
     }

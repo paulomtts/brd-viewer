@@ -3,6 +3,8 @@ import qs.Commons
 import "vendor/canvas" as Local
 import "core/domain/board.js" as Board
 import "core/domain/graph.js" as Graph
+import "ui/components" as UI
+import "ui/theme" as T
 
 // The Graph section: one node per milestone on a pan/zoom canvas. It renders
 // and emits only; Panel.qml owns the model (Graph.graphModel) and the cursor.
@@ -16,6 +18,13 @@ Item {
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.55)
   property string fontFamily: Style.font.family
+  // What the shared components draw with; Panel still passes the colours one
+  // by one, so the theme follows them.
+  property var theme: T.Theme {
+    foreground: view.foreground
+    dim: view.dim
+    fontFamily: view.fontFamily
+  }
 
   signal nodeClicked(string id)
 
@@ -46,14 +55,13 @@ Item {
 
   Local.CanvasControls { canvas: canvas; showCulling: false }
 
-  Text {
+  UI.ThemedText {
     objectName: "graphEmpty"
+    variant: "dim"
+    theme: view.theme
     anchors.centerIn: parent
     visible: view.nodes.length === 0
     text: "No milestones in this project."
-    color: view.dim
-    font.family: view.fontFamily
-    font.pixelSize: Style.font.body
   }
 
   Component {
@@ -91,24 +99,21 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 4
 
-        Text {
+        UI.ThemedText {
           objectName: "graphNodeTitle"
+          theme: view.theme
           width: parent.width
           text: node.entry.title
-          color: view.foreground
-          font.family: view.fontFamily
-          font.pixelSize: Style.font.body
           font.bold: true
           elide: Text.ElideRight
         }
 
-        Text {
+        UI.ThemedText {
           objectName: "graphNodeProgress"
+          variant: "caption"
+          theme: view.theme
           width: parent.width
           text: node.entry.total > 0 ? node.entry.done + "/" + node.entry.total + " done" : "No stories"
-          color: view.dim
-          font.family: view.fontFamily
-          font.pixelSize: Style.font.caption
         }
       }
     }

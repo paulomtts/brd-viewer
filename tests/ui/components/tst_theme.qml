@@ -28,4 +28,9 @@ TestCase {
     compare(theme.captionSize, Style.font.caption)
     compare(theme.headingSize, Style.font.heading)
   }
+
+  function test_it_carries_the_small_body_size_too() {
+    var theme = createTemporaryObject(themeC, tc)
+    compare(theme.smallSize, Style.font.bodySmall)
+  }
 }

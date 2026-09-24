@@ -61,22 +61,21 @@ Item {
     cardObjectName: dialog.cardObjectName
     onDismissed: dialog.cancelRequested()
 
-    Text {
+    UI.ThemedText {
+      variant: "small"
+      theme: dialog.theme
       width: parent.width
       text: dialog.message
       color: dialog.urgent
-      font.family: dialog.fontFamily
-      font.pixelSize: Style.font.bodySmall
       wrapMode: Text.WordWrap
     }
 
-    Text {
+    UI.ThemedText {
+      variant: "caption"
+      theme: dialog.theme
       visible: dialog.detail !== ""
       width: parent.width
       text: dialog.detail
-      color: dialog.dim
-      font.family: dialog.fontFamily
-      font.pixelSize: Style.font.caption
       elide: Text.ElideMiddle
     }
 
@@ -102,14 +101,14 @@ Item {
       }
     }
 
-    Text {
+    UI.ThemedText {
       objectName: "confirmError"
+      variant: "caption"
+      theme: dialog.theme
       visible: dialog.error !== ""
       width: parent.width
       text: dialog.error
       color: dialog.urgent
-      font.family: dialog.fontFamily
-      font.pixelSize: Style.font.caption
       wrapMode: Text.WordWrap
     }
 

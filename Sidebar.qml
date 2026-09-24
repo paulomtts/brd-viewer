@@ -70,12 +70,11 @@ Item {
         anchors.leftMargin: Style.space(10)
         anchors.rightMargin: Style.space(10)
 
-        Text {
+        UI.ThemedText {
+          theme: sidebar.theme
           Layout.fillWidth: true
           text: sidebar.selectedProject ? sidebar.selectedProject.name : "No project"
           color: sidebar.selectedProject ? sidebar.foreground : sidebar.dim
-          font.family: sidebar.fontFamily
-          font.pixelSize: Style.font.body
           font.bold: true
           elide: Text.ElideRight
         }
@@ -157,13 +156,13 @@ Item {
         }
       }
 
-      Text {
+      UI.ThemedText {
+        variant: "small"
+        theme: sidebar.theme
         visible: sidebar.projects.length === 0
         width: parent.width
         text: sidebar.dropdownQuery === "" ? "No projects registered." : "No projects match “" + sidebar.dropdownQuery + "”."
         color: sidebar.dim
-        font.family: sidebar.fontFamily
-        font.pixelSize: Style.font.bodySmall
         wrapMode: Text.WordWrap
       }
 
@@ -208,15 +207,13 @@ Item {
     opacity: enabled ? 1 : 0.4
     foreground: sidebar.foreground
 
-    Text {
+    UI.ThemedText {
       id: navLabel
+      theme: sidebar.theme
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       anchors.leftMargin: Style.space(10)
       text: navRow.label
-      color: sidebar.foreground
-      font.family: sidebar.fontFamily
-      font.pixelSize: Style.font.body
       font.bold: navRow.current
     }
 
@@ -243,17 +240,15 @@ Item {
     foreground: sidebar.foreground
     onHasCursorChanged: if (hasCursor) listFlick.ensureVisible(item)
 
-    Text {
+    UI.ThemedText {
       id: itemLabel
+      theme: sidebar.theme
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.leftMargin: Style.space(10)
       anchors.rightMargin: Style.space(10)
       text: item.modelData.name
-      color: sidebar.foreground
-      font.family: sidebar.fontFamily
-      font.pixelSize: Style.font.body
       elide: Text.ElideRight
     }
 
