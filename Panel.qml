@@ -153,8 +153,8 @@ Panel {
     root.scrollOnCursor = true
     root.lastKeyMoveMs = Date.now()
     root.cursorIndex = root.clamp(root.cursorIndex + delta, 0, list.length - 1)
-    // Headers and the search box live inside the flickable; reaching the
-    // first row of a list should reveal them again.
+    // Reaching the first row of a list shows whatever sits above it in the
+    // scrolling content (e.g. the Documents type badges).
     if (root.cursorIndex === 0 && root.viewMode !== "entry") Qt.callLater(root.scrollToTop)
   }
 
@@ -775,7 +775,7 @@ Panel {
     // At least 80% of the screen tall, whatever the section holds, so the
     // popup does not jump in size between sections; long content still scrolls.
     readonly property real minContentHeight: 0.8 * panel.screenH - panel.verticalContentInset
-    contentHeight: panel.fittedContentHeight(Math.max(column.implicitHeight, sidebar.implicitHeight, minContentHeight),
+    contentHeight: panel.fittedContentHeight(Math.max(toolbar.implicitHeight + Style.space(12) + column.implicitHeight, sidebar.implicitHeight, minContentHeight),
       Math.max(Style.space(620), 0.8 * panel.screenH))
 
     Item {
@@ -840,11 +840,107 @@ Panel {
         onFilterKey: function(event) { if (root.handleGlobalKey(event)) event.accepted = true }
       }
 
-      Flickable {
-        id: panelFlick
+      // Column 2 of the layout: a toolbar that never scrolls (heading, refresh,
+      // search) above the content, which scrolls on its own.
+      Column {
+        id: toolbar
+        objectName: "panelToolbar"
         anchors.left: sidebar.right
         anchors.leftMargin: Style.space(12)
         anchors.top: parent.top
+        anchors.right: parent.right
+        spacing: Style.space(12)
+
+        RowLayout {
+          width: parent.width
+          spacing: Style.spacing.md
+
+          Text {
+            visible: root.viewMode === "entry" || root.viewMode === "document"
+            text: "‹ Back"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.goBack() }
+          }
+
+          Text {
+            objectName: "projectHeading"
+            Layout.fillWidth: true
+            text: root.selectedProject ? root.sectionTitle : "brd Viewer"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.heading
+            font.bold: true
+            elide: Text.ElideMiddle
+          }
+
+          Text {
+            visible: root.viewMode === "board" || root.viewMode === "graph"
+            text: "⟳"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.fetchBoard() }
+          }
+        }
+
+        TextField {
+          id: searchField
+          objectName: "searchField"
+          visible: !root.deleteTarget && !!root.selectedProject && (root.viewMode === "board" || root.viewMode === "documents")
+          width: parent.width
+          foreground: root.foreground
+          placeholderText: root.viewMode === "documents" ? "Search documents…" : "Search cards…"
+          text: root.searchQuery
+          Keys.forwardTo: [globalKeys]
+
+          onTextChanged: {
+            root.searchQuery = text
+            root.cursorIndex = 0
+          }
+
+          Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Escape) {
+              if (root.searchQuery !== "") { root.searchQuery = "" }
+              else root.close()
+              event.accepted = true
+              return
+            }
+            if (event.key === Qt.Key_Right && searchField.cursorPosition === searchField.text.length) {
+              root.activateCursor(); event.accepted = true; return
+            }
+            if (event.key === Qt.Key_Down) { root.moveCursor(1); event.accepted = true; return }
+            if (event.key === Qt.Key_Up) { root.moveCursor(-1); event.accepted = true; return }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+              root.activateCursor(); event.accepted = true; return
+            }
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+              root.switchPanel((event.modifiers & Qt.ShiftModifier) || event.key === Qt.Key_Backtab ? -1 : 1)
+              event.accepted = true
+              return
+            }
+          }
+        }
+
+        Text {
+          visible: root.loadError !== ""
+          width: parent.width
+          text: root.loadError
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          wrapMode: Text.WordWrap
+        }
+      }
+
+      Flickable {
+        id: panelFlick
+        objectName: "panelFlick"
+        anchors.left: sidebar.right
+        anchors.leftMargin: Style.space(12)
+        anchors.top: toolbar.bottom
+        anchors.topMargin: toolbar.height > 0 ? Style.space(12) : 0
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         contentWidth: width
@@ -859,87 +955,6 @@ Panel {
           id: column
           width: panelFlick.width
           spacing: Style.space(12)
-
-          RowLayout {
-            width: parent.width
-            spacing: Style.spacing.md
-
-            Text {
-              visible: root.viewMode === "entry" || root.viewMode === "document"
-              text: "‹ Back"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.goBack() }
-            }
-
-            Text {
-              Layout.fillWidth: true
-              text: root.selectedProject ? root.sectionTitle : "brd Viewer"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.heading
-              font.bold: true
-              elide: Text.ElideMiddle
-            }
-
-            Text {
-              visible: root.viewMode === "board" || root.viewMode === "graph"
-              text: "⟳"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.fetchBoard() }
-            }
-          }
-
-          TextField {
-            id: searchField
-            objectName: "searchField"
-            visible: !root.deleteTarget && !!root.selectedProject && (root.viewMode === "board" || root.viewMode === "documents")
-            width: parent.width
-            foreground: root.foreground
-            placeholderText: root.viewMode === "documents" ? "Search documents…" : "Search cards…"
-            text: root.searchQuery
-            Keys.forwardTo: [globalKeys]
-
-            onTextChanged: {
-              root.searchQuery = text
-              root.cursorIndex = 0
-            }
-
-            Keys.onPressed: function(event) {
-              if (event.key === Qt.Key_Escape) {
-                if (root.searchQuery !== "") { root.searchQuery = "" }
-                else root.close()
-                event.accepted = true
-                return
-              }
-              if (event.key === Qt.Key_Right && searchField.cursorPosition === searchField.text.length) {
-                root.activateCursor(); event.accepted = true; return
-              }
-              if (event.key === Qt.Key_Down) { root.moveCursor(1); event.accepted = true; return }
-              if (event.key === Qt.Key_Up) { root.moveCursor(-1); event.accepted = true; return }
-              if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                root.activateCursor(); event.accepted = true; return
-              }
-              if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                root.switchPanel((event.modifiers & Qt.ShiftModifier) || event.key === Qt.Key_Backtab ? -1 : 1)
-                event.accepted = true
-                return
-              }
-            }
-          }
-
-          Text {
-            visible: root.loadError !== ""
-            width: parent.width
-            text: root.loadError
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.WordWrap
-          }
 
           Column {
             visible: !!root.deleteTarget

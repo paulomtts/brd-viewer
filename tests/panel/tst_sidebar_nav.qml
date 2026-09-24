@@ -149,4 +149,34 @@ TestCase {
     p.cursorIndex = 0; p.activateCursor()
     compare(p.focusItem.objectName, "keyCatcher")
   }
+
+  function findIn(item, name) {
+    if (item.objectName === name) return item
+    var kids = item.children || []
+    for (var i = 0; i < kids.length; i++) { var r = findIn(kids[i], name); if (r) return r }
+    return null
+  }
+  function insideFlick(item) {
+    for (var it = item; it; it = it.parent) if (it.objectName === "panelFlick") return true
+    return false
+  }
+
+  function test_the_toolbar_stays_outside_the_scrolling_area() {
+    var host = createTemporaryObject(hostC, tc)
+    var comp = Qt.createComponent("Panel.qml")
+    var p = comp.createObject(host)
+    p.opened = true
+    p.stateLoaded = true
+    p.applyProjectsList([{ root_path: "/home/u/a", name: "alpha" }])
+    var kc = host
+    var toolbar = findIn(kc, "panelToolbar")
+    var flick = findIn(kc, "panelFlick")
+    verify(toolbar, "panelToolbar")
+    verify(flick, "panelFlick")
+    verify(!insideFlick(toolbar), "toolbar is not inside the flickable")
+    verify(!insideFlick(findIn(kc, "searchField")), "search is not inside the flickable")
+    verify(!insideFlick(findIn(kc, "projectHeading")), "heading is not inside the flickable")
+    verify(insideFlick(findIn(kc, "documentsView")), "content is inside the flickable")
+    verify(flick.y >= toolbar.y + toolbar.height, "content starts below the toolbar")
+  }
 }
