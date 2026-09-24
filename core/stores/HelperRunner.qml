@@ -46,9 +46,13 @@ Scope {
       stdout: StdioCollector { waitForEnd: true; onStreamFinished: p.outText = String(text || "") }
       stderr: StdioCollector { waitForEnd: true }
       onExited: function(exitCode) {
-        if (p.launchSeq === runner.seq && p.launchGuard === runner.guard) {
+        // The newest run always releases `busy` on its exit, even when its
+        // result is dropped because the guard has since changed -- otherwise
+        // the lock would never be cleared again. An exit that a newer run has
+        // already superseded changes nothing: that newer run still holds it.
+        if (p.launchSeq === runner.seq) {
           runner.busy = false
-          runner.finished(p.outText, exitCode, p.launchGuard)
+          if (p.launchGuard === runner.guard) runner.finished(p.outText, exitCode, p.launchGuard)
         }
         p.destroy()
       }

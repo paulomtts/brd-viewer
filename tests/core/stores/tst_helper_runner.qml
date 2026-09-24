@@ -115,6 +115,22 @@ TestCase {
     compare(tc.events.length, 0)
   }
 
+  // The newest run's exit always releases `busy`, even when its result is
+  // dropped: nothing else would ever clear it, and the lock would be stuck for
+  // the rest of the session.
+  function test_the_newest_runs_exit_clears_busy_even_when_its_result_is_dropped() {
+    var r = make(); if (!r) return
+    r.guard = "/home/u/a"
+    r.run(["/home/u/a"])
+    var proc = r.current
+    compare(r.busy, true)
+    r.guard = "/home/u/b"
+    proc.outText = "for a"
+    proc.exited(0)
+    compare(tc.events.length, 0, "the result is still dropped")
+    compare(r.busy, false, "but the runner is free again")
+  }
+
   function test_cancel_drops_the_running_run() {
     var r = make(); if (!r) return
     r.run(["a"])
