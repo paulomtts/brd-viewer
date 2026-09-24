@@ -42,9 +42,9 @@ TestCase {
   function test_the_graph_section_shows_and_selects_the_first_milestone() {
     var p = make(); if (!p) return
     p.showSection("graph")
-    compare(p.viewMode, "graph")
-    compare(p.section, "graph")
-    compare(p.sectionTitle, "Graph")
+    compare(p.app.nav.viewMode, "graph")
+    compare(p.app.nav.section, "graph")
+    compare(p.app.nav.sectionTitle, "Graph")
     compare(p.graphCursor, "m1")
     compare(p.graph.nodes.length, 3)
   }
@@ -53,7 +53,7 @@ TestCase {
     var p = make(); if (!p) return
     var event = { key: Qt.Key_3, modifiers: Qt.ControlModifier, accepted: false }
     compare(p.handleGlobalKey(event), true)
-    compare(p.viewMode, "graph")
+    compare(p.app.nav.viewMode, "graph")
   }
 
   function test_arrow_keys_move_the_selection_along_the_dependency_chain() {
@@ -79,9 +79,9 @@ TestCase {
     kc.moveRequested(-1, 0)
     compare(p.graphCursor, "m1")
     kc.activateRequested()
-    compare(p.viewMode, "entry")
+    compare(p.app.nav.viewMode, "entry")
     compare(p.selectedCardId, "m1")
-    compare(p.section, "graph")
+    compare(p.app.nav.section, "graph")
   }
 
   function test_back_from_a_card_returns_to_the_graph_with_the_selection() {
@@ -89,9 +89,9 @@ TestCase {
     p.showSection("graph")
     p.moveGraph("right")
     p.activateGraphNode()
-    compare(p.viewMode, "entry")
+    compare(p.app.nav.viewMode, "entry")
     p.goBack()
-    compare(p.viewMode, "graph")
+    compare(p.app.nav.viewMode, "graph")
     compare(p.graphCursor, "m2")
   }
 
@@ -99,7 +99,7 @@ TestCase {
     var p = make(); if (!p) return
     p.openCard("m2")
     p.goBack()
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 
   function test_the_graph_view_receives_the_model_and_clicks_open_the_card() {
@@ -111,7 +111,7 @@ TestCase {
     compare(gv.edges.length, 2)
     gv.nodeClicked("m2")
     compare(p.graphCursor, "m2")
-    compare(p.viewMode, "entry")
+    compare(p.app.nav.viewMode, "entry")
     compare(p.selectedCardId, "m2")
   }
 

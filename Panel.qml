@@ -10,6 +10,7 @@ import "core/domain/documents.js" as Documents
 import "core/domain/graph.js" as Graph
 import "core/domain/memories.js" as Memories
 import "core/domain/projects.js" as Projects
+import "core/stores" as Core
 
 // Browses brd's local kanban board (`brd projects` / `brd tree`), per
 // project: pick a project, then view its cards as a Board.
@@ -26,30 +27,18 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string pluginDir: Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
 
-  property string viewMode: "board"   // "board" | "entry" | "documents" | "document" | "graph" | "memories" | "memory"
-  property bool dropdownOpen: false
-  property string dropdownQuery: ""
-  property int dropdownCursor: 0
+  // All non-visual state lives in the stores; `app` is how the tests reach it.
+  Core.App { id: appStores; backendDir: root.pluginDir + "core/backend/" }
+  readonly property var app: appStores
+
   property string storedProject: ""
   property bool stateLoaded: false
   property bool stateReadOk: false
 
-  readonly property string section: (viewMode === "documents" || viewMode === "document") ? "documents"
-    : (viewMode === "memories" || viewMode === "memory") ? "memories"
-    : viewMode === "graph" ? "graph"
-    : (viewMode === "entry" && root.returnMode === "graph") ? "graph" : "board"
-  readonly property string sectionTitle: section === "documents" ? "Documents" : section === "graph" ? "Graph" : section === "memories" ? "Memories" : "Board"
   readonly property bool documentsEnabled: true
   property var projects: []            // [{ root_path, name }]
   property var selectedProject: null   // { root_path, name } | null
   property string loadError: ""
-
-  property string searchQuery: ""
-  property int cursorIndex: 0
-  // True only while the keyboard is driving the cursor: rows then scroll
-  // themselves into view. Hover must not scroll, or the list would move
-  // under a stationary pointer and re-trigger hover.
-  property bool scrollOnCursor: false
 
   // Deleting a project (brd forget). Always gated behind typing "delete", and
   // snapshot-and-forget.py saves a snapshot first and refuses to forget if it
@@ -59,10 +48,7 @@ Panel {
   property bool deleting: false
   property string deleteError: ""
   property string lastSnapshot: ""
-  property int returnCursor: 0
-  property string returnMode: "board"   // the list a card was opened from
   property string graphCursor: ""
-  property real returnScrollY: 0
 
   property var docs: []
   property bool docsLoading: false
@@ -88,7 +74,7 @@ Panel {
   // the path and replaces the file atomically); the list is re-read afterwards
   // so badges and filters follow.
   function setDocTag(id) {
-    if (root.viewMode !== "document" || !root.selectedProject || root.docTagBusy) return
+    if (appStores.nav.viewMode !== "document" || !root.selectedProject || root.docTagBusy) return
     if (["architecture", "specs", "standards", "audits", "default"].indexOf(id) < 0) return
     root.docTagError = ""
     root.docTagBusy = true
@@ -106,33 +92,33 @@ Panel {
     if (result.ok) root.fetchDocs()
     else root.docTagError = result.error
   }
-  readonly property var filteredDocs: Documents.filterDocs(Documents.filterDocsByCategory(root.docs, root.docCategory), root.searchQuery)
+  readonly property var filteredDocs: Documents.filterDocs(Documents.filterDocsByCategory(root.docs, root.docCategory), appStores.nav.searchQuery)
 
   function toggleDocCategory(id) {
     root.docCategory = root.docCategory === id ? "" : id
-    root.cursorIndex = 0
-    root.scrollOnCursor = false
+    appStores.nav.cursorIndex = 0
+    appStores.nav.scrollOnCursor = false
     Qt.callLater(root.scrollToTop)
   }
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
-  readonly property var filteredProjects: Projects.filterProjects(root.projects, root.dropdownQuery)
+  readonly property var filteredProjects: Projects.filterProjects(root.projects, appStores.nav.dropdownQuery)
 
   function currentList() {
-    if (root.viewMode === "board") return root.boardCards
-    if (root.viewMode === "entry") return root.detailLinkList
-    if (root.viewMode === "documents") return root.filteredDocs
-    if (root.viewMode === "memories") return root.filteredMemories
+    if (appStores.nav.viewMode === "board") return root.boardCards
+    if (appStores.nav.viewMode === "entry") return root.detailLinkList
+    if (appStores.nav.viewMode === "documents") return root.filteredDocs
+    if (appStores.nav.viewMode === "memories") return root.filteredMemories
     return []
   }
 
   readonly property Item focusItem: root.deleteTarget ? confirmField
     : root.memoryDeleteOpen ? memoryConfirm.focusItem
     : root.newMemoryOpen ? newMemoryDialog.focusItem
-    : (root.viewMode === "memory" && root.memoryEditing) ? memoryNote.editorItem
-    : root.dropdownOpen ? sidebar.filterItem
-    : (root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory" || root.viewMode === "graph" || !root.selectedProject) ? keyCatcher
+    : (appStores.nav.viewMode === "memory" && root.memoryEditing) ? memoryNote.editorItem
+    : appStores.nav.dropdownOpen ? sidebar.filterItem
+    : (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory" || appStores.nav.viewMode === "graph" || !root.selectedProject) ? keyCatcher
     : searchField
 
   function focusForView() {
@@ -143,8 +129,7 @@ Panel {
   }
 
   function resetSearch() {
-    searchQuery = ""
-    cursorIndex = 0
+    appStores.nav.resetSearch()
   }
 
   readonly property var graph: Graph.graphModel(root.cardRoots)
@@ -159,22 +144,14 @@ Panel {
   function moveCursor(delta) {
     var list = root.currentList()
     if (list.length === 0) return
-    root.scrollOnCursor = true
-    root.lastKeyMoveMs = Date.now()
-    root.cursorIndex = root.clamp(root.cursorIndex + delta, 0, list.length - 1)
+    appStores.nav.moveCursor(delta, list.length)
     // Reaching the first row of a list shows whatever sits above it in the
     // scrolling content (e.g. the Documents type badges).
-    if (root.cursorIndex === 0 && root.viewMode !== "entry") Qt.callLater(root.scrollToTop)
+    if (appStores.nav.cursorIndex === 0 && appStores.nav.viewMode !== "entry") Qt.callLater(root.scrollToTop)
   }
 
-  property double lastKeyMoveMs: 0
-
-  // Scrolling with the keys slides rows under a stationary pointer, which fires
-  // their hover handlers; those must not steal the cursor from the keyboard.
   function hoverCursor(index) {
-    if (Date.now() - root.lastKeyMoveMs < 300) return
-    root.scrollOnCursor = false
-    root.cursorIndex = index
+    appStores.nav.hoverCursor(index)
   }
 
   function scrollToTop() {
@@ -213,10 +190,10 @@ Panel {
 
   function activateCursor() {
     var list = root.currentList()
-    if (root.cursorIndex < 0 || root.cursorIndex >= list.length) return
-    if (root.viewMode === "documents") root.openDoc(list[root.cursorIndex].path)
-    else if (root.viewMode === "memories") root.openMemory(list[root.cursorIndex].file)
-    else root.openCard(list[root.cursorIndex].id)
+    if (appStores.nav.cursorIndex < 0 || appStores.nav.cursorIndex >= list.length) return
+    if (appStores.nav.viewMode === "documents") root.openDoc(list[appStores.nav.cursorIndex].path)
+    else if (appStores.nav.viewMode === "memories") root.openMemory(list[appStores.nav.cursorIndex].file)
+    else root.openCard(list[appStores.nav.cursorIndex].id)
   }
 
   function activateGraphNode() {
@@ -225,7 +202,7 @@ Panel {
 
   function openDelete(project) {
     if (root.deleting || !project) return
-    root.dropdownOpen = false
+    appStores.nav.dropdownOpen = false
     root.deleteTarget = project
     root.confirmText = ""
     root.deleteError = ""
@@ -268,8 +245,8 @@ Panel {
   // The panel was just opened: refresh the registry and drop any half-finished
   // UI state. The project on screen stays selected while it is still registered.
   function onPanelOpened() {
-    root.dropdownOpen = false
-    root.dropdownQuery = ""
+    appStores.nav.dropdownOpen = false
+    appStores.nav.dropdownQuery = ""
     if (!root.deleting) { root.deleteTarget = null; root.confirmText = ""; root.deleteError = "" }
     root.refreshProjects()
     root.focusForView()
@@ -295,14 +272,14 @@ Panel {
     root.selectedProject = null
     root.watchedDbPath = ""
     root.applyTreeData([])
-    root.viewMode = "board"
+    appStores.nav.viewMode = "board"
     root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
   }
 
   function selectProject(project) {
     selectedProject = project
     resetSearch()
-    viewMode = "board"
+    appStores.nav.viewMode = "board"
     root.resetMemories(); root.docs = []; root.docCategory = ""; root.docTagError = ""; root.graphCursor = ""; root.docsError = ""; root.docsLoading = false; root.selectedDocPath = ""; root.docText = ""; root.docError = ""; root.docTooLargeFlag = false
     root.watchedDbPath = ""
     resolveDbPathProc.command = ["python3", root.pluginDir + "core/backend/projects/resolve-db-path.py", project.root_path]
@@ -347,33 +324,28 @@ Panel {
 
   function toggleDropdown() {
     if (root.deleteTarget) return
-    if (root.dropdownOpen) { root.closeDropdown(); return }
-    root.dropdownQuery = ""
+    if (appStores.nav.dropdownOpen) { root.closeDropdown(); return }
     var index = 0
     for (var i = 0; i < root.projects.length; i++)
       if (root.selectedProject && root.projects[i].root_path === root.selectedProject.root_path) index = i
-    root.dropdownCursor = index
-    root.dropdownOpen = true
+    appStores.nav.toggleDropdown(index)
     root.focusForView()
   }
 
   function closeDropdown() {
-    if (!root.dropdownOpen) return
-    root.dropdownOpen = false
-    root.dropdownQuery = ""
+    if (!appStores.nav.dropdownOpen) return
+    appStores.nav.closeDropdown()
     root.focusForView()
   }
 
   function moveDropdown(delta) {
-    var n = root.filteredProjects.length
-    if (n === 0) return
-    root.dropdownCursor = root.clamp(root.dropdownCursor + delta, 0, n - 1)
+    appStores.nav.moveDropdown(delta, root.filteredProjects.length)
   }
 
   function acceptDropdown() {
     var list = root.filteredProjects
-    if (root.dropdownCursor < 0 || root.dropdownCursor >= list.length) return
-    root.chooseProject(list[root.dropdownCursor])
+    if (appStores.nav.dropdownCursor < 0 || appStores.nav.dropdownCursor >= list.length) return
+    root.chooseProject(list[appStores.nav.dropdownCursor])
   }
 
   // Shortcuts that work wherever the caret is. Returns true when it handled the
@@ -386,8 +358,8 @@ Panel {
     if (event.key === Qt.Key_2) { root.showSection("documents"); return true }
     if (event.key === Qt.Key_3) { root.showSection("graph"); return true }
     if (event.key === Qt.Key_4) { root.showSection("memories"); return true }
-    if (event.key === Qt.Key_N && root.viewMode === "memories") { root.openNewMemory(); return true }
-    if (event.key === Qt.Key_E && root.viewMode === "memory") { root.startMemoryEdit(); return true }
+    if (event.key === Qt.Key_N && appStores.nav.viewMode === "memories") { root.openNewMemory(); return true }
+    if (event.key === Qt.Key_E && appStores.nav.viewMode === "memory") { root.startMemoryEdit(); return true }
     return false
   }
 
@@ -395,10 +367,10 @@ Panel {
     if (!root.selectedProject || root.deleteTarget || root.memoryDeleteOpen || root.newMemoryOpen) return
     if (root.memoryEditing && root.memoryDraft !== root.memoryText) return
     if (name === "documents" && !root.documentsEnabled) return
-    if (root.dropdownOpen) root.dropdownOpen = false
+    if (appStores.nav.dropdownOpen) appStores.nav.dropdownOpen = false
     root.resetSearch()
-    root.scrollOnCursor = false
-    root.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : name === "memories" ? "memories" : "board"
+    appStores.nav.scrollOnCursor = false
+    appStores.nav.viewMode = name === "documents" ? "documents" : name === "graph" ? "graph" : name === "memories" ? "memories" : "board"
     root.memoryEditing = false
     if (name === "documents") root.fetchDocs()
     if (name === "memories") root.fetchMemories()
@@ -419,13 +391,13 @@ Panel {
     root.cardRoots = roots
     var indexed = Board.indexTree(roots)
     root.cardMap = indexed.cardMap
-    if (root.viewMode === "entry" && !root.cardMap[root.selectedCardId]) root.restoreListView()
+    if (appStores.nav.viewMode === "entry" && !root.cardMap[root.selectedCardId]) root.restoreListView()
   }
 
   property string watchedDbPath: ""
 
   readonly property var visibleBoardRoots: root.cardRoots.filter(function(c) {
-    return Board.subtreeMatches(c, root.searchQuery)
+    return Board.subtreeMatches(c, appStores.nav.searchQuery)
   })
 
   function boardColumn(status) {
@@ -439,7 +411,7 @@ Panel {
   readonly property var boardCards: Board.boardOrder(root.visibleBoardRoots, root.statuses)
 
   // The clickable rows of the card being viewed, in display order.
-  readonly property var detailLinkList: root.viewMode === "entry"
+  readonly property var detailLinkList: appStores.nav.viewMode === "entry"
     ? Board.detailLinks(root.cardMap[root.selectedCardId], root.cardMap) : []
 
   function boardIndexOf(id) {
@@ -472,15 +444,12 @@ Panel {
 
   function openCard(id) {
     if (!root.cardMap[id]) return
-    if (root.viewMode === "board" || root.viewMode === "graph") {
-      root.returnMode = root.viewMode
-      root.returnCursor = root.cursorIndex
-      root.returnScrollY = panelFlick ? panelFlick.contentY : 0
-    }
+    if (appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph")
+      appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0, appStores.nav.viewMode)
     selectedCardId = id
-    viewMode = "entry"
-    root.scrollOnCursor = false
-    root.cursorIndex = 0
+    appStores.nav.viewMode = "entry"
+    appStores.nav.scrollOnCursor = false
+    appStores.nav.cursorIndex = 0
     Qt.callLater(root.scrollToTop)
     focusForView()
   }
@@ -488,10 +457,11 @@ Panel {
   // Leaving a card puts the Board back exactly as it was: same highlighted
   // card, same scroll position.
   function restoreListView() {
-    viewMode = root.returnMode
-    root.scrollOnCursor = false
-    root.cursorIndex = root.returnCursor
-    Qt.callLater(function() { if (panelFlick) root.scrollBy(root.returnScrollY - panelFlick.contentY) })
+    var back = appStores.nav.popReturn()
+    appStores.nav.viewMode = back.mode
+    appStores.nav.scrollOnCursor = false
+    appStores.nav.cursorIndex = back.cursor
+    Qt.callLater(function() { if (panelFlick) root.scrollBy(back.scrollY - panelFlick.contentY) })
     focusForView()
   }
 
@@ -523,16 +493,15 @@ Panel {
     var entry = null
     for (var i = 0; i < root.docs.length; i++) if (root.docs[i].path === path) entry = root.docs[i]
     if (!entry || !root.selectedProject) return
-    root.returnCursor = root.cursorIndex
-    root.returnScrollY = panelFlick ? panelFlick.contentY : 0
+    appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
     root.selectedDocPath = path
     root.docTagError = ""
     root.docText = ""
     root.docError = ""
     root.docTooLargeFlag = Documents.docTooLarge(entry.size)
-    root.viewMode = "document"
-    root.scrollOnCursor = false
-    root.cursorIndex = 0
+    appStores.nav.viewMode = "document"
+    appStores.nav.scrollOnCursor = false
+    appStores.nav.cursorIndex = 0
     Qt.callLater(root.scrollToTop)
     root.focusForView()
   }
@@ -543,10 +512,11 @@ Panel {
     root.docText = ""
     root.docError = ""
     root.docTooLargeFlag = false
-    root.viewMode = "documents"
-    root.scrollOnCursor = false
-    root.cursorIndex = root.returnCursor
-    Qt.callLater(function() { if (panelFlick) root.scrollBy(root.returnScrollY - panelFlick.contentY) })
+    var back = appStores.nav.popReturn()
+    appStores.nav.viewMode = "documents"
+    appStores.nav.scrollOnCursor = false
+    appStores.nav.cursorIndex = back.cursor
+    Qt.callLater(function() { if (panelFlick) root.scrollBy(back.scrollY - panelFlick.contentY) })
     root.focusForView()
   }
 
@@ -575,7 +545,7 @@ Panel {
   property var memoriesProc: null
 
   readonly property var memoryTypes: Memories.memoryTypeCounts(root.memories)
-  readonly property var filteredMemories: Memories.filterMemories(Memories.filterMemoriesByType(root.memories, root.memoryType), root.searchQuery)
+  readonly property var filteredMemories: Memories.filterMemories(Memories.filterMemoriesByType(root.memories, root.memoryType), appStores.nav.searchQuery)
   readonly property bool canCreateMemory: root.memoryDir !== ""
   readonly property var selectedMemoryEntry: {
     for (var i = 0; i < root.memories.length; i++)
@@ -616,14 +586,14 @@ Panel {
     if (root.pendingMemoryOpen !== "") {
       var file = root.pendingMemoryOpen
       root.pendingMemoryOpen = ""
-      if (root.viewMode === "memories") root.openMemory(file)
+      if (appStores.nav.viewMode === "memories") root.openMemory(file)
     }
   }
 
   function toggleMemoryType(id) {
     root.memoryType = root.memoryType === id ? "" : id
-    root.cursorIndex = 0
-    root.scrollOnCursor = false
+    appStores.nav.cursorIndex = 0
+    appStores.nav.scrollOnCursor = false
     Qt.callLater(root.scrollToTop)
   }
 
@@ -631,19 +601,17 @@ Panel {
     var known = false
     for (var i = 0; i < root.memories.length; i++) if (root.memories[i].file === file) known = true
     if (!known || !root.selectedProject || root.memoryDir === "") return
-    if (root.viewMode === "memories") {
-      root.returnCursor = root.cursorIndex
-      root.returnScrollY = panelFlick ? panelFlick.contentY : 0
-    }
+    if (appStores.nav.viewMode === "memories")
+      appStores.nav.pushReturn(panelFlick ? panelFlick.contentY : 0)
     root.selectedMemory = file
     root.memoryText = ""
     root.memoryReadError = ""
     root.memoryEditing = false
     root.memoryDraft = ""
     root.memoryOpError = ""
-    root.viewMode = "memory"
-    root.scrollOnCursor = false
-    root.cursorIndex = 0
+    appStores.nav.viewMode = "memory"
+    appStores.nav.scrollOnCursor = false
+    appStores.nav.cursorIndex = 0
     Qt.callLater(root.scrollToTop)
     root.focusForView()
   }
@@ -655,10 +623,11 @@ Panel {
     root.memoryEditing = false
     root.memoryDraft = ""
     root.memoryOpError = ""
-    root.viewMode = "memories"
-    root.scrollOnCursor = false
-    root.cursorIndex = root.returnCursor
-    Qt.callLater(function() { if (panelFlick) root.scrollBy(root.returnScrollY - panelFlick.contentY) })
+    var back = appStores.nav.popReturn()
+    appStores.nav.viewMode = "memories"
+    appStores.nav.scrollOnCursor = false
+    appStores.nav.cursorIndex = back.cursor
+    Qt.callLater(function() { if (panelFlick) root.scrollBy(back.scrollY - panelFlick.contentY) })
     root.focusForView()
   }
 
@@ -668,7 +637,7 @@ Panel {
   }
 
   function startMemoryEdit() {
-    if (root.viewMode !== "memory" || root.memoryEditing || root.memoryBusy || root.memoryText === "") return
+    if (appStores.nav.viewMode !== "memory" || root.memoryEditing || root.memoryBusy || root.memoryText === "") return
     root.memoryEditing = true
     root.memoryDraft = root.memoryText
     root.memoryEditBase = root.memoryText
@@ -710,7 +679,7 @@ Panel {
   }
 
   function openNewMemory() {
-    if (!root.canCreateMemory || root.memoryBusy || root.viewMode !== "memories") return
+    if (!root.canCreateMemory || root.memoryBusy || appStores.nav.viewMode !== "memories") return
     root.newMemoryOpen = true
     root.newMemoryError = ""
     root.focusForView()
@@ -730,7 +699,7 @@ Panel {
   }
 
   function requestMemoryDelete() {
-    if (root.viewMode !== "memory" || root.selectedMemory === "" || root.memoryBusy) return
+    if (appStores.nav.viewMode !== "memory" || root.selectedMemory === "" || root.memoryBusy) return
     root.memoryDeleteOpen = true
     root.memoryDeleteError = ""
     root.focusForView()
@@ -778,9 +747,9 @@ Panel {
   }
 
   function goBack() {
-    if (viewMode === "memory") { if (root.memoryEditing) root.memoryEscape(); else root.restoreMemoriesList(); return }
-    if (viewMode === "entry") { restoreListView(); return }
-    if (viewMode === "document") { restoreDocumentsList(); return }
+    if (appStores.nav.viewMode === "memory") { if (root.memoryEditing) root.memoryEscape(); else root.restoreMemoriesList(); return }
+    if (appStores.nav.viewMode === "entry") { restoreListView(); return }
+    if (appStores.nav.viewMode === "document") { restoreDocumentsList(); return }
   }
 
   function resolvedCard(id) {
@@ -917,7 +886,7 @@ Panel {
   FileView {
     id: docFile
     objectName: "docFile"
-    path: root.viewMode === "document" && !root.docTooLargeFlag && root.selectedProject && root.selectedDocPath !== ""
+    path: appStores.nav.viewMode === "document" && !root.docTooLargeFlag && root.selectedProject && root.selectedDocPath !== ""
       ? Documents.docAbsolutePath(root.selectedProject.root_path, root.selectedDocPath) : ""
     watchChanges: true
     printErrors: false
@@ -1009,7 +978,7 @@ Panel {
   FileView {
     id: memoryFile
     objectName: "memoryFile"
-    path: root.viewMode === "memory" && root.memoryDir !== "" && root.selectedMemory !== ""
+    path: appStores.nav.viewMode === "memory" && root.memoryDir !== "" && root.selectedMemory !== ""
       ? Memories.memoryAbsolutePath(root.memoryDir, root.selectedMemory) : ""
     watchChanges: true
     printErrors: false
@@ -1052,7 +1021,7 @@ Panel {
         root.deleteTarget = null
         root.confirmText = ""
         root.lastSnapshot = result.snapshot
-        root.cursorIndex = 0
+        appStores.nav.cursorIndex = 0
         root.refreshProjects()
         root.focusForView()
       } else {
@@ -1089,25 +1058,25 @@ Panel {
       objectName: "keyCatcher"
       Keys.forwardTo: [globalKeys]
       anchors.fill: parent
-      onCloseRequested: root.deleteTarget ? root.cancelDelete() : root.memoryDeleteOpen ? root.cancelMemoryDelete() : root.newMemoryOpen ? root.cancelNewMemory() : (root.dropdownOpen ? root.closeDropdown() : ((root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory") ? root.goBack() : root.close()))
+      onCloseRequested: root.deleteTarget ? root.cancelDelete() : root.memoryDeleteOpen ? root.cancelMemoryDelete() : root.newMemoryOpen ? root.cancelNewMemory() : (appStores.nav.dropdownOpen ? root.closeDropdown() : ((appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory") ? root.goBack() : root.close()))
       onMoveRequested: function(dx, dy) {
-        if (root.viewMode === "graph") {
+        if (appStores.nav.viewMode === "graph") {
           if (dx !== 0) root.moveGraph(dx < 0 ? "left" : "right")
           else if (dy !== 0) root.moveGraph(dy < 0 ? "up" : "down")
           return
         }
-        if (dx < 0 && (root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory")) { root.goBack(); return }
-        if (root.viewMode !== "entry" && root.viewMode !== "document" && root.viewMode !== "memory") return
-        if (dx > 0) { if (root.viewMode === "entry") root.activateCursor(); return }
+        if (dx < 0 && (appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory")) { root.goBack(); return }
+        if (appStores.nav.viewMode !== "entry" && appStores.nav.viewMode !== "document" && appStores.nav.viewMode !== "memory") return
+        if (dx > 0) { if (appStores.nav.viewMode === "entry") root.activateCursor(); return }
         if (dy === 0) return
         // Links are the cursor's targets; a card without any is just text,
         // so the arrows scroll it instead.
-        if (root.viewMode === "entry" && root.detailLinkList.length > 0) root.moveCursor(dy)
+        if (appStores.nav.viewMode === "entry" && root.detailLinkList.length > 0) root.moveCursor(dy)
         else root.scrollBy(dy * Style.space(56))
       }
       onActivateRequested: {
-        if (root.viewMode === "entry") root.activateCursor()
-        else if (root.viewMode === "graph") root.activateGraphNode()
+        if (appStores.nav.viewMode === "entry") root.activateCursor()
+        else if (appStores.nav.viewMode === "graph") root.activateGraphNode()
       }
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
@@ -1119,10 +1088,10 @@ Panel {
         width: Style.space(200)
         projects: root.filteredProjects
         selectedProject: root.selectedProject
-        section: root.section
-        dropdownOpen: root.dropdownOpen
-        dropdownQuery: root.dropdownQuery
-        dropdownCursor: root.dropdownCursor
+        section: appStores.nav.section
+        dropdownOpen: appStores.nav.dropdownOpen
+        dropdownQuery: appStores.nav.dropdownQuery
+        dropdownCursor: appStores.nav.dropdownCursor
         canDelete: !!root.selectedProject && !root.deleting && !root.deleteTarget
         documentsEnabled: root.documentsEnabled
         foreground: root.foreground
@@ -1131,10 +1100,10 @@ Panel {
         fontFamily: root.fontFamily
         onDropdownToggled: root.toggleDropdown()
         onProjectChosen: function(project) { root.chooseProject(project) }
-        onQueryEdited: function(text) { root.dropdownQuery = text; root.dropdownCursor = 0 }
+        onQueryEdited: function(text) { appStores.nav.dropdownQuery = text; appStores.nav.dropdownCursor = 0 }
         onSectionChosen: function(name) { root.showSection(name) }
         onDeleteRequested: root.openDelete(root.selectedProject)
-        onCursorHovered: function(index) { root.dropdownCursor = index }
+        onCursorHovered: function(index) { appStores.nav.dropdownCursor = index }
         onDropdownMove: function(delta) { root.moveDropdown(delta) }
         onDropdownAccept: root.acceptDropdown()
         onDropdownCancel: root.closeDropdown()
@@ -1157,7 +1126,7 @@ Panel {
           spacing: Style.spacing.md
 
           Text {
-            visible: root.viewMode === "entry" || root.viewMode === "document" || root.viewMode === "memory"
+            visible: appStores.nav.viewMode === "entry" || appStores.nav.viewMode === "document" || appStores.nav.viewMode === "memory"
             text: "‹ Back"
             color: root.foreground
             font.family: root.fontFamily
@@ -1168,7 +1137,7 @@ Panel {
           Text {
             objectName: "projectHeading"
             Layout.fillWidth: true
-            text: root.selectedProject ? root.sectionTitle : "Project Manager"
+            text: root.selectedProject ? appStores.nav.sectionTitle : "Project Manager"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
@@ -1178,7 +1147,7 @@ Panel {
 
           Text {
             objectName: "newMemoryButton"
-            visible: root.viewMode === "memories" && root.canCreateMemory
+            visible: appStores.nav.viewMode === "memories" && root.canCreateMemory
             text: "＋ New"
             color: root.foreground
             font.family: root.fontFamily
@@ -1187,33 +1156,33 @@ Panel {
           }
 
           Text {
-            visible: root.viewMode === "board" || root.viewMode === "graph" || root.viewMode === "memories"
+            visible: appStores.nav.viewMode === "board" || appStores.nav.viewMode === "graph" || appStores.nav.viewMode === "memories"
             text: "⟳"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.viewMode === "memories" ? root.fetchMemories() : root.fetchBoard() }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appStores.nav.viewMode === "memories" ? root.fetchMemories() : root.fetchBoard() }
           }
         }
 
         TextField {
           id: searchField
           objectName: "searchField"
-          visible: !!root.selectedProject && (root.viewMode === "board" || root.viewMode === "documents" || root.viewMode === "memories")
+          visible: !!root.selectedProject && (appStores.nav.viewMode === "board" || appStores.nav.viewMode === "documents" || appStores.nav.viewMode === "memories")
           width: parent.width
           foreground: root.foreground
-          placeholderText: root.viewMode === "documents" ? "Search documents…" : root.viewMode === "memories" ? "Search memories…" : "Search cards…"
-          text: root.searchQuery
+          placeholderText: appStores.nav.viewMode === "documents" ? "Search documents…" : appStores.nav.viewMode === "memories" ? "Search memories…" : "Search cards…"
+          text: appStores.nav.searchQuery
           Keys.forwardTo: [globalKeys]
 
           onTextChanged: {
-            root.searchQuery = text
-            root.cursorIndex = 0
+            appStores.nav.searchQuery = text
+            appStores.nav.cursorIndex = 0
           }
 
           Keys.onPressed: function(event) {
             if (event.key === Qt.Key_Escape) {
-              if (root.searchQuery !== "") { root.searchQuery = "" }
+              if (appStores.nav.searchQuery !== "") { appStores.nav.searchQuery = "" }
               else root.close()
               event.accepted = true
               return
@@ -1288,7 +1257,7 @@ Panel {
           }
 
           Column {
-            visible: root.viewMode === "board" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "board" && !!root.selectedProject
             width: parent.width
             spacing: Style.space(10)
 
@@ -1305,7 +1274,7 @@ Panel {
             Text {
               visible: root.cardRoots.length > 0 && root.visibleBoardRoots.length === 0
               width: parent.width
-              text: "No cards match “" + root.searchQuery + "”."
+              text: "No cards match “" + appStores.nav.searchQuery + "”."
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
@@ -1345,7 +1314,7 @@ Panel {
 
           GraphView {
             id: graphView
-            visible: root.viewMode === "graph" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "graph" && !!root.selectedProject
             width: parent.width
             height: Math.max(Style.space(240), panelFlick.height - y - Style.space(12))
             nodes: root.graph.nodes
@@ -1358,17 +1327,17 @@ Panel {
           }
 
           MemoriesView {
-            visible: root.viewMode === "memories" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "memories" && !!root.selectedProject
             width: parent.width
             notes: root.filteredMemories
             types: root.memoryTypes
             activeType: root.memoryType
-            query: root.searchQuery
-            cursorIndex: root.cursorIndex
+            query: appStores.nav.searchQuery
+            cursorIndex: appStores.nav.cursorIndex
             loading: root.memoriesLoading
             found: root.memoriesFound
             error: root.memoriesError
-            scrollOnCursor: root.scrollOnCursor
+            scrollOnCursor: appStores.nav.scrollOnCursor
             foreground: root.foreground
             dim: root.dim
             fontFamily: root.fontFamily
@@ -1380,7 +1349,7 @@ Panel {
 
           MemoryNoteView {
             id: memoryNote
-            visible: root.viewMode === "memory" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "memory" && !!root.selectedProject
             width: parent.width
             entry: root.selectedMemoryEntry
             text: root.memoryText
@@ -1402,17 +1371,17 @@ Panel {
           }
 
           DocumentsView {
-            visible: root.viewMode === "documents" && !!root.selectedProject
+            visible: appStores.nav.viewMode === "documents" && !!root.selectedProject
             width: parent.width
             docs: root.filteredDocs
-            query: root.searchQuery
+            query: appStores.nav.searchQuery
             categories: Documents.docCategoryCounts(root.docs)
             activeCategory: root.docCategory
-            cursorIndex: root.cursorIndex
+            cursorIndex: appStores.nav.cursorIndex
             loading: root.docsLoading
             error: root.docsError
             truncated: root.docsTruncated
-            scrollOnCursor: root.scrollOnCursor
+            scrollOnCursor: appStores.nav.scrollOnCursor
             foreground: root.foreground
             dim: root.dim
             fontFamily: root.fontFamily
@@ -1423,7 +1392,7 @@ Panel {
           }
 
           Column {
-            visible: root.viewMode === "document"
+            visible: appStores.nav.viewMode === "document"
             width: parent.width
             spacing: Style.space(10)
 
@@ -1471,7 +1440,7 @@ Panel {
 
           Column {
             id: detailCard
-            visible: root.viewMode === "entry" && !!root.cardMap[root.selectedCardId]
+            visible: appStores.nav.viewMode === "entry" && !!root.cardMap[root.selectedCardId]
             width: parent.width
             spacing: Style.space(10)
 
@@ -1742,8 +1711,8 @@ Panel {
     property string prefix: ""
     signal activated()
 
-    hasCursor: rowIndex >= 0 && root.cursorIndex === rowIndex
-    onHasCursorChanged: if (hasCursor && root.scrollOnCursor) root.scrollItemIntoView(detailLink)
+    hasCursor: rowIndex >= 0 && appStores.nav.cursorIndex === rowIndex
+    onHasCursorChanged: if (hasCursor && appStores.nav.scrollOnCursor) root.scrollItemIntoView(detailLink)
     foreground: root.foreground
     implicitHeight: detailLinkLayout.implicitHeight + Style.spacing.rowPaddingX
 
@@ -1790,8 +1759,8 @@ Panel {
     property var progress: ({ done: 0, total: 0 })
     signal activated()
 
-    hasCursor: cardIndex >= 0 && root.cursorIndex === cardIndex
-    onHasCursorChanged: if (hasCursor && root.scrollOnCursor) root.scrollItemIntoView(boardCard)
+    hasCursor: cardIndex >= 0 && appStores.nav.cursorIndex === cardIndex
+    onHasCursorChanged: if (hasCursor && appStores.nav.scrollOnCursor) root.scrollItemIntoView(boardCard)
     foreground: root.foreground
     bordered: true
     implicitHeight: cardLayout.implicitHeight + Style.space(16)

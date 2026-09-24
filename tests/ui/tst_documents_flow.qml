@@ -38,8 +38,8 @@ TestCase {
     var proc = p.docsProc
     verify(proc, "listDocsProc")
     compare(proc.objectName, "listDocsProc")
-    compare(p.viewMode, "documents")
-    compare(p.section, "documents")
+    compare(p.app.nav.viewMode, "documents")
+    compare(p.app.nav.section, "documents")
     compare(p.docsLoading, true)
     compare(proc.command[0], "python3")
     verify(String(proc.command[1]).endsWith("list-docs.py"))
@@ -53,7 +53,7 @@ TestCase {
     p.applyDocsResult(docList, 0)
     compare(p.docsLoading, false)
     compare(paths(p.docs), "README.md,docs/specs/Design Doc.md,docs/huge.md")
-    p.searchQuery = "design"
+    p.app.nav.searchQuery = "design"
     compare(paths(p.filteredDocs), "docs/specs/Design Doc.md")
     compare(paths(p.currentList()), "docs/specs/Design Doc.md")
   }
@@ -65,17 +65,17 @@ TestCase {
     compare(p.docsError, "nope")
     compare(p.docs.length, 0)
     p.showSection("board")
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 
   function test_opening_a_document_points_the_file_view_at_its_absolute_path() {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
-    p.cursorIndex = 1
+    p.app.nav.cursorIndex = 1
     p.activateCursor()
-    compare(p.viewMode, "document")
-    compare(p.section, "documents")
+    compare(p.app.nav.viewMode, "document")
+    compare(p.app.nav.section, "documents")
     compare(p.selectedDocPath, "docs/specs/Design Doc.md")
     var fv = named(p, "docFile")
     verify(fv, "docFile")
@@ -90,7 +90,7 @@ TestCase {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
-    p.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.activateCursor()
     var fv = named(p, "docFile")
     fv.stubText = "one"; fv.loaded(); compare(p.docText, "one")
     fv.stubText = "two"; fv.loaded(); compare(p.docText, "two")
@@ -100,8 +100,8 @@ TestCase {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
-    p.cursorIndex = 2; p.activateCursor()
-    compare(p.viewMode, "document")
+    p.app.nav.cursorIndex = 2; p.activateCursor()
+    compare(p.app.nav.viewMode, "document")
     compare(p.docTooLargeFlag, true)
     compare(named(p, "docFile").path, "")
   }
@@ -110,22 +110,22 @@ TestCase {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
-    p.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.activateCursor()
     named(p, "docFile").loadFailed(1)
     compare(p.docError, "Could not read this document.")
     p.goBack()
-    compare(p.viewMode, "documents")
+    compare(p.app.nav.viewMode, "documents")
   }
 
   function test_back_restores_the_list_position() {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
-    p.cursorIndex = 1
+    p.app.nav.cursorIndex = 1
     p.activateCursor()
     p.goBack()
-    compare(p.viewMode, "documents")
-    compare(p.cursorIndex, 1)
+    compare(p.app.nav.viewMode, "documents")
+    compare(p.app.nav.cursorIndex, 1)
     compare(p.selectedDocPath, "")
   }
 
@@ -133,7 +133,7 @@ TestCase {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.goBack()
-    compare(p.viewMode, "documents")
+    compare(p.app.nav.viewMode, "documents")
   }
 
   function test_switching_project_reloads_the_documents_list() {
@@ -141,7 +141,7 @@ TestCase {
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
     p.chooseProject(pB)
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
     p.showSection("documents")
     compare(p.docsProc.command[2], "/home/u/b")
     compare(p.docs.length, 0)
@@ -152,9 +152,9 @@ TestCase {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
-    p.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.activateCursor()
     compare(p.handleGlobalKey({ modifiers: Qt.ControlModifier, key: Qt.Key_1 }), true)
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 
   function test_a_normal_single_run_fills_the_list() {
@@ -243,9 +243,9 @@ TestCase {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(docList, 0)
-    p.cursorIndex = 0; p.activateCursor()
+    p.app.nav.cursorIndex = 0; p.activateCursor()
     p.goBack()
-    p.cursorIndex = 1; p.activateCursor()
+    p.app.nav.cursorIndex = 1; p.activateCursor()
     named(p, "docFile").loadFailed(1)
     compare(p.docError, "Could not read this document.")
   }
@@ -277,9 +277,9 @@ TestCase {
     p.showSection("documents")
     p.applyDocsResult(catList, 0)
     p.toggleDocCategory("specs")
-    p.searchQuery = "two"
+    p.app.nav.searchQuery = "two"
     compare(paths(p.filteredDocs), "docs/superpowers/specs/t.md")
-    p.searchQuery = "audit"
+    p.app.nav.searchQuery = "audit"
     compare(p.filteredDocs.length, 0)
   }
 
@@ -287,9 +287,9 @@ TestCase {
     var p = make(); if (!p) return
     p.showSection("documents")
     p.applyDocsResult(catList, 0)
-    p.cursorIndex = 3
+    p.app.nav.cursorIndex = 3
     p.toggleDocCategory("specs")
-    compare(p.cursorIndex, 0)
+    compare(p.app.nav.cursorIndex, 0)
   }
 
   function test_switching_project_clears_the_category() {
@@ -306,26 +306,26 @@ TestCase {
     p.showSection("documents")
     p.applyDocsResult(catList, 0)
     p.moveCursor(1)
-    compare(p.cursorIndex, 1)
+    compare(p.app.nav.cursorIndex, 1)
     p.hoverCursor(0)
-    compare(p.cursorIndex, 1)
+    compare(p.app.nav.cursorIndex, 1)
     wait(400)
     p.hoverCursor(0)
-    compare(p.cursorIndex, 0)
+    compare(p.app.nav.cursorIndex, 0)
   }
 
   function tagFixture() {
     var p = make(); if (!p) return null
     p.showSection("documents")
     p.applyDocsResult(catList, 0)
-    p.cursorIndex = 1
+    p.app.nav.cursorIndex = 1
     p.activateCursor()
     return p
   }
 
   function test_choosing_a_type_runs_the_helper_for_the_open_document() {
     var p = tagFixture(); if (!p) return
-    compare(p.viewMode, "document")
+    compare(p.app.nav.viewMode, "document")
     compare(p.selectedDocCategory, "specs")
     p.setDocTag("audits")
     var proc = named(p, "setDocTagProc")
@@ -358,7 +358,7 @@ TestCase {
     p.applyDocTagResult('{"ok": false, "error": "Could not write the document: Permission denied"}', 1)
     compare(p.docTagBusy, false)
     compare(p.docTagError, "Could not write the document: Permission denied")
-    compare(p.viewMode, "document")
+    compare(p.app.nav.viewMode, "document")
     p.setDocTag("standards")
     compare(p.docTagError, "")
   }

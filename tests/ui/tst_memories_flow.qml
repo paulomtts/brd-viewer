@@ -46,9 +46,9 @@ TestCase {
   function test_the_section_fetches_and_lists_the_memories() {
     var p = make(); if (!p) return
     p.showSection("memories")
-    compare(p.viewMode, "memories")
-    compare(p.section, "memories")
-    compare(p.sectionTitle, "Memories")
+    compare(p.app.nav.viewMode, "memories")
+    compare(p.app.nav.section, "memories")
+    compare(p.app.nav.sectionTitle, "Memories")
     compare(p.memoriesLoading, true)
     var proc = p.memoriesProc
     verify(proc, "memoriesProc")
@@ -66,20 +66,20 @@ TestCase {
   function test_ctrl_4_shows_memories() {
     var p = make(); if (!p) return
     compare(p.handleGlobalKey({ key: Qt.Key_4, modifiers: Qt.ControlModifier, accepted: false }), true)
-    compare(p.viewMode, "memories")
+    compare(p.app.nav.viewMode, "memories")
   }
 
   function test_type_filter_and_search_combine_and_reset_the_cursor() {
     var p = loaded(); if (!p) return
-    p.cursorIndex = 2
+    p.app.nav.cursorIndex = 2
     p.toggleMemoryType("feedback")
     compare(p.memoryType, "feedback")
-    compare(p.cursorIndex, 0)
+    compare(p.app.nav.cursorIndex, 0)
     compare(files(p.filteredMemories), "feedback_a.md,feedback_b.md")
-    p.searchQuery = "real"
+    p.app.nav.searchQuery = "real"
     compare(files(p.filteredMemories), "feedback_b.md")
     compare(files(p.currentList()), "feedback_b.md")
-    p.searchQuery = ""
+    p.app.nav.searchQuery = ""
     p.toggleMemoryType("feedback")
     compare(p.memoryType, "")
     compare(p.filteredMemories.length, 3)
@@ -92,15 +92,15 @@ TestCase {
     compare(p.memoriesError, "nope")
     compare(p.memories.length, 0)
     p.showSection("board")
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 
   function test_opening_a_note_points_the_file_view_at_it_and_back_restores_the_list() {
     var p = loaded(); if (!p) return
-    p.cursorIndex = 1
+    p.app.nav.cursorIndex = 1
     p.activateCursor()
-    compare(p.viewMode, "memory")
-    compare(p.section, "memories")
+    compare(p.app.nav.viewMode, "memory")
+    compare(p.app.nav.section, "memories")
     compare(p.selectedMemory, "feedback_a.md")
     compare(p.selectedMemoryEntry.name, "Terse")
     var fv = named(p, "memoryFile")
@@ -110,8 +110,8 @@ TestCase {
     fv.loaded()
     compare(p.memoryText, "---\nname: Terse\n---\nbody")
     p.goBack()
-    compare(p.viewMode, "memories")
-    compare(p.cursorIndex, 1)
+    compare(p.app.nav.viewMode, "memories")
+    compare(p.app.nav.cursorIndex, 1)
     compare(named(p, "memoryFile").path, "")
   }
 
@@ -187,7 +187,7 @@ TestCase {
     compare(p.newMemoryOpen, false)
     compare(p.memoriesLoading, true)
     p.applyMemoriesResult(memList.replace('"notes": [', '"notes": [{"file": "feedback_terse-replies.md", "name": "Terse replies", "description": "no summaries", "type": "feedback", "size": 1, "indexed": true},'), 0)
-    compare(p.viewMode, "memory")
+    compare(p.app.nav.viewMode, "memory")
     compare(p.selectedMemory, "feedback_terse-replies.md")
   }
 
@@ -240,7 +240,7 @@ TestCase {
     compare(p.memoryBusy, true)
     p.applyMemoryOpResult('{"ok": true, "backup": "/b"}', 0)
     compare(p.memoryDeleteOpen, false)
-    compare(p.viewMode, "memories")
+    compare(p.app.nav.viewMode, "memories")
     compare(p.memoriesLoading, true)
   }
 
@@ -259,7 +259,7 @@ TestCase {
     p.openMemory("user_role.md")
     p.requestMemoryDelete()
     compare(p.handleGlobalKey({ key: Qt.Key_1, modifiers: Qt.ControlModifier, accepted: false }), false)
-    compare(p.viewMode, "memory")
+    compare(p.app.nav.viewMode, "memory")
     compare(p.focusItem.objectName, "confirmTyped")
     p.cancelMemoryDelete()
     p.setMemoryText("t")
@@ -280,7 +280,7 @@ TestCase {
     compare(p.memoryType, "")
     compare(p.selectedMemory, "")
     compare(p.memoryDir, "")
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 
   function test_the_views_are_wired_and_the_note_view_reports_actions() {
@@ -325,7 +325,7 @@ TestCase {
     p.applyMemoryOpResult('{"ok": true, "backup": ""}', 0)
     p.showSection("board")
     p.applyMemoriesResult(memList.replace('"notes": [', '"notes": [{"file": "user_late.md", "name": "Late", "description": "", "type": "user", "size": 1, "indexed": true},'), 0)
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
     compare(p.selectedMemory, "")
   }
 

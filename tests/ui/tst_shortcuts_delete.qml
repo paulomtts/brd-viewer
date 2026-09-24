@@ -36,20 +36,20 @@ TestCase {
   function test_ctrl_p_toggles_the_dropdown() {
     var p = make(); if (!p) return
     compare(p.handleGlobalKey(ctrl(Qt.Key_P)), true)
-    compare(p.dropdownOpen, true)
+    compare(p.app.nav.dropdownOpen, true)
     compare(p.handleGlobalKey(ctrl(Qt.Key_P)), true)
-    compare(p.dropdownOpen, false)
+    compare(p.app.nav.dropdownOpen, false)
   }
 
   function test_ctrl_digits_switch_sections() {
     var p = make(); if (!p) return
     p.chooseProject(pB)
     compare(p.handleGlobalKey(ctrl(Qt.Key_1)), true)
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
     compare(p.handleGlobalKey(ctrl(Qt.Key_2)), true)
-    compare(p.viewMode, "documents")
+    compare(p.app.nav.viewMode, "documents")
     compare(p.handleGlobalKey(ctrl(Qt.Key_1)), true)
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 
   function test_other_keys_are_not_handled() {
@@ -57,7 +57,7 @@ TestCase {
     compare(p.handleGlobalKey(plain(Qt.Key_P)), false)
     compare(p.handleGlobalKey(ctrl(Qt.Key_X)), false)
     compare(p.handleGlobalKey(plain(Qt.Key_1)), false)
-    compare(p.dropdownOpen, false)
+    compare(p.app.nav.dropdownOpen, false)
   }
 
   function test_shortcuts_are_ignored_while_confirming_a_delete() {
@@ -65,7 +65,7 @@ TestCase {
     p.openDelete(p.selectedProject)
     compare(p.handleGlobalKey(ctrl(Qt.Key_P)), false)
     compare(p.handleGlobalKey(ctrl(Qt.Key_1)), false)
-    compare(p.dropdownOpen, false)
+    compare(p.app.nav.dropdownOpen, false)
   }
 
   function test_escape_with_the_dropdown_open_closes_only_the_dropdown() {
@@ -74,7 +74,7 @@ TestCase {
     var sb = find(p, "sidebar")
     verify(sb, "sidebar found")
     sb.dropdownCancel()
-    compare(p.dropdownOpen, false)
+    compare(p.app.nav.dropdownOpen, false)
     compare(p.opened, true)
   }
 
@@ -125,6 +125,6 @@ TestCase {
     del.exited(0)
     p.applyProjectsList([])
     compare(p.selectedProject, null)
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 }

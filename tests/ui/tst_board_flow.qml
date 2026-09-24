@@ -29,20 +29,20 @@ TestCase {
     p.applyTreeData([m1, x1, b1])
     wait(50)
     compare(ids(p.boardCards), "m1,b1,x1")
-    p.moveCursor(1); compare(p.cursorIndex, 1)
-    p.moveCursor(5); compare(p.cursorIndex, 2)
+    p.moveCursor(1); compare(p.app.nav.cursorIndex, 1)
+    p.moveCursor(5); compare(p.app.nav.cursorIndex, 2)
     p.moveCursor(-1)
     p.activateCursor()
-    compare(p.viewMode, "entry"); compare(p.selectedCardId, "b1")
+    compare(p.app.nav.viewMode, "entry"); compare(p.selectedCardId, "b1")
     p.goBack()
-    compare(p.viewMode, "board"); compare(p.cursorIndex, 1)
-    p.cursorIndex = 0
+    compare(p.app.nav.viewMode, "board"); compare(p.app.nav.cursorIndex, 1)
+    p.app.nav.cursorIndex = 0
     p.activateCursor(); compare(p.selectedCardId, "m1")
     p.activateCursor(); compare(p.selectedCardId, "s1")
     compare(p.detailLinkList.map(function(l) { return l.section }).join(","), "parent,child,child")
     p.moveCursor(1); p.activateCursor(); compare(p.selectedCardId, "t1")
     compare(p.detailLinkList.map(function(l) { return l.section + ":" + l.id }).join(","), "parent:s1,blocker:x1")
     p.applyTreeData([x1])
-    compare(p.viewMode, "board")
+    compare(p.app.nav.viewMode, "board")
   }
 }
