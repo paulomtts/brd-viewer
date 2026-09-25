@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import qs.Commons
 import "../../vendor/canvas" as Local
 import "../../vendor/canvas/positions.js" as Positions
@@ -146,6 +147,77 @@ Item {
     return rect
   }
 
+  // ---- Touchpad wheel -------------------------------------------------------
+  //
+  // Two fingers moving APART zoom (the canvas's PinchHandler, untouched); two
+  // fingers moving TOGETHER must pan. The canvas's own wheel entry point
+  // already pans when the event carries a pixel delta -- but a touchpad slide
+  // does not always arrive that way: Qt on Wayland may report it with an angle
+  // delta only, which that entry point reads as a mouse notch, and a slide then
+  // zooms (or, when the notch is horizontal, does nothing at all).
+  //
+  // So touchpad wheels are taken HERE, in front of the canvas, normalised to a
+  // pixel delta, and handed to the canvas's one wheel entry point -- no camera
+  // arithmetic is reimplemented. A WheelHandler that fires blocks the items
+  // behind it, so the canvas never sees the same event twice; and mouse wheels
+  // never reach this handler at all (acceptedDevices), so wheel-zoom and
+  // Ctrl+wheel are exactly what they were.
+
+  // One mouse notch is 120 angle units; this is what a notch is worth in pixels
+  // when a touchpad slide reports no pixel delta of its own. A tuning constant.
+  readonly property real _wheelNotchPixels: 50
+
+  // The pan delta a touchpad wheel asks for: its own pixel delta when it has a
+  // usable one, else its angle delta at _wheelNotchPixels per notch. Both carry
+  // the same sign convention (positive = up / away), so the fallback pans the
+  // way the pixel delta would. Non-finite fields count as zero.
+  function _touchpadPixels(pixelDelta, angleDelta) {
+    function number(value) { return (typeof value === "number" && isFinite(value)) ? value : 0 }
+    var px = number(pixelDelta ? pixelDelta.x : 0)
+    var py = number(pixelDelta ? pixelDelta.y : 0)
+    if (px !== 0 || py !== 0) return { x: px, y: py }
+    var ax = number(angleDelta ? angleDelta.x : 0)
+    var ay = number(angleDelta ? angleDelta.y : 0)
+    return { x: ax / 120 * view._wheelNotchPixels, y: ay / 120 * view._wheelNotchPixels }
+  }
+
+  // A whole touchpad wheel event. Ctrl is the zoom modifier and is forwarded
+  // untouched, so Ctrl+slide still zooms about the cursor exactly as before;
+  // everything else becomes a pan. An event that asks for nothing is dropped
+  // rather than forwarded, so a stray zero can never be read as a notch.
+  function _handleTouchpadWheel(pixelDelta, angleDelta, modifiers, point) {
+    if ((modifiers & Qt.ControlModifier) !== 0) {
+      canvas._handleWheel(pixelDelta, angleDelta, modifiers, point)
+      return
+    }
+    var delta = view._touchpadPixels(pixelDelta, angleDelta)
+    if (delta.x === 0 && delta.y === 0) return
+    canvas._handleWheel(delta, { x: 0, y: 0 }, Qt.NoModifier, point)
+  }
+
+  // Opt-in tracing of every wheel event that reaches the graph, so the shape a
+  // real device delivers can be read off the shell log. Run the shell with
+  // OPM_DEBUG_WHEEL=1 (see README) -- off, nothing below runs.
+  readonly property bool _debugWheel: view._envIsOne("OPM_DEBUG_WHEEL")
+
+  // An unset variable reads back as undefined, and a host that cannot answer at
+  // all must not take the graph down with it: anything but "1" means off.
+  function _envIsOne(name) {
+    try { return ("" + Quickshell.env(name)) === "1" } catch (error) { return false }
+  }
+
+  function _logWheel(where, event) {
+    var device = event.device
+    console.log("[opm wheel] " + where
+                + " device=" + (device ? device.type : "?")
+                + " name=" + (device ? device.name : "?")
+                + " pixelDelta=" + event.pixelDelta.x + "," + event.pixelDelta.y
+                + " angleDelta=" + event.angleDelta.x + "," + event.angleDelta.y
+                + " phase=" + event.phase
+                + " modifiers=" + event.modifiers
+                + " inverted=" + event.inverted)
+  }
+
   Local.Canvas {
     id: canvas
     objectName: "graphCanvas"
@@ -285,6 +357,41 @@ Item {
           }
         }
       }
+    }
+  }
+
+  // The wheel layer, in front of the canvas and behind nothing that matters: it
+  // carries wheel handlers ONLY, so presses, drags, taps and the pinch all fall
+  // straight through to the canvas and its nodes, boxes and controls.
+  Item {
+    id: wheelLayer
+    objectName: "graphWheelLayer"
+    anchors.fill: parent
+
+    // Touchpad only. It blocks (the default), so the canvas's own wheel
+    // handler never sees the event -- this one has already forwarded it.
+    WheelHandler {
+      objectName: "graphTouchpadWheelHandler"
+      target: null
+      acceptedDevices: PointerDevice.TouchPad
+
+      onWheel: function(event) {
+        if (view._debugWheel) view._logWheel("touchpad", event)
+        var at = canvas.mapFromItem(wheelLayer, event.x, event.y)
+        view._handleTouchpadWheel(event.pixelDelta, event.angleDelta, event.modifiers,
+                                  { x: at.x, y: at.y })
+      }
+    }
+
+    // Tracing only, for every device: `blocking: false` so it never takes an
+    // event away from the handler above or from the canvas, and `enabled` so
+    // nothing of it runs unless OPM_DEBUG_WHEEL=1 asked for it.
+    WheelHandler {
+      objectName: "graphWheelLogHandler"
+      target: null
+      enabled: view._debugWheel
+      blocking: false
+      onWheel: function(event) { view._logWheel("seen", event) }
     }
   }
 

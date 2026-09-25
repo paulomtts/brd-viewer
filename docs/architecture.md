@@ -199,6 +199,27 @@ would load its own type instead of ours.
   (`canvas._moveNode`, the write counterpart of the read above) and committed to
   `arranged` ONCE, when the gesture ends: handing the canvas a new `nodes` array
   per pointer event would re-run the layout on every frame.
+- **Touchpad wheel.** A two-finger slide must pan; a pinch zooms (the vendored
+  canvas's `PinchHandler`, untouched). The canvas's own `WheelHandler` pans on a
+  pixel delta and zooms on an angle delta, which is right for a mouse but not for
+  a touchpad: Qt on Wayland may report a slide with an angle delta only, and the
+  canvas would then read it as a mouse notch. `GraphView` therefore puts a
+  `graphWheelLayer` Item IN FRONT of the canvas carrying wheel handlers only, so
+  presses, drags, taps and the pinch still fall straight through. Its first
+  handler is `acceptedDevices: PointerDevice.TouchPad` and blocking (the
+  default), so the canvas never sees the same event twice and a mouse wheel
+  never reaches it at all; it normalises the event to a pixel delta
+  (`_touchpadPixels`: the event's own, else its angle delta at
+  `_wheelNotchPixels` per 120) and forwards it to the canvas's one wheel entry
+  point, `canvas._handleWheel`, so no camera arithmetic is reimplemented.
+  Ctrl is forwarded untouched and still zooms about the cursor. The second
+  handler is `blocking: false`, `enabled` only under `OPM_DEBUG_WHEEL=1`, and
+  traces every wheel event the graph sees (device, deltas, phase, modifiers,
+  inverted) to the shell log -- the only way to read the shape a real device
+  delivers, since QtTest cannot synthesize a pixel delta or a touchpad device.
+  `tst_graph_wheel.qml` drives the normalisation through `_handleTouchpadWheel`
+  and checks that the panel's own Flickable/Column stack does not swallow a
+  wheel on the way down.
 - Every map in `graph.js` keyed by a card id goes through its `mapKey`, and the
   position maps (keyed by raw card id, because they cross into QML that way) are
   prototype-less and read with `hasOwnProperty`: brd can name a card

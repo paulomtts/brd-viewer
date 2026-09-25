@@ -44,7 +44,13 @@ until it is next saved, and existing snapshots and backups are left in their
   milestones, laid out left to right. Arrow keys move the selection to
   the nearest node in that direction and the view follows; Enter or a click
   opens the milestone's card, and Back returns to the graph. The canvas also
-  has mouse pan/zoom, `+`/`-` and on-screen zoom/organize/fit buttons. Nodes can
+  has mouse pan/zoom, `+`/`-` and on-screen zoom/organize/fit buttons. On a
+  touchpad, two fingers moving the SAME way pan the canvas and a pinch zooms it;
+  Ctrl with either zooms about the pointer. (If a slide does not pan on your
+  machine, start the shell with `OPM_DEBUG_WHEEL=1` and scroll over the graph:
+  every wheel event it sees is logged as `[opm wheel] …` with its device, pixel
+  and angle deltas, phase, modifiers and inverted flag, which is what a bug
+  report about this needs.) Nodes can
   be dragged for a look around, but the graph never creates or removes links.
   A **Milestone | Story** switch in the toolbar picks the view (Milestone is
   the default; the choice is remembered for the session and survives a project
